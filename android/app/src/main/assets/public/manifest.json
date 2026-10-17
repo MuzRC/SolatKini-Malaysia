@@ -1,0 +1,82 @@
+{
+  "id": "/",
+  "name": "SolatKini Malaysia - Waktu Solat JAKIM & Azan",
+  "short_name": "SolatKini",
+  "description": "Aplikasi waktu solat tepat mengikut zon JAKIM Malaysia, laungan vokal azan rasmi tempatan, arah kiblat, penjejak puasa dan checklist solat harian.",
+  "lang": "ms",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#070d0b",
+  "theme_color": "#070d0b",
+  "categories": ["lifestyle", "utilities", "books"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Paparan Waktu Solat & Azan Malaysia"
+    },
+    {
+      "src": "/screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "SolatKini Malaysia Desktop & PWA"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Waktu Solat",
+      "short_name": "Solat",
+      "description": "Semak waktu solat zon anda sekarang",
+      "url": "/",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Kompas Kiblat",
+      "short_name": "Kiblat",
+      "description": "Cari arah kiblat tepat ke Kaabah",
+      "url": "/#kiblat",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Wirid & Tasbih",
+      "short_name": "Wirid",
+      "description": "Zikir digital dengan maklum balas haptik",
+      "url": "/#wirid",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}

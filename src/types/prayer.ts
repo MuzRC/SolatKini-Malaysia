@@ -79,3 +79,12 @@ export interface FastingTrackerState {
 }
 
 export type ActiveTab = 'solat' | 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget' | 'kredit';
+
+export type FardPrayerKey = 'subuh' | 'zohor' | 'asar' | 'maghrib' | 'isyak';
+
+export interface DailyPrayerChecklistState {
+  date: string; // YYYY-MM-DD
+  completed: Record<FardPrayerKey, boolean>;
+}
+
+export const FARD_PRAYERS_ORDER: FardPrayerKey[] = ['subuh', 'zohor', 'asar', 'maghrib', 'isyak'];

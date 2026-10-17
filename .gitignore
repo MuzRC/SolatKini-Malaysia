@@ -1,8 +1,45 @@
+# Dependencies
 node_modules/
-build/
+.pnp
+.pnp.js
+
+# Build Outputs
 dist/
+dist-ssr/
+build/
 coverage/
-.DS_Store
-*.log
-.env*
+
+# Environment variables & Secrets (Anti-Harvesting Protection)
+.env
+.env.*
 !.env.example
+*.env
+*.pem
+*.key
+*.cert
+*.crt
+
+# Android Native Credentials & Local Properties
+*.jks
+*.keystore
+*.p12
+google-services.json
+local.properties
+android/.gradle/
+android/app/build/
+android/build/
+android/captures/
+.gradle/
+
+# IDE & Editor files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log

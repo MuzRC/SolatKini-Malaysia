@@ -26,7 +26,15 @@ import {
   Check,
   RefreshCw
 } from 'lucide-react';
-import { DayPrayerTimes, JakimZone, PrayerKey, AzanVoice, AppNotificationSettings } from '../types/prayer';
+import {
+  DayPrayerTimes,
+  JakimZone,
+  PrayerKey,
+  AzanVoice,
+  AppNotificationSettings,
+  FardPrayerKey,
+  FARD_PRAYERS_ORDER
+} from '../types/prayer';
 import { JAKIM_ZONES, findNearestZone } from '../data/jakimZones';
 import {
   determineNextPrayer,
@@ -268,6 +276,93 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     isRamadan: hijri.isRamadan,
     isUserFasting: isUserFastingToday,
   });
+
+  // 5 Fard Prayers Daily Checklist State
+  const [prayerChecklist, setPrayerChecklist] = useState<Record<FardPrayerKey, boolean>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`solatkini_prayer_checklist_${prayerTimes.date}`);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return {
+      subuh: false,
+      zohor: false,
+      asar: false,
+      maghrib: false,
+      isyak: false,
+    };
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem(`solatkini_prayer_checklist_${prayerTimes.date}`);
+        if (saved) {
+          setPrayerChecklist(JSON.parse(saved));
+        } else {
+          setPrayerChecklist({
+            subuh: false,
+            zohor: false,
+            asar: false,
+            maghrib: false,
+            isyak: false,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }, [prayerTimes.date]);
+
+  const handleTogglePrayerDone = (fardKey: FardPrayerKey) => {
+    setPrayerChecklist((prev) => {
+      const updated = {
+        ...prev,
+        [fardKey]: !prev[fardKey],
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(
+            `solatkini_prayer_checklist_${prayerTimes.date}`,
+            JSON.stringify(updated)
+          );
+        } catch {
+          // ignore
+        }
+      }
+      return updated;
+    });
+
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(35);
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  const handleResetChecklist = () => {
+    const initial = {
+      subuh: false,
+      zohor: false,
+      asar: false,
+      maghrib: false,
+      isyak: false,
+    };
+    setPrayerChecklist(initial);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`solatkini_prayer_checklist_${prayerTimes.date}`);
+    }
+  };
+
+  const completedFardCount = FARD_PRAYERS_ORDER.filter((k) => prayerChecklist[k]).length;
+  const fardPercentage = Math.round((completedFardCount / 5) * 100);
 
   const handleVoiceSelect = (voice: AzanVoice) => {
     // Stop any active or preview audio immediately when selecting a voice
@@ -522,6 +617,95 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
       </div>
 
+      {/* Penjejak & Checklist Solat Harian (5 Waktu Fardu) */}
+      <div className="rounded-3xl bg-gradient-to-br from-[#0a1612] via-[#0e2119] to-[#08120e] border border-emerald-500/30 p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                <CheckCircle2 className="w-4 h-4" />
+              </span>
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                Checklist Solat Fardu Harian
+              </h3>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/40 text-emerald-300 font-semibold font-mono shadow-sm">
+                {completedFardCount}/5 Selesai ({fardPercentage}%)
+              </span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Tandakan 5 solat fardu yang telah disempurnakan hari ini ({currentTime.toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'short' })}).
+            </p>
+          </div>
+
+          {completedFardCount > 0 && (
+            <button
+              onClick={handleResetChecklist}
+              className="text-xs text-slate-400 hover:text-red-400 transition self-start sm:self-center px-2.5 py-1 rounded-xl border border-slate-800 hover:border-red-900/50 bg-slate-900/60"
+            >
+              Set Semula
+            </button>
+          )}
+        </div>
+
+        {/* Visual Progress Bar */}
+        <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-emerald-950">
+          <div
+            className="h-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400 rounded-full transition-all duration-300 ease-out"
+            style={{ width: `${fardPercentage}%` }}
+          />
+        </div>
+
+        {/* 5 Fard Prayers Quick Toggle Row */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+          {FARD_PRAYERS_ORDER.map((fardKey) => {
+            const isDone = prayerChecklist[fardKey];
+            const prayerName = PRAYER_LABELS[fardKey];
+            const prayerTime = formatDisplayTime(prayerTimes.times[fardKey]);
+
+            return (
+              <button
+                key={fardKey}
+                onClick={() => handleTogglePrayerDone(fardKey)}
+                className={`p-3 rounded-2xl border text-left transition flex items-center justify-between gap-2 active:scale-95 ${
+                  isDone
+                    ? 'bg-emerald-950/70 border-emerald-400/60 text-white shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/30'
+                    : 'bg-slate-900/50 border-slate-800/80 hover:border-slate-700 text-slate-300'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold flex items-center gap-1.5">
+                    {prayerName}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    {prayerTime}
+                  </div>
+                </div>
+
+                <div
+                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition ${
+                    isDone
+                      ? 'bg-emerald-500 text-slate-950 font-black'
+                      : 'border-2 border-slate-600 text-transparent'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Celebratory message upon completing 5/5 prayers */}
+        {completedFardCount === 5 && (
+          <div className="p-3.5 rounded-2xl bg-emerald-900/40 border border-emerald-400/40 flex items-center gap-3 text-xs text-emerald-200 animate-in fade-in-50 duration-300">
+            <Sparkles className="w-5 h-5 text-amber-300 shrink-0" />
+            <span>
+              <strong>Alhamdulillah!</strong> Anda telah menyempurnakan kesemua 5 waktu solat fardu hari ini. Semoga setiap sujud dan doa diterima oleh Allah SWT.
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* 7 Daily Prayer Times Schedule Grid */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
@@ -544,48 +728,78 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             return (
               <div
                 key={key}
-                className={`relative rounded-2xl p-4 transition-all duration-200 ${
+                className={`relative rounded-2xl p-4 transition-all duration-200 flex flex-col justify-between ${
                   isNext
                     ? 'glass-card-active ring-1 ring-emerald-400/60'
                     : 'glass-card hover:border-emerald-500/30'
                 }`}
               >
-                {isNext && (
-                  <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold tracking-wider uppercase border border-emerald-400/30">
-                    Seterusnya
-                  </div>
-                )}
+                <div>
+                  {isNext && (
+                    <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold tracking-wider uppercase border border-emerald-400/30">
+                      Seterusnya
+                    </div>
+                  )}
 
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
-                    {label}
-                    {isSpecialFastingTime && (
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">
-                        {key === 'imsak' ? 'Imsak' : 'Berbuka'}
-                      </span>
-                    )}
-                  </span>
-                  
-                  {/* Alert toggle */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
+                      {label}
+                      {isSpecialFastingTime && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">
+                          {key === 'imsak' ? 'Imsak' : 'Berbuka'}
+                        </span>
+                      )}
+                    </span>
+                    
+                    {/* Alert toggle */}
+                    <button
+                      onClick={() => handleTogglePrayerNotif(key)}
+                      title={isAlertEnabled ? 'Azan Aktif' : 'Azan Senyap'}
+                      className={`min-h-[36px] min-w-[36px] flex items-center justify-center rounded-xl transition ${
+                        isAlertEnabled
+                          ? 'text-emerald-400 bg-emerald-950/60 hover:bg-emerald-900/60'
+                          : 'text-slate-500 hover:text-slate-300 bg-slate-900/40'
+                      }`}
+                    >
+                      {isAlertEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  <div className="text-2xl font-black text-white font-mono tracking-tight tabular-nums">
+                    {displayTime}
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                    {time24} (24 Jam)
+                  </div>
+                </div>
+
+                {/* Checklist action for Fard prayer */}
+                {FARD_PRAYERS_ORDER.includes(key as FardPrayerKey) && (
                   <button
-                    onClick={() => handleTogglePrayerNotif(key)}
-                    title={isAlertEnabled ? 'Azan Aktif' : 'Azan Senyap'}
-                    className={`min-h-[36px] min-w-[36px] flex items-center justify-center rounded-xl transition ${
-                      isAlertEnabled
-                        ? 'text-emerald-400 bg-emerald-950/60 hover:bg-emerald-900/60'
-                        : 'text-slate-500 hover:text-slate-300 bg-slate-900/40'
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTogglePrayerDone(key as FardPrayerKey);
+                    }}
+                    className={`mt-3 w-full py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 border transition active:scale-95 ${
+                      prayerChecklist[key as FardPrayerKey]
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
+                        : 'bg-slate-900/60 text-slate-400 hover:text-white border-slate-800 hover:border-slate-700'
                     }`}
                   >
-                    {isAlertEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                    <Check
+                      className={`w-3.5 h-3.5 ${
+                        prayerChecklist[key as FardPrayerKey]
+                          ? 'text-emerald-400 stroke-[3]'
+                          : 'text-slate-500'
+                      }`}
+                    />
+                    <span>
+                      {prayerChecklist[key as FardPrayerKey]
+                        ? 'Telah Solat'
+                        : 'Tanda Selesai'}
+                    </span>
                   </button>
-                </div>
-
-                <div className="text-2xl font-black text-white font-mono tracking-tight tabular-nums">
-                  {displayTime}
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                  {time24} (24 Jam)
-                </div>
+                )}
               </div>
             );
           })}

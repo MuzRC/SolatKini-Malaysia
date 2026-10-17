@@ -1,0 +1,9 @@
+{
+	"appId": "com.solatkini.app",
+	"appName": "SolatKini",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"server": {
+		"androidScheme": "https"
+	}
+}
