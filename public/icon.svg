@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1a14"/>
+      <stop offset="100%" stop-color="#050a08"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fcd34d"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="emerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="128" fill="none" stroke="#10b981" stroke-width="6" stroke-opacity="0.25"/>
+
+  <!-- Glowing Crescent Moon -->
+  <path d="M 270 120 C 190 120 126 184 126 264 C 126 344 190 408 270 408 C 304 408 335 396 360 376 C 285 370 226 308 226 232 C 226 178 256 131 300 108 C 290 106 280 120 270 120 Z" fill="url(#emerald)" filter="url(#glow)"/>
+
+  <!-- Golden 8-Point Star / Rub el Hizb -->
+  <g transform="translate(350, 190) scale(0.65)" filter="url(#glow)">
+    <rect x="-35" y="-35" width="70" height="70" rx="6" fill="url(#gold)" />
+    <rect x="-35" y="-35" width="70" height="70" rx="6" fill="url(#gold)" transform="rotate(45)" />
+    <circle cx="0" cy="0" r="16" fill="#0a1a14" />
+  </g>
+
+  <!-- Subtle Mosque Minaret Silhouette -->
+  <path d="M 230 408 L 282 408 L 274 330 C 274 320 268 314 256 314 C 244 314 238 320 238 330 Z" fill="#34d399" opacity="0.35"/>
+</svg>

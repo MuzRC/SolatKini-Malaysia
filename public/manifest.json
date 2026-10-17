@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "SolatKini Malaysia",
+  "short_name": "SolatKini",
+  "description": "Aplikasi Waktu Solat JAKIM Malaysia, Azan, Arah Kiblat, Kalendar Hijri, Penjejak Puasa & Wirid.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070d0b",
+  "theme_color": "#070d0b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

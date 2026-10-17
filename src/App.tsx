@@ -1,0 +1,413 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Clock,
+  Compass,
+  Moon,
+  Radio,
+  BookOpen,
+  Sparkles,
+  Download,
+  Volume2,
+  MapPin,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Award,
+  Heart
+} from 'lucide-react';
+import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './types/prayer';
+import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
+import { fetchDayPrayerTimes } from './services/prayerService';
+import { audioNotificationService } from './services/audioNotificationService';
+import { PrayerDashboard } from './components/PrayerDashboard';
+import { QiblaCompass } from './components/QiblaCompass';
+import { FastingTracker } from './components/FastingTracker';
+import { TasbihWirid } from './components/TasbihWirid';
+import { DuaCollection } from './components/DuaCollection';
+import { HomeWidgetPreview } from './components/HomeWidgetPreview';
+import { CreditsPage } from './components/CreditsPage';
+import { AzanAlarmModal } from './components/AzanAlarmModal';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('solat');
+
+  // Active JAKIM zone (defaults to WLY01 Kuala Lumpur & Putrajaya or saved in localStorage)
+  const [currentZone, setCurrentZone] = useState<JakimZone>(() => {
+    if (typeof window !== 'undefined') {
+      const savedCode = localStorage.getItem('solatkini_active_zone');
+      if (savedCode) {
+        return findZoneByCode(savedCode);
+      }
+    }
+    return JAKIM_ZONES[0];
+  });
+
+  const [prayerData, setPrayerData] = useState<{
+    times: DayPrayerTimes;
+    isOfflineCalculated: boolean;
+    lastSyncTime: string;
+  } | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLiveSyncing, setIsLiveSyncing] = useState(false);
+
+  // Automatic Geolocation state
+  const [geoStatus, setGeoStatus] = useState<{
+    type: 'detected' | 'error' | null;
+    message: string;
+    zoneName?: string;
+  } | null>(null);
+
+  const hasAutoLocatedRef = useRef(false);
+
+  // Full-screen Azan Alarm Modal State
+  const [alarmModalState, setAlarmModalState] = useState<{
+    isOpen: boolean;
+    prayerKey: PrayerKey;
+    prayerName: string;
+    voice: AzanVoice;
+  }>({
+    isOpen: false,
+    prayerKey: 'subuh',
+    prayerName: 'Subuh',
+    voice: 'jakim',
+  });
+
+  // 1. AUTOMATIC GEOLOCATION DETECTION ON APP LAUNCH
+  useEffect(() => {
+    if (hasAutoLocatedRef.current) return;
+    hasAutoLocatedRef.current = true;
+
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const nearest = findNearestZone(latitude, longitude);
+
+          setCurrentZone(nearest);
+          localStorage.setItem('solatkini_active_zone', nearest.code);
+
+          setGeoStatus({
+            type: 'detected',
+            message: 'Zon waktu solat JAKIM diselaraskan secara automatik mengikut koordinat GPS anda.',
+            zoneName: `${nearest.daerah.split(',')[0]} (${nearest.code})`,
+          });
+
+          // Auto-hide toast after 5 seconds
+          setTimeout(() => {
+            setGeoStatus(null);
+          }, 5000);
+        },
+        (error) => {
+          // Graceful fallback: Keep current or saved zone
+          console.info('Geolocation notice:', error.message);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 8000,
+          maximumAge: 60000,
+        }
+      );
+    }
+  }, []);
+
+  // 2. Fetch prayer data on launch & whenever currentZone changes
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+
+    fetchDayPrayerTimes(currentZone, new Date(), false).then((data) => {
+      if (isMounted) {
+        setPrayerData(data);
+        setIsLoading(false);
+      }
+    });
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_active_zone', currentZone.code);
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentZone]);
+
+  // 3. Automatic Day Transition Check (Midnight 00:00 AM Auto-Refresh)
+  useEffect(() => {
+    let lastDate = new Date().getDate();
+    const interval = setInterval(() => {
+      const currentDate = new Date().getDate();
+      if (currentDate !== lastDate) {
+        lastDate = currentDate;
+        // Day has rolled over, automatically fetch fresh schedule for the new day
+        fetchDayPrayerTimes(currentZone, new Date(), true).then((data) => {
+          setPrayerData(data);
+        });
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentZone]);
+
+  const handleLiveSync = async () => {
+    setIsLiveSyncing(true);
+    try {
+      const data = await fetchDayPrayerTimes(currentZone, new Date(), true);
+      setPrayerData(data);
+    } finally {
+      setIsLiveSyncing(false);
+    }
+  };
+
+  // 3. Setup Azan trigger listener from audio service
+  useEffect(() => {
+    const unsubscribe = audioNotificationService.registerAzanTriggerListener(
+      (prayerKey, prayerName, voice) => {
+        setAlarmModalState({
+          isOpen: true,
+          prayerKey,
+          prayerName,
+          voice,
+        });
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const handleZoneChange = (zone: JakimZone) => {
+    setCurrentZone(zone);
+  };
+
+  const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
+    audioNotificationService.unlockAudio();
+    audioNotificationService.triggerAzan(key, name, voice);
+  };
+
+  const navItems = [
+    { id: 'solat', label: 'Waktu Solat', icon: Clock },
+    { id: 'kiblat', label: 'Arah Kiblat', icon: Compass },
+    { id: 'puasa', label: 'Berbuka & Puasa', icon: Moon },
+    { id: 'wirid', label: 'Wirid & Tasbih', icon: Radio },
+    { id: 'doa', label: 'Koleksi Doa', icon: BookOpen },
+    { id: 'widget', label: 'Widget Skrin', icon: Sparkles },
+    { id: 'kredit', label: 'Kredit & Info', icon: Award },
+  ] as const;
+
+  return (
+    <div className="min-h-screen bg-[#070d0b] text-slate-100 flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200">
+      {/* Subtle Ambient Night Sky Light */}
+      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[300px] bg-emerald-950/20 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* TOP NOTIFICATION TOAST FOR AUTOMATIC GEOLOCATION */}
+      {geoStatus && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="glass-panel p-4 rounded-2xl border border-emerald-500/40 bg-[#0d1f18]/95 shadow-2xl flex items-start justify-between gap-3 text-left">
+            <div className="flex items-start gap-2.5">
+              <MapPin className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                  Lokasi Dikesan: <span className="text-emerald-300 font-mono">{geoStatus.zoneName}</span>
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5 leading-snug">{geoStatus.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setGeoStatus(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* TOP DESKTOP HEADER (Zone 1: Wordmark, Zone 2: Navigation Links, Zone 3: Action) */}
+      <header className="sticky top-0 z-40 bg-[#070d0b]/80 backdrop-blur-xl border-b border-emerald-900/30 px-4 sm:px-6 lg:px-8 py-3.5">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 lg:gap-8">
+          {/* Zone 1: Brand Wordmark */}
+          <div
+            onClick={() => setActiveTab('solat')}
+            className="flex items-center gap-2 cursor-pointer select-none shrink-0"
+          >
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-slate-950 font-black shadow-md shadow-emerald-900/40">
+              <Sparkles className="w-4 h-4 fill-slate-950 text-slate-950" />
+            </div>
+            <span className="text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap">
+              SolatKini <span className="text-emerald-400 font-normal text-xs ml-1">Malaysia</span>
+            </span>
+          </div>
+
+          {/* Zone 2: Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-xs lg:text-sm font-medium text-slate-300">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                    isActive
+                      ? 'text-emerald-400 font-semibold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Zone 3: Primary Action (Quick Azan test / Active Zone Pill) */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setActiveTab('widget')}
+              className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Pasang PWA
+            </button>
+
+            <button
+              onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', 'jakim')}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition active:scale-95"
+            >
+              <Volume2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Uji</span> Azan
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* MAIN CONTENT VIEWPORT */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-5 pb-20 md:pb-12">
+        {isLoading || !prayerData ? (
+          <div className="min-h-[50vh] flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-slate-400 font-medium">Memuatkan Waktu Solat JAKIM...</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'solat' && (
+              <PrayerDashboard
+                currentZone={currentZone}
+                onZoneChange={handleZoneChange}
+                prayerTimes={prayerData.times}
+                isOfflineCalculated={prayerData.isOfflineCalculated}
+                lastSyncTime={prayerData.lastSyncTime}
+                isLiveSyncing={isLiveSyncing}
+                onLiveSync={handleLiveSync}
+                onNavigateToTab={(tab) => setActiveTab(tab)}
+                onTriggerTestAlarm={handleTriggerTestAlarm}
+              />
+            )}
+
+            {activeTab === 'kiblat' && <QiblaCompass currentZone={currentZone} />}
+
+            {activeTab === 'puasa' && (
+              <FastingTracker prayerTimes={prayerData.times} currentZone={currentZone} />
+            )}
+
+            {activeTab === 'wirid' && <TasbihWirid />}
+
+            {activeTab === 'doa' && <DuaCollection />}
+
+            {activeTab === 'widget' && (
+              <HomeWidgetPreview prayerTimes={prayerData.times} currentZone={currentZone} />
+            )}
+
+            {activeTab === 'kredit' && (
+              <CreditsPage onNavigateToTab={(tab) => setActiveTab(tab)} />
+            )}
+          </>
+        )}
+      </main>
+
+      {/* GLOBAL FOOTER (Desktop & Mobile accessible) */}
+      <footer className="mt-auto border-t border-emerald-950/60 bg-[#060a08]/90 backdrop-blur-md py-6 px-4 sm:px-6 mb-16 md:mb-0">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 text-xs">
+              <span className="font-bold text-white tracking-tight">SolatKini Malaysia</span>
+              <span className="text-emerald-500">•</span>
+              <span className="text-emerald-400 font-medium">Idea: Musa Bin Sarudin</span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-300 font-medium">Dilaksanakan Oleh: Gemini 3.8</span>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Data rasmi Jabatan Kemajuan Islam Malaysia (JAKIM) • 60 Zon Waktu Solat • Versi 2.5.0 PWA
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <button
+              onClick={() => setActiveTab('kredit')}
+              className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 ${
+                activeTab === 'kredit'
+                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5 text-emerald-400" />
+              Halaman Kredit & Info
+            </button>
+            <button
+              onClick={() => setActiveTab('solat')}
+              className="text-slate-400 hover:text-emerald-300 transition"
+            >
+              Waktu Solat
+            </button>
+            <span className="text-slate-700">•</span>
+            <button
+              onClick={() => setActiveTab('kiblat')}
+              className="text-slate-400 hover:text-emerald-300 transition"
+            >
+              Kiblat
+            </button>
+          </div>
+        </div>
+      </footer>
+
+      {/* MOBILE BOTTOM NAVIGATION BAR (Thumb Zone Optimized - 7 Tabs) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070d0b]/95 backdrop-blur-xl border-t border-emerald-950/80 px-1 py-1.5 pb-safe shadow-2xl">
+        <div className="grid grid-cols-7 items-center">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`min-h-[46px] flex flex-col items-center justify-center rounded-xl transition px-0.5 ${
+                  isActive
+                    ? 'text-emerald-400 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+                    isActive ? 'bg-emerald-500/20 text-emerald-400' : ''
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-[8px] tracking-tight truncate max-w-[46px] text-center mt-0.5">
+                  {item.label.split(' ')[0]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* FULL-SCREEN AZAN ALARM NOTIFICATION MODAL */}
+      <AzanAlarmModal
+        isOpen={alarmModalState.isOpen}
+        prayerKey={alarmModalState.prayerKey}
+        prayerName={alarmModalState.prayerName}
+        voice={alarmModalState.voice}
+        onClose={() => setAlarmModalState((prev) => ({ ...prev, isOpen: false }))}
+      />
+    </div>
+  );
+}
