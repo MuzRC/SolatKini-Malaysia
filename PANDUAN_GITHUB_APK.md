@@ -86,4 +86,20 @@ Punca ralat ini berlaku kerana tindakan pihak ketiga `android-actions/setup-andr
    git push origin main
    ```
 
+---
+
+## 7. Penyelesaian Ralat: "[fatal] The Capacitor CLI requires NodeJS >=22.0.0"
+
+Punca ralat ini berlaku kerana versi Capacitor 8.x (`@capacitor/cli: ^8.5.3`) mewajibkan persekitaran Node.js sekurang-kurangnya versi **22.0.0 (LTS)**.
+
+**Penyelesaian yang telah dikemas kini:**
+- Langkah 2 pada `.github/workflows/build-apk.yml` telah dinaik taraf kepada `node-version: 22`.
+- Jalankan arahan *push* ini ke repositori anda:
+  ```bash
+  git add .
+  git commit -m "Fix: Kemas kini Node.js kepada v22 untuk Capacitor CLI 8"
+  git push origin main
+  ```
+
+
 

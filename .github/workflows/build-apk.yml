@@ -23,10 +23,10 @@ jobs:
       - name: 1. Checkout Kod Sumber
         uses: actions/checkout@v4
 
-      - name: 2. Sediakan Persekitaran Node.js (LTS v20)
+      - name: 2. Sediakan Persekitaran Node.js (LTS v22)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: 3. Pasang Kebergantungan NPM
         run: |
