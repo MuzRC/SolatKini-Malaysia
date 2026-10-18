@@ -86,7 +86,7 @@ public class AzanAlarmPlugin extends Plugin {
     }
 
     @PermissionCallback
-    private void notificationCallback(PluginCall call) {
+    public void notificationCallback(PluginCall call) {
         boolean granted = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             granted = ContextCompat.checkSelfPermission(

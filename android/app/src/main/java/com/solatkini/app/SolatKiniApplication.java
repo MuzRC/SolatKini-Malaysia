@@ -1,6 +1,7 @@
 package com.solatkini.app;
 
 import android.app.Application;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
@@ -35,7 +36,7 @@ public class SolatKiniApplication extends Application {
             azanChannel.setBypassDnd(true);
             azanChannel.enableVibration(true);
             azanChannel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000});
-            azanChannel.setLockscreenVisibility(NotificationChannel.VISIBILITY_PUBLIC);
+            azanChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
@@ -56,7 +57,7 @@ public class SolatKiniApplication extends Application {
             );
             reminderChannel.setDescription("Pemberitahuan peringatan waktu solat");
             reminderChannel.enableVibration(true);
-            reminderChannel.setLockscreenVisibility(NotificationChannel.VISIBILITY_PUBLIC);
+            reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
             manager.createNotificationChannel(azanChannel);
             manager.createNotificationChannel(reminderChannel);
