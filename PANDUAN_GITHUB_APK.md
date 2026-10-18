@@ -48,3 +48,24 @@ Sebaik sahaja anda menolak (*push*) kod ke GitHub:
 4. Ekstrak fail zip tersebut, dan anda akan mendapati fail pemasangan Android:
    **`app-debug.apk`**
 5. Pindahkan fail `.apk` ke telefon pintar anda dan pasang (*Install*) seperti biasa.
+
+---
+
+## 5. Penyelesaian Ralat: "Dependencies lock file is not found"
+
+Jika anda melihat ralat:
+`Dependencies lock file is not found in /home/runner/work/SolatKini-Malaysia/SolatKini-Malaysia. Supported file patterns: package-lock.json,npm-shrinkwrap.json,yarn.lock`
+
+Punca ralat ini berlaku kerana GitHub Actions sebelum ini mencari fail `package-lock.json` untuk pengoptimuman *cache* NPM, namun fail tersebut belum dijana/dimuat naik ke repositori.
+
+**Tindakan pembetulan yang telah dilakukan:**
+1. Fail `package-lock.json` rasmi telah dijana dan sedia di dalam folder projek.
+2. Aliran kerja `.github/workflows/build-apk.yml` telah dikemas kini untuk melupuskan sekatan ketat *cache* `setup-node`, dan menggunakan fallback pintar (`if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi`).
+3. Anda hanya perlu membuat *commit* dan *push* fail terkini ke GitHub:
+   ```bash
+   git add .
+   git commit -m "Fix: Tambah package-lock.json dan kemas kini workflow APK"
+   git push origin main
+   ```
+   Binaan di tab **Actions** akan terus lulus tanpa sebarang ralat lagi!
+
