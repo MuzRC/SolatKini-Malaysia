@@ -36,9 +36,10 @@ jobs:
             npm install
           fi
 
-      - name: 4. Bina Aplikasi Web (Vite Build)
+      - name: 4. Bina Aplikasi Web & Jana Ikon Android
         run: |
           npm run build
+          node scripts/generate-android-icons.js
 
       - name: 5. Sinkronisasi Kod ke Projek Android (Capacitor Sync)
         run: |

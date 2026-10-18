@@ -33,7 +33,7 @@ Sekiranya anda belum membuat repositori di GitHub:
 Sebaik sahaja anda menolak (*push*) kod ke GitHub:
 1. Buka repositori anda di GitHub dan klik pada tab **Actions**.
 2. Anda akan melihat aliran kerja bernama **`Build SolatKini Android APK`** sedang berjalan secara automatik.
-3. GitHub akan menyediakan persekitaran Linux, memasang Java JDK 17, Android SDK, dan membina fail APK menggunakan Gradle dalam masa 2 hingga 4 minit.
+3. GitHub akan menyediakan persekitaran Linux, memasang Java JDK 21 LTS, Node.js 22 LTS, Android SDK, dan membina fail APK menggunakan Gradle dalam masa 2 hingga 4 minit.
 
 > **Petua:** Anda juga boleh menjalankan binaan secara manual pada bila-bila masa:
 > Klik tab **Actions** &rarr; pilih **Build SolatKini Android APK** &rarr; klik butang **"Run workflow"**.
@@ -115,6 +115,17 @@ Punca ralat ini berlaku kerana modul **Capacitor 8 Android** (`@capacitor/androi
   git commit -m "Fix: Naik taraf JDK kepada Java 21 LTS untuk menyokong Capacitor 8"
   git push origin main
   ```
+
+---
+
+## 9. Penambahbaikan Versi APK Terkini: Ikon Rasmi, Audio Tempatan & Widget
+
+Kemaskini terbaharu merangkumi pembaikan menyeluruh:
+1. **Ikon Aplikasi Native Android**: Ikon rasmi hijau zamrud bulan sabit dan kubah masjid SolatKini kini dijana secara automatik ke dalam semua resolusi Android (`mipmap-mdpi` hingga `mipmap-xxxhdpi`) serta warna latar belakang `#0a1a14`. Tiada lagi ikon templat Capacitor atau ikon robot Android.
+2. **7 Koleksi Audio Azan 100% Tempatan**: Ketiga-tiga fail azan yang sebelum ini gagal dimuat turun (*failed to fetch*) iaitu **Mishary Al-Afasy**, **Azan Subuh**, dan **Takbir Hari Raya** kini telah dimuat turun dan dibundelkan terus ke dalam folder `public/audio/azan/` dan aset Android APK. Ia sedia dimainkan 100% luar talian tanpa isu sambungan atau sekatan CORS!
+3. **Widget Skrin Utama Native & Mod Jam Meja (AOD)**: Disediakan `SolatWidgetProvider` rasmi Android bersama susun atur waktu solat 5 waktu, serta fungsi **Mod Jam Meja Skrin Penuh (Always-On Display)** dengan sokongan *Screen Wake Lock* untuk telefon di atas meja.
+4. **Pembersihan Mod PWA**: Segala rujukan lapuk berkaitan PWA/PWABuilder telah dikeluarkan dan digantikan dengan pengalaman aplikasi Android (APK) sepenuhnya.
+
 
 
 

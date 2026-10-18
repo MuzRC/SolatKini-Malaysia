@@ -109,7 +109,7 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
             </div>
 
             <p className="text-sm text-slate-300 leading-relaxed">
-              Melaksanakan pembinaan penuh aplikasi daripada seni bina kod, algoritma falak, pengurusan memori audio IndexedDB luar talian, pemulihan ralat, reka bentuk antara muka responsif Tailwind CSS, serta integrasi automatik GPS dan PWA.
+              Melaksanakan pembinaan penuh aplikasi daripada seni bina kod, algoritma falak, pengurusan memori audio IndexedDB luar talian, pemulihan ralat, reka bentuk antara muka responsif Tailwind CSS, serta integrasi automatik GPS dan Capacitor Android APK.
             </p>
 
             <div className="pt-2 flex flex-wrap gap-2 text-xs">
@@ -196,10 +196,10 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
           </div>
           <div>
             <div className="text-2xl font-black text-white font-mono">v2.5.0</div>
-            <p className="text-xs text-slate-400 mt-1">SolatKini Progressive Web App (PWA)</p>
+            <p className="text-xs text-slate-400 mt-1">SolatKini Aplikasi Android (APK)</p>
           </div>
           <div className="text-[11px] text-emerald-400 bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-900/40 w-fit">
-            Ready for Offline Use
+            100% Siap Luar Talian
           </div>
         </div>
 

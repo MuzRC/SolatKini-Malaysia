@@ -849,7 +849,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             <Sparkles className="w-5 h-5" />
           </div>
           <span className="text-sm font-bold text-white">Widget Skrin</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Simulasi & pasang PWA</span>
+          <span className="text-[11px] text-slate-400 mt-0.5">Widget Telefon & Jam Meja</span>
         </button>
       </div>
 
@@ -1231,9 +1231,9 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                     1
                   </span>
                   <div>
-                    <strong className="text-white">Pasang Aplikasi ke Skrin Utama (PWA):</strong>
+                    <strong className="text-white">Aplikasi Android (APK) Siap Pasang:</strong>
                     <p className="text-slate-400 text-xs mt-0.5">
-                      Gunakan butang <em>Pasang Aplikasi</em> di bar navigasi untuk keizinan penggera audio penuh.
+                      Aplikasi SolatKini berjalan sebagai aplikasi native penuh pada telefon anda untuk keizinan penggera audio dan sokongan widget skrin utama.
                     </p>
                   </div>
                 </div>

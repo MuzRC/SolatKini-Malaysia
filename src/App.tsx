@@ -264,8 +264,8 @@ export default function App() {
               onClick={() => setActiveTab('widget')}
               className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition"
             >
-              <Download className="w-3.5 h-3.5" />
-              Pasang PWA
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              Widget Skrin
             </button>
 
             <button
@@ -335,7 +335,7 @@ export default function App() {
               <span className="text-slate-300 font-medium">Dilaksanakan Oleh: Gemini 3.8</span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Data rasmi Jabatan Kemajuan Islam Malaysia (JAKIM) • 60 Zon Waktu Solat • Versi 2.5.0 PWA
+              Data rasmi Jabatan Kemajuan Islam Malaysia (JAKIM) • 60 Zon Waktu Solat • Versi 2.5.0 APK Android
             </p>
           </div>
 

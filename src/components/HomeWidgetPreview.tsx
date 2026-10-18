@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Smartphone,
   Sparkles,
-  Download,
-  Share2,
   Clock,
   Moon,
-  Sun,
-  MapPin,
   Check,
-  ChevronRight,
-  ShieldCheck,
   Layers,
-  ExternalLink
+  Maximize2,
+  Minimize2,
+  Tv,
+  Smartphone
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
-import { determineNextPrayer, PRAYER_LABELS, PRAYER_KEYS_ORDER, getFastingCountdown } from '../services/prayerService';
+import { determineNextPrayer, PRAYER_LABELS, getFastingCountdown } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
 import { getHijriDate } from '../utils/hijriCalendar';
 
@@ -28,43 +24,44 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
   prayerTimes,
   currentZone,
 }) => {
-  const [currentTime] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [activeWidgetSize, setActiveWidgetSize] = useState<'mini' | 'medium' | 'fasting'>('medium');
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(false);
-  const [showIOSModal, setShowIOSModal] = useState(false);
+  const [isStandbyMode, setIsStandbyMode] = useState<boolean>(false);
+  const [wakeLockSentinel, setWakeLockSentinel] = useState<any>(null);
 
+  // Live timer for widget clock
   useEffect(() => {
-    // Check standalone mode
-    if (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true
-    ) {
-      setIsInstalled(true);
-    }
-
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-    };
-
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
 
-  const handleInstallClick = async () => {
-    if (installPrompt) {
-      installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      if (choice.outcome === 'accepted') {
-        setIsInstalled(true);
+  // Screen Wake Lock for Standby / Desk Clock Mode
+  useEffect(() => {
+    let sentinel: any = null;
+    const requestWakeLock = async () => {
+      if (isStandbyMode && 'wakeLock' in navigator) {
+        try {
+          sentinel = await (navigator as any).wakeLock.request('screen');
+          setWakeLockSentinel(sentinel);
+        } catch (err) {
+          console.warn('Wake Lock tidak disokong atau ditolak:', err);
+        }
       }
-      setInstallPrompt(null);
-    } else {
-      // Show iOS Safari guidance
-      setShowIOSModal(true);
+    };
+
+    if (isStandbyMode) {
+      requestWakeLock();
+    } else if (wakeLockSentinel) {
+      wakeLockSentinel.release().catch(() => {});
+      setWakeLockSentinel(null);
     }
-  };
+
+    return () => {
+      if (sentinel) sentinel.release().catch(() => {});
+    };
+  }, [isStandbyMode]);
 
   const nextPrayer = determineNextPrayer(prayerTimes, currentTime);
   const hijri = getHijriDate(currentTime);
@@ -74,30 +71,101 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
     isUserFasting: isUserFastingToday,
   });
 
+  // FULL SCREEN STANDBY / DESK CLOCK MODE
+  if (isStandbyMode) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#050b08] text-white flex flex-col justify-between p-6 sm:p-10 select-none">
+        {/* Top bar with zone and exit */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-white tracking-wide">SolatKini · Jam Meja</h1>
+              <p className="text-xs text-emerald-400 font-mono">
+                {currentZone.code} — {currentZone.daerah}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsStandbyMode(false)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition active:scale-95"
+          >
+            <Minimize2 className="w-4 h-4 text-emerald-400" />
+            <span>Keluar Mod Skrin Penuh</span>
+          </button>
+        </div>
+
+        {/* Center Clock & Next Prayer */}
+        <div className="text-center my-auto space-y-4">
+          <div className="text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tight text-emerald-400 drop-shadow-[0_0_35px_rgba(16,185,129,0.3)]">
+            {currentTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+          </div>
+
+          <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-emerald-950/70 border border-emerald-500/40 text-emerald-200 text-sm sm:text-base font-semibold">
+            <Clock className="w-4 h-4 text-amber-300" />
+            <span>Waktu Seterusnya: <strong>{nextPrayer.nextLabel}</strong> jam <strong>{nextPrayer.nextDisplayTime}</strong></span>
+            <span className="text-amber-300 font-mono">({nextPrayer.countdownFormatted} lagi)</span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-400">
+            {hijri.formatted}
+          </p>
+        </div>
+
+        {/* Bottom 5 Prayers Strip */}
+        <div className="grid grid-cols-5 gap-2 sm:gap-4 max-w-4xl mx-auto w-full">
+          {(['subuh', 'zohor', 'asar', 'maghrib', 'isyak'] as const).map((k) => {
+            const isNext = nextPrayer.nextKey === k;
+            return (
+              <div
+                key={k}
+                className={`p-3 rounded-2xl text-center border transition ${
+                  isNext
+                    ? 'bg-emerald-600/30 border-emerald-400 shadow-lg shadow-emerald-950'
+                    : 'bg-slate-900/40 border-slate-800'
+                }`}
+              >
+                <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
+                  {PRAYER_LABELS[k].split(' ')[0]}
+                </div>
+                <div className="text-base sm:text-xl font-bold font-mono text-white mt-1">
+                  {prayerTimes.times[k]}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
-      {/* Banner PWA & Widget */}
+      {/* Banner Widget & Jam Meja */}
       <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase mb-2">
               <Layers className="w-3.5 h-3.5 text-amber-300" />
-              Sokongan Widget & PWA
+              Sokongan Widget Telefon & Jam Meja
             </div>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Widget Skrin Utama Telefon
+              Widget Skrin Utama & Jam Meja
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 mt-1">
-              Pasang SolatKini sebagai aplikasi terus pada skrin utama telefon anda untuk widget interaktif
+              Paparkan waktu solat secara masa nyata di Skrin Utama telefon atau jadikan telefon anda sebagai jam solat digital di meja.
             </p>
           </div>
 
           <button
-            onClick={handleInstallClick}
+            onClick={() => setIsStandbyMode(true)}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition active:scale-95 shrink-0"
           >
-            <Download className="w-4 h-4" />
-            {isInstalled ? 'Aplikasi Sudah Dipasang' : 'Pasang ke Skrin Utama'}
+            <Maximize2 className="w-4 h-4 text-amber-300" />
+            <span>Aktifkan Mod Jam Meja (AOD)</span>
           </button>
         </div>
       </div>
@@ -265,95 +333,54 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </div>
       </div>
 
-      {/* PWABuilder APK Generation Guide Card */}
+      {/* Android Widget Installation Guide Card */}
       <div className="rounded-3xl bg-gradient-to-br from-[#0c1a14] via-slate-900 to-[#0c1a14] border border-emerald-500/30 p-6 sm:p-7 shadow-xl space-y-4">
-        <div className="flex items-start sm:items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
-              <Download className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg font-bold text-white">Status APK di PWABuilder</h3>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  100% Siap Dijana
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Fail manifest.json, ikon PNG 192/512/maskable, screenshots, dan service worker telah lengkap dikonfigurasikan.
-              </p>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <Smartphone className="w-6 h-6" />
           </div>
-
-          <a
-            href="https://www.pwabuilder.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 shadow-md transition active:scale-95"
-          >
-            <span>Buka PWABuilder</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </a>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white">Panduan Memasang Widget di Skrin Telefon</h3>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                Aplikasi Android
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Widget rasmi SolatKini membolehkan anda melihat waktu solat terus tanpa perlu membuka aplikasi.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
             <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-              <Check className="w-4 h-4" /> 1. Salin URL Aplikasi
+              <Check className="w-4 h-4" /> 1. Tekan Lama Skrin
             </div>
             <p className="text-[11px] text-slate-300">
-              Salin alamat web (URL) SolatKini dari bar alamat pelayar anda.
+              Tekan dan tahan pada mana-mana ruang kosong di Skrin Utama (Home Screen) telefon anda.
             </p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
             <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-              <Check className="w-4 h-4" /> 2. Masukkan ke PWABuilder
+              <Check className="w-4 h-4" /> 2. Pilih Menu &apos;Widgets&apos;
             </div>
             <p className="text-[11px] text-slate-300">
-              Tampal URL di laman <span className="font-mono text-emerald-300">pwabuilder.com</span> dan tekan butang <strong>Start</strong>.
+              Ketik pada ikon <strong>Widgets</strong> yang muncul di bahagian bawah skrin pelancar anda.
             </p>
           </div>
 
           <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
             <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-              <Check className="w-4 h-4" /> 3. Muat Turun APK
+              <Check className="w-4 h-4" /> 3. Letakkan SolatKini
             </div>
             <p className="text-[11px] text-slate-300">
-              Pilih <strong>Package for Stores &rarr; Android</strong> untuk menjana dan memuat turun fail APK/AAB anda.
+              Cari <strong>SolatKini</strong>, tarik widget ke skrin utama anda dan lepaskan pada saiz yang anda sukai.
             </p>
           </div>
         </div>
       </div>
-
-      {/* iOS Safari Guide Modal */}
-      {showIOSModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-sm rounded-3xl bg-[#0f1a16] border border-emerald-500/30 p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <Smartphone className="w-5 h-5 text-emerald-400" />
-              Pasang pada iPhone / iPad
-            </h3>
-            <div className="mt-3 space-y-2.5 text-xs text-slate-300 leading-relaxed">
-              <p>
-                1. Tekan ikon <strong>Kongsi (Share / <Share2 className="w-3.5 h-3.5 inline text-emerald-400" />)</strong> di bar bawah pelayar Safari.
-              </p>
-              <p>
-                2. Skrol ke bawah dan pilih <strong>&quot;Add to Home Screen&quot; (Tambah ke Skrin Utama)</strong>.
-              </p>
-              <p>
-                3. Tekan <strong>Add</strong> di sudut atas kanan. SolatKini kini sedia beroperasi seperti aplikasi native.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowIOSModal(false)}
-              className="mt-5 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs"
-            >
-              Faham
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
