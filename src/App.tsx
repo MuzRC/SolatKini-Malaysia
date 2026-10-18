@@ -19,6 +19,7 @@ import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './ty
 import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
 import { fetchDayPrayerTimes } from './services/prayerService';
 import { audioNotificationService } from './services/audioNotificationService';
+import { nativeAlarmService } from './services/nativeAlarmService';
 import { PrayerDashboard } from './components/PrayerDashboard';
 import { QiblaCompass } from './components/QiblaCompass';
 import { FastingTracker } from './components/FastingTracker';
@@ -158,6 +159,39 @@ export default function App() {
     }
   };
 
+  // 4. Request Android 13+ Notification Permission on App Startup & Listen for Native Azan Trigger
+  useEffect(() => {
+    // Check and request notification permissions as soon as app opens
+    nativeAlarmService.checkPermissions().then((status) => {
+      if (!status.notificationsGranted) {
+        nativeAlarmService.requestNotificationPermission();
+      }
+    });
+
+    // Window event listener dispatched by MainActivity when Azan Intent arrives
+    const handleNativeAzanTrigger = (event: any) => {
+      try {
+        let data: { prayerName?: string; prayerKey?: PrayerKey; voice?: AzanVoice } = {};
+        if (typeof event.detail === 'string') {
+          data = JSON.parse(event.detail);
+        } else if (event.detail) {
+          data = event.detail;
+        }
+        setAlarmModalState({
+          isOpen: true,
+          prayerKey: (data.prayerKey as PrayerKey) || 'solat' as PrayerKey,
+          prayerName: data.prayerName || 'Solat',
+          voice: data.voice || 'jakim',
+        });
+      } catch (e) {
+        console.warn('Ralat menerima acara azan asli:', e);
+      }
+    };
+
+    window.addEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
+    return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
+  }, []);
+
   // 3. Setup Azan trigger listener from audio service
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
@@ -180,6 +214,11 @@ export default function App() {
   const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
     audioNotificationService.unlockAudio();
     audioNotificationService.triggerAzan(key, name, voice);
+
+    // If on native Android, also trigger native test alarm
+    if (nativeAlarmService.getIsNative()) {
+      nativeAlarmService.testAlarm(name, voice, 1);
+    }
   };
 
   const navItems = [

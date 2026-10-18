@@ -48,6 +48,7 @@ import { AZAN_OPTIONS, audioNotificationService, ExtendedAzanAudioOption } from 
 import { audioStorageService } from '../services/audioStorageService';
 import { getHijriDate, getFastingRecommendation } from '../utils/hijriCalendar';
 import { widgetService } from '../services/widgetService';
+import { nativeAlarmService } from '../services/nativeAlarmService';
 
 interface PrayerDashboardProps {
   currentZone: JakimZone;
@@ -254,6 +255,34 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone]);
 
+  // Sync to native Android AlarmManager (Exact Alarms for background wake-up)
+  useEffect(() => {
+    if (prayerTimes && prayerTimes.times) {
+      const list = PRAYER_KEYS_ORDER.map((k) => ({
+        key: k,
+        label: PRAYER_LABELS[k],
+        time: prayerTimes.times[k],
+        displayTime: formatDisplayTime(prayerTimes.times[k]),
+      }));
+
+      const enabledMap: Record<PrayerKey, boolean> = {
+        imsak: false,
+        subuh: notificationSettings.preferences.subuh?.enabled ?? true,
+        syuruk: false,
+        zohor: notificationSettings.preferences.zohor?.enabled ?? true,
+        asar: notificationSettings.preferences.asar?.enabled ?? true,
+        maghrib: notificationSettings.preferences.maghrib?.enabled ?? true,
+        isyak: notificationSettings.preferences.isyak?.enabled ?? true,
+      };
+
+      if (notificationSettings.masterEnabled) {
+        nativeAlarmService.schedulePrayers(list, selectedVoice, enabledMap);
+      } else {
+        nativeAlarmService.cancelAllAlarms();
+      }
+    }
+  }, [prayerTimes, selectedVoice, notificationSettings]);
+
   const hijri = getHijriDate(currentTime);
   const recommendation = getFastingRecommendation(currentTime, hijri);
 
@@ -388,7 +417,16 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   };
 
-  const handleTogglePrayerNotif = (key: PrayerKey) => {
+  const handleTogglePrayerNotif = async (key: PrayerKey) => {
+    const isCurrentlyEnabled = notificationSettings.preferences[key]?.enabled;
+    if (!isCurrentlyEnabled) {
+      // User is activating an azan alarm: check & prompt for Android 13+ permission
+      const perms = await nativeAlarmService.checkPermissions();
+      if (!perms.notificationsGranted) {
+        await nativeAlarmService.requestNotificationPermission();
+      }
+    }
+
     setNotificationSettings((prev) => {
       const updated = {
         ...prev,
@@ -1018,6 +1056,51 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 >
                   {isPlayingPreview ? 'Henti' : 'Uji Bunyi'}
                 </button>
+              </div>
+
+              {/* Native Android AlarmManager & TargetSDK 33 Status Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1813] to-[#08120e] border border-emerald-500/30 text-left space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">
+                      Sistem Penggera Azan Asli (Android AlarmManager)
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30">
+                    TargetSDK 33+
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  Dikuasakan oleh perkakasan <code className="text-emerald-300 font-mono">AlarmManager.setExactAndAllowWhileIdle</code> dan saluran audio <code className="text-emerald-300 font-mono">STREAM_ALARM</code> bagi menjamin laungan azan berkumandang tepat pada waktunya dan berupaya melepasi mod senyap serta skrin kunci.
+                </p>
+                <div className="pt-1 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={async () => {
+                      const prayerName = nextPrayerInfo.nextLabel || 'Subuh';
+                      const res = await nativeAlarmService.testAlarm(prayerName, selectedVoice, 3);
+                      if (res) {
+                        setAudioToast('Penggera azan asli dijadualkan! Kunci skrin telefon anda sekarang untuk menguji.');
+                      } else {
+                        onTriggerTestAlarm(nextPrayerInfo.nextKey, prayerName, selectedVoice);
+                        setAudioToast('Ujian azan dimulakan.');
+                      }
+                      setTimeout(() => setAudioToast(null), 5000);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-emerald-950/40"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    Uji Penggera Asli Telefon (3 Saat)
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await nativeAlarmService.openExactAlarmSettings();
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"
+                  >
+                    Tetapan Penggera Tepat
+                  </button>
+                </div>
               </div>
 
               {AZAN_OPTIONS.map((opt) => {

@@ -1,6 +1,6 @@
 {
-  "summary": "Pelan pelaksanaan yang disemak semula: Membina projek Capacitor Android dan aliran kerja GitHub Actions CI/CD (.github/workflows/build-apk.yml) untuk kompilasi APK automatik, serta menguatkuasakan perlindungan keselamatan anti-harvesting kunci API melalui seni bina sifar kunci rahsia dan penapisan ketat .gitignore.",
-  "updatedAt": "2026-10-17T23:31:36.794324147Z",
+  "summary": "Pelan komprehensif bagi pembinaan semula sistem penggera Azan asli (Android AlarmManager), integrasi kebenaran notifikasi Android 13+ (TargetSDK 33 POST_NOTIFICATIONS), pengurusan skrin penuh azan dan kemas kini kod runtime untuk binaan APK GitHub Actions.",
+  "updatedAt": "2026-10-18T22:23:09.440121594Z",
   "requestFeedback": true,
   "userFacing": true
 }

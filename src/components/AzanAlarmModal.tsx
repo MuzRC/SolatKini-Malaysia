@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, BellRing, Sparkles, Check, Play, Square, Sliders } from 'lucide-react';
 import { AzanVoice, PrayerKey } from '../types/prayer';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
+import { nativeAlarmService } from '../services/nativeAlarmService';
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
 
 interface AzanAlarmModalProps {
@@ -43,6 +44,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
 
   const handleStopAudio = () => {
     audioNotificationService.stopAudio();
+    nativeAlarmService.stopNativeAzan();
     setIsPlaying(false);
   };
 
@@ -54,6 +56,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
 
   const handleCloseAll = () => {
     audioNotificationService.stopAudio();
+    nativeAlarmService.stopNativeAzan();
     onClose();
   };
 
