@@ -23,10 +23,10 @@ jobs:
       - name: 1. Checkout Kod Sumber
         uses: actions/checkout@v4
 
-      - name: 2. Sediakan Persekitaran Node.js (LTS v22)
+      - name: 2. Sediakan Persekitaran Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22'
 
       - name: 3. Pasang Kebergantungan NPM
         run: |
@@ -51,12 +51,11 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: 7. Sediakan Android SDK & Terima Lesen Secara Automatik
+      - name: 7. Terima Lesen Android SDK Secara Automatik
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || yes | sdkmanager --licenses || true
+          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: 8. Berikan Kebenaran Perlaksanaan Gradle
+      - name: 8. Berikan Kebenaran Perlaksanaan Gradle Wrapper
         run: |
           chmod +x android/gradlew
 
