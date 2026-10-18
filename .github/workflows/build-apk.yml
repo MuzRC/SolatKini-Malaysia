@@ -23,22 +23,12 @@ jobs:
       - name: 1. Checkout Kod Sumber
         uses: actions/checkout@v4
 
-      - name: 2. Sediakan Persekitaran Node.js
+      - name: 2. Sediakan Persekitaran Node.js (LTS v20)
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: 3. Sediakan Persekitaran Java JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-          cache: 'gradle'
-
-      - name: 4. Sediakan Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 5. Pasang Kebergantungan NPM
+      - name: 3. Pasang Kebergantungan NPM
         run: |
           if [ -f package-lock.json ]; then
             npm ci || npm install
@@ -46,18 +36,29 @@ jobs:
             npm install
           fi
 
-      - name: 6. Bina Aplikasi Web (Vite Build)
+      - name: 4. Bina Aplikasi Web (Vite Build)
         run: |
           npm run build
 
-      - name: 7. Sinkronisasikan Kod ke Projek Android (Capacitor Sync)
+      - name: 5. Sinkronisasi Kod ke Projek Android (Capacitor Sync)
         run: |
           npx cap sync android
 
+      - name: 6. Sediakan Persekitaran Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: 7. Sediakan Android SDK & Terima Lesen Secara Automatik
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || yes | sdkmanager --licenses || true
+
       - name: 8. Berikan Kebenaran Perlaksanaan Gradle
         run: |
-          cd android
-          chmod +x ./gradlew
+          chmod +x android/gradlew
 
       - name: 9. Kompil Fail APK Android (Gradle Assemble Debug)
         run: |

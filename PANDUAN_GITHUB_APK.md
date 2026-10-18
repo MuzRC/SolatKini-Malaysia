@@ -69,3 +69,21 @@ Punca ralat ini berlaku kerana GitHub Actions sebelum ini mencari fail `package-
    ```
    Binaan di tab **Actions** akan terus lulus tanpa sebarang ralat lagi!
 
+---
+
+## 6. Penyelesaian Ralat: "Failed to find package 'tools' / sdkmanager exit code 1"
+
+Punca ralat ini berlaku kerana tindakan pihak ketiga `android-actions/setup-android@v3` cuba memasang pakej lapuk `tools` yang sudah tidak disokong pada pelari moden GitHub Actions. Selain itu, pelari `ubuntu-latest` sebenarnya telah pun mempunyai Android SDK terbina yang lengkap.
+
+**Penyelesaian yang telah dikemas kini:**
+1. Aliran kerja kini menggunakan Android SDK terbina pelari GitHub secara terus tanpa memerlukan tindakan lapuk pihak ketiga.
+2. Skrip pengesahan lesen automatik (`yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true`) dijalankan secara automatik.
+3. Menggunakan Java JDK 17 Temurin yang disyorkan oleh Gradle dan Google.
+4. Tolak fail terkini ke GitHub menggunakan:
+   ```bash
+   git add .
+   git commit -m "Fix: Workflow GitHub Actions Android SDK sedia ada & auto-lesen"
+   git push origin main
+   ```
+
+
