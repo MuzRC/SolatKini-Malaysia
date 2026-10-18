@@ -101,5 +101,21 @@ Punca ralat ini berlaku kerana versi Capacitor 8.x (`@capacitor/cli: ^8.5.3`) me
   git push origin main
   ```
 
+---
+
+## 8. Penyelesaian Ralat: "Execution failed for task ':capacitor-android:compileDebugJavaWithJavac' > error: invalid source release: 21"
+
+Punca ralat ini berlaku kerana modul **Capacitor 8 Android** (`@capacitor/android: ^8.5.3`) telah dikonfigurasikan dengan piawaian kod sumber Java 21 (`sourceCompatibility = JavaVersion.VERSION_21`). Apabila GitHub Actions menggunakan Java JDK 17, pengkompil `javac` Java 17 menolak kod tersebut kerana tidak menyokong versi sasaran 21.
+
+**Penyelesaian yang telah dikemas kini:**
+- Langkah 6 dalam `.github/workflows/build-apk.yml` telah dinaik taraf daripada `java-version: '17'` kepada **`java-version: '21'`** (Temurin JDK 21 LTS).
+- Tolak perubahan ini ke GitHub menggunakan arahan:
+  ```bash
+  git add .
+  git commit -m "Fix: Naik taraf JDK kepada Java 21 LTS untuk menyokong Capacitor 8"
+  git push origin main
+  ```
+
+
 
 

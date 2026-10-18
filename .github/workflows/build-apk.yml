@@ -44,11 +44,11 @@ jobs:
         run: |
           npx cap sync android
 
-      - name: 6. Sediakan Persekitaran Java JDK 17
+      - name: 6. Sediakan Persekitaran Java JDK 21 (Diperlukan oleh Capacitor 8)
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: 7. Terima Lesen Android SDK Secara Automatik
