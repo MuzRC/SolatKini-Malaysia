@@ -47,6 +47,7 @@ import { formatDisplayTime } from '../utils/prayerCalculator';
 import { AZAN_OPTIONS, audioNotificationService, ExtendedAzanAudioOption } from '../services/audioNotificationService';
 import { audioStorageService } from '../services/audioStorageService';
 import { getHijriDate, getFastingRecommendation } from '../utils/hijriCalendar';
+import { widgetService } from '../services/widgetService';
 
 interface PrayerDashboardProps {
   currentZone: JakimZone;
@@ -136,29 +137,35 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   }, [isAudioSettingsOpen]);
 
   const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
-    try {
-      audioNotificationService.stopAudio();
-      setIsPlayingPreview(false);
+    audioNotificationService.stopAudio();
+    setIsPlayingPreview(false);
+
+    // 1. Tetapkan serta-merta sebagai nada azan pilihan peranti
+    audioStorageService.setActiveDeviceVoice(opt.id);
+    setActiveDeviceVoice(opt.id);
+    setSelectedVoice(opt.id);
+    setAudioToast(`Berjaya! ${opt.title} kini ditetapkan sebagai nada azan telefon anda.`);
+    setTimeout(() => setAudioToast(null), 4000);
+
+    // 2. Simpan ke memori luar talian di latar belakang jika belum disimpan
+    if (!cachedVoiceIds.includes(opt.id)) {
       setDownloadingVoiceId(opt.id);
       setDownloadProgress(0);
-      await audioStorageService.downloadAndCacheAzan(
-        opt.id,
-        opt.audioUrl,
-        opt.filename,
-        false,
-        (p) => setDownloadProgress(p)
-      );
-      setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
-      audioStorageService.setActiveDeviceVoice(opt.id);
-      setActiveDeviceVoice(opt.id);
-      setSelectedVoice(opt.id);
-      setAudioToast(`Berjaya! ${opt.title} kini ditetapkan sebagai nada azan rasmi telefon anda.`);
-      setTimeout(() => setAudioToast(null), 4000);
-    } catch (err: any) {
-      setAudioToast(`Ralat: ${err.message || 'Gagal menetapkan azan'}`);
-      setTimeout(() => setAudioToast(null), 4000);
-    } finally {
-      setDownloadingVoiceId(null);
+      try {
+        await audioStorageService.downloadAndCacheAzan(
+          opt.id,
+          opt.audioUrl,
+          opt.filename,
+          false,
+          (p) => setDownloadProgress(p),
+          opt.fallbackUrl
+        );
+        setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
+      } catch (err) {
+        console.warn('Pra-simpanan audio latar belakang:', err);
+      } finally {
+        setDownloadingVoiceId(null);
+      }
     }
   };
 
@@ -239,6 +246,13 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }, 1000);
     return () => clearInterval(timer);
   }, [prayerTimes]);
+
+  // Sync to native Android Home Screen Widget
+  useEffect(() => {
+    if (prayerTimes && currentZone) {
+      widgetService.syncWidget(prayerTimes, currentZone);
+    }
+  }, [prayerTimes, currentZone]);
 
   const hijri = getHijriDate(currentTime);
   const recommendation = getFastingRecommendation(currentTime, hijri);

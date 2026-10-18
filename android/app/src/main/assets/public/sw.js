@@ -1,6 +1,6 @@
 /**
- * SolatKini Malaysia - Progressive Web App Service Worker
- * Ensures 100% offline functionality, asset caching, and PWABuilder APK compliance.
+ * SolatKini Malaysia - Application Cache Service Worker
+ * Memastikan fungsi 100% luar talian (offline) dan pemuatan pantas aset aplikasi.
  */
 
 const CACHE_NAME = 'solatkini-cache-v2.6.0';

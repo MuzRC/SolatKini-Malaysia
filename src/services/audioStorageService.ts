@@ -193,6 +193,79 @@ class AudioStorageService {
   }
 
   /**
+   * Helper to load audio blob reliably across modern browsers and Android WebViews.
+   * Uses standard fetch first, with XMLHttpRequest blob fallback to guarantee local asset reading.
+   */
+  private async fetchAudioBlobWithFallback(
+    url: string,
+    onProgress?: (progressPercent: number) => void
+  ): Promise<Blob> {
+    // 1. Try standard fetch with progress reader
+    try {
+      const targetUrl = url.startsWith('/') && typeof window !== 'undefined'
+        ? new URL(url, window.location.href).href
+        : url;
+
+      const response = await fetch(targetUrl);
+      if (response.ok) {
+        const contentLength = +(response.headers.get('Content-Length') || 0);
+        if (response.body && contentLength > 0 && onProgress) {
+          const reader = response.body.getReader();
+          let received = 0;
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            onProgress(Math.min(100, Math.round((received / contentLength) * 100)));
+          }
+          return new Blob(chunks as any[], { type: 'audio/mpeg' });
+        }
+        return await response.blob();
+      }
+    } catch (err) {
+      console.warn(`[AudioStorage] Standard fetch gagal bagi ${url}, mencuba XMLHttpRequest:`, err);
+    }
+
+    // 2. Fallback: XMLHttpRequest with responseType = 'blob' (Works 100% in Android WebView for assets)
+    return new Promise((resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'blob';
+
+        if (onProgress) {
+          xhr.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
+              onProgress(percent);
+            }
+          };
+        }
+
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 0) { // status 0 is valid for local android_asset
+            const blob = xhr.response as Blob;
+            if (blob && blob.size > 100_000) {
+              resolve(blob);
+              return;
+            }
+          }
+          reject(new Error(`XHR status ${xhr.status}: ${xhr.statusText || 'Gagal memuat turun fail'}`));
+        };
+
+        xhr.onerror = () => reject(new Error('Rangkaian terputus semasa memuat turun fail audio'));
+        xhr.ontimeout = () => reject(new Error('Masa muat turun tamat (timeout)'));
+        xhr.timeout = 25000;
+        xhr.send();
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+
+  /**
    * Fetches an MP3 from local app storage or remote URL, caches it in IndexedDB for offline play,
    * and optionally triggers a browser download dialog for the user.
    */
@@ -204,52 +277,51 @@ class AudioStorageService {
     onProgress?: (progressPercent: number) => void,
     fallbackUrl?: string
   ): Promise<Blob> {
-    let response: Response;
+    // Check if already in cache
+    const existing = await this.getAudioBlob(voiceId);
+    if (existing && this.isValidAudioBlob(existing)) {
+      if (onProgress) onProgress(100);
+      if (saveToDisk && typeof window !== 'undefined') {
+        this.triggerFileDownload(existing, filename);
+      }
+      return existing;
+    }
+
+    let blob: Blob | null = null;
+
+    // Try primary URL
     try {
-      response = await fetch(audioUrl);
-      if (!response.ok) throw new Error(`Status ${response.status}: ${response.statusText}`);
-    } catch (err) {
+      blob = await this.fetchAudioBlobWithFallback(audioUrl, onProgress);
+    } catch (primaryErr) {
+      console.warn(`[AudioStorage] Audio utama (${audioUrl}) gagal dimuat turun:`, primaryErr);
       if (fallbackUrl) {
-        console.warn(`Pautan audio utama (${audioUrl}) tidak dapat dicapai, mencuba pautan sandaran (${fallbackUrl})...`);
-        response = await fetch(fallbackUrl);
-        if (!response.ok) throw new Error(`Gagal memuat turun fail azan: ${response.statusText}`);
-      } else {
-        throw err;
-      }
-    }
-
-    const reader = response.body?.getReader();
-    const contentLength = +(response.headers.get('Content-Length') || 0);
-
-    let receivedLength = 0;
-    const chunks: Uint8Array[] = [];
-
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        chunks.push(value);
-        receivedLength += value.length;
-
-        if (contentLength && onProgress) {
-          const percent = Math.min(100, Math.round((receivedLength / contentLength) * 100));
-          onProgress(percent);
+        try {
+          blob = await this.fetchAudioBlobWithFallback(fallbackUrl, onProgress);
+        } catch (fallbackErr) {
+          throw new Error(`Gagal memuat turun fail azan (${filename}). Sila pastikan sambungan internet aktif.`);
         }
+      } else {
+        throw primaryErr;
       }
     }
 
-    const blob = chunks.length > 0 ? new Blob(chunks as any[], { type: 'audio/mpeg' }) : await response.blob();
-
-    if (!this.isValidAudioBlob(blob)) {
-      throw new Error(`Fail yang dimuat turun tidak sah (${blob.size} bytes). Pastikan fail adalah MP3 vokal audio.`);
+    if (!blob || !this.isValidAudioBlob(blob)) {
+      throw new Error(`Fail audio yang dimuat turun tidak sah. Sila cuba sekali lagi.`);
     }
 
     // 1. Cache into IndexedDB for instantaneous offline play
     await this.saveAudioBlob(voiceId, blob);
 
-    // 2. Trigger browser download if requested
+    // 2. Trigger disk download if requested
     if (saveToDisk && typeof window !== 'undefined') {
+      this.triggerFileDownload(blob, filename);
+    }
+
+    return blob;
+  }
+
+  private triggerFileDownload(blob: Blob, filename: string) {
+    try {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -258,9 +330,9 @@ class AudioStorageService {
       a.click();
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (e) {
+      console.warn('Gagal memulakan muat turun ke disk fail:', e);
     }
-
-    return blob;
   }
 }
 

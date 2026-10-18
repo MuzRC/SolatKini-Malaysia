@@ -283,10 +283,6 @@ class AudioNotificationService {
     if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
       try {
         const audio = new Audio();
-        // Only set crossOrigin if loading from external CDN
-        if (sourceUrl.startsWith('http://') || sourceUrl.startsWith('https://')) {
-          audio.crossOrigin = 'anonymous';
-        }
         audio.preload = 'auto';
         audio.src = sourceUrl;
         audio.volume = this.volume;
