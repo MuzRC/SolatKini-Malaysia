@@ -84,6 +84,19 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const [selectedStateFilter, setSelectedStateFilter] = useState<string>('Semua');
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [notificationsGranted, setNotificationsGranted] = useState<boolean>(true);
+
+  // Semak status kebenaran notifikasi dan kemas kini apabila tetingkap aktif semula
+  useEffect(() => {
+    const checkPerms = () => {
+      nativeAlarmService.checkPermissions().then((res) => {
+        setNotificationsGranted(res.notificationsGranted);
+      });
+    };
+    checkPerms();
+    window.addEventListener('focus', checkPerms);
+    return () => window.removeEventListener('focus', checkPerms);
+  }, []);
 
   // Azan and notification preferences
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
@@ -575,6 +588,58 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* NOTIFICATION PERMISSION WARNING BANNER IF NOT GRANTED */}
+      {!notificationsGranted && (
+        <div className="rounded-2xl p-4 bg-gradient-to-r from-amber-950/70 to-[#1e1408] border border-amber-500/50 text-left space-y-2.5 shadow-xl animate-in fade-in duration-300">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <BellOff className="w-5 h-5 text-amber-400 shrink-0" />
+              <h4 className="text-sm font-bold text-white">
+                Kebenaran Notifikasi Belum Diaktifkan
+              </h4>
+            </div>
+            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold uppercase tracking-wider">
+              Tindakan Diperlukan
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Untuk membolehkan laungan azan dan penggera waktu solat berbunyi pada telefon anda, sila benarkan notifikasi sistem Android.
+          </p>
+          <div className="pt-1 flex flex-wrap items-center gap-2">
+            <button
+              onClick={async () => {
+                await nativeAlarmService.requestNotificationPermission();
+                setTimeout(async () => {
+                  const perms = await nativeAlarmService.checkPermissions();
+                  setNotificationsGranted(perms.notificationsGranted);
+                }, 1000);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/40"
+            >
+              <Bell className="w-3.5 h-3.5 fill-slate-950" />
+              Minta Kebenaran Notifikasi Sekarang
+            </button>
+            <button
+              onClick={async () => {
+                await nativeAlarmService.openNotificationSettings();
+              }}
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition"
+            >
+              Buka Tetapan Telefon (App Info)
+            </button>
+          </div>
+          <div className="text-[11px] text-amber-200/90 bg-black/40 p-3 rounded-xl border border-amber-500/30 mt-1 leading-relaxed">
+            <strong>Panduan Suis Kelabu (Android 13/14 Sideload):</strong> Jika suis notifikasi dimalapkan (greyed out) dalam Tetapan Telefon:
+            <ol className="list-decimal list-inside mt-1 space-y-0.5 text-slate-300">
+              <li>Tekan butang <strong className="text-amber-300">&quot;Buka Tetapan Telefon (App Info)&quot;</strong> di atas.</li>
+              <li>Tekan <strong>ikon 3 titik di sudut atas kanan</strong> halaman tersebut.</li>
+              <li>Pilih <strong>&quot;Benarkan tetapan terhad&quot; (Allow restricted settings)</strong> dan masukkan PIN / cap jari telefon anda.</li>
+              <li>Suis notifikasi kini aktif dan sedia dihidupkan.</li>
+            </ol>
+          </div>
+        </div>
+      )}
 
       {/* Hero Countdown & Next Prayer Spotlight Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e241c] via-[#091712] to-[#060c0a] border border-emerald-500/20 p-6 sm:p-8 shadow-2xl">

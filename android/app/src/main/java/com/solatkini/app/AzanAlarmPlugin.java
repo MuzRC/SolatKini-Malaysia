@@ -74,7 +74,22 @@ public class AzanAlarmPlugin extends Plugin {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-                requestPermissionForAlias("notifications", call, "notificationCallback");
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ActivityCompat.requestPermissions(
+                                getActivity(),
+                                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                MainActivity.NOTIFICATION_PERMISSION_CODE
+                            );
+                        }
+                    });
+                }
+                JSObject ret = new JSObject();
+                ret.put("granted", false);
+                ret.put("status", "requested");
+                call.resolve(ret);
                 return;
             }
         }

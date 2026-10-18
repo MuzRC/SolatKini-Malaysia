@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.WindowManager;
 import androidx.core.app.ActivityCompat;
@@ -16,7 +18,8 @@ import com.getcapacitor.JSObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
-    private static final int NOTIFICATION_PERMISSION_CODE = 101;
+    public static final int NOTIFICATION_PERMISSION_CODE = 101;
+    private boolean permissionRequested = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -26,14 +29,28 @@ public class MainActivity extends BridgeActivity {
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
-        requestNotificationPermissionImmediate();
         handleAzanIntent(getIntent());
     }
 
-    private void requestNotificationPermissionImmediate() {
+    @Override
+    public void onResume() {
+        super.onResume();
+        if (!permissionRequested) {
+            permissionRequested = true;
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    requestNotificationPermissionImmediate();
+                }
+            }, 700);
+        }
+    }
+
+    public void requestNotificationPermissionImmediate() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
+                Log.i(TAG, "Mencetuskan dialog kebenaran POST_NOTIFICATIONS pada onResume...");
                 ActivityCompat.requestPermissions(
                     this,
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
