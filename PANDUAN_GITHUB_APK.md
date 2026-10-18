@@ -126,7 +126,24 @@ Kemaskini terbaharu merangkumi pembaikan menyeluruh:
 3. **Widget Skrin Utama Native & Mod Jam Meja (AOD)**: Disediakan `SolatWidgetProvider` rasmi Android bersama susun atur waktu solat 5 waktu, serta fungsi **Mod Jam Meja Skrin Penuh (Always-On Display)** dengan sokongan *Screen Wake Lock* untuk telefon di atas meja.
 4. **Pembersihan Mod PWA**: Segala rujukan lapuk berkaitan PWA/PWABuilder telah dikeluarkan dan digantikan dengan pengalaman aplikasi Android (APK) sepenuhnya.
 
+---
 
+## 10. Penyelesaian Suis Notifikasi Kelabu (Greyed Out) & Kebenaran Android 13/14 (TargetSDK 33+)
 
+### Mengapa Suis Notifikasi Pernah Menjadi Kelabu?
+Pada Android 8.0 hingga Android 14+, sistem Android akan mematikan suis notifikasi atau tidak memaparkan sebarang kategori sekiranya aplikasi belum mendaftarkan **NotificationChannel** sebaik sahaja aplikasi dimulakan. 
 
+Kini kod telah dikemaskini sepenuhnya:
+1. **Pendaftaran Automatik Saluran (`SolatKiniApplication.java`)**: 
+   Dua saluran rasmi iaitu **Penggera Azan SolatKini** (prioriti maksima, saluran penggera USAGE_ALARM) dan **Peringatan Waktu Solat** didaftarkan terus ke sistem operasi Android sebaik aplikasi dibuka.
+2. **Permintaan Kebenaran Segera (`POST_NOTIFICATIONS`)**: 
+   Dialog sistem meminta kebenaran notifikasi dipanggil secara langsung melalui `ActivityCompat` pada waktu pelancaran.
+3. **Butang Pintas Tetapan Notifikasi**: 
+   Di dalam aplikasi (pada panel Waktu Solat & Tetapan Muadzin), disediakan butang **"Tetapan Notifikasi Telefon"** untuk membawa anda terus ke halaman tetapan notifikasi sistem.
 
+### Langkah Tambahan Jika Telefon Menunjukkan "Tetapan Terhad" (Restricted Settings)
+Bagi telefon Android 13 dan 14 ke atas, sebarang fail APK yang dipasang di luar Google Play Store (sideload) kadang-kala disekat sementara oleh ciri keselamatan Android:
+1. Buka **Tetapan Telefon (Settings) &rarr; Aplikasi (Apps) &rarr; SolatKini**.
+2. Jika suis bertulis *"Restricted setting / Tetapan terhad"*, tekan **ikon 3 titik di bucu atas kanan**.
+3. Pilih **"Allow restricted settings" (Benarkan tetapan terhad)** dan sahkan menggunakan cap jari atau PIN telefon anda.
+4. Suis notifikasi kini aktif dan sedia dibuka sepenuhnya!

@@ -1094,6 +1094,14 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                   </button>
                   <button
                     onClick={async () => {
+                      await nativeAlarmService.openNotificationSettings();
+                    }}
+                    className="px-3 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 text-xs font-semibold border border-emerald-500/40 transition"
+                  >
+                    Tetapan Notifikasi Telefon
+                  </button>
+                  <button
+                    onClick={async () => {
                       await nativeAlarmService.openExactAlarmSettings();
                     }}
                     className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition"

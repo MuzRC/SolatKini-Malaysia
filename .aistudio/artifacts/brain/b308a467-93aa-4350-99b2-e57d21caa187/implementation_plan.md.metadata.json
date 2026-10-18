@@ -1,6 +1,6 @@
 {
-  "summary": "Pelan komprehensif bagi pembinaan semula sistem penggera Azan asli (Android AlarmManager), integrasi kebenaran notifikasi Android 13+ (TargetSDK 33 POST_NOTIFICATIONS), pengurusan skrin penuh azan dan kemas kini kod runtime untuk binaan APK GitHub Actions.",
-  "updatedAt": "2026-10-18T22:23:09.440121594Z",
+  "summary": "Pelan penyelesaian isu notifikasi kelabu (greyed out) dalam Tetapan Telefon Android (App Info) melalui pendaftaran saluran notifikasi segera pada peringkat Application.onCreate(), pencetus terus kebenaran POST_NOTIFICATIONS, dan integrasi pautan pintas ke tetapan sistem.",
+  "updatedAt": "2026-10-18T23:01:40.623086763Z",
   "requestFeedback": true,
   "userFacing": true
 }

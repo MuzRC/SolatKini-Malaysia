@@ -135,6 +135,40 @@ public class AzanAlarmPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void openNotificationSettings(PluginCall call) {
+        Context context = getContext();
+        try {
+            Intent intent = new Intent();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+                intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+            } else {
+                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
+            }
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.e(TAG, "Gagal membuka tetapan notifikasi khusus, beralih ke tetapan aplikasi", e);
+            try {
+                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                fallback.setData(Uri.parse("package:" + context.getPackageName()));
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(fallback);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+            } catch (Exception err) {
+                call.reject("Tidak dapat membuka tetapan sistem: " + err.getMessage());
+            }
+        }
+    }
+
+    @PluginMethod
     public void schedulePrayerAlarms(PluginCall call) {
         try {
             Context context = getContext();

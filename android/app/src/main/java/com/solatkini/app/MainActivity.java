@@ -1,17 +1,22 @@
 package com.solatkini.app;
 
+import android.Manifest;
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.WindowManager;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.JSObject;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
+    private static final int NOTIFICATION_PERMISSION_CODE = 101;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -21,7 +26,21 @@ public class MainActivity extends BridgeActivity {
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
+        requestNotificationPermissionImmediate();
         handleAzanIntent(getIntent());
+    }
+
+    private void requestNotificationPermissionImmediate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    NOTIFICATION_PERMISSION_CODE
+                );
+            }
+        }
     }
 
     @Override

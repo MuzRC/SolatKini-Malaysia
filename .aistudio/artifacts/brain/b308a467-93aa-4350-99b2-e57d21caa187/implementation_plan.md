@@ -1,132 +1,100 @@
-# Pelan Pelaksanaan: Sistem Penggera Azan Asli Android (AlarmManager) & Kebenaran Notifikasi TargetSDK 33+
+# Pelan Pelaksanaan: Memperbaiki Isu Notifikasi Kelabu (Greyed Out) Dalam Tetapan Sistem Android (App Info)
 
-Pelan ini menggariskan penaiktarafan menyeluruh dan pembinaan semula sistem penggera azan aplikasi SolatKini ke tahap **Android Native Alarm System** bagi memastikan laungan azan berbunyi secara tepat waktu pada telefon pintar pengguna melepasi mod senyap, disokong oleh kebenaran notifikasi Android 13+ (`POST_NOTIFICATIONS`), pengurusan skrin visual azan penuh automatik, serta persediaan binaan sedia-tolak ke GitHub.
+Pelan ini menggariskan penyelesaian khusus bagi mengatasi masalah suis notifikasi yang dimalapkan (*greyed out*) dalam Tetapan Telefon Android (**App Info -> Notifications**) dengan mendaftarkan saluran notifikasi (*Notification Channels*) secara rasmi pada peringkat permulaan aplikasi (**Application Class**), mencetuskan dialog kebenaran `POST_NOTIFICATIONS` secara langsung, dan memastikan sistem operasi Android mengiktiraf aplikasi sebagai pengeluar notifikasi aktif.
 
 ---
 
 ## Keputusan Kritikal & Maklum Balas Pengguna
 
 > [!IMPORTANT]
-> Berdasarkan pilihan yang telah disahkan oleh pengguna pada fasa temubual:
-> 1. **Saluran Audio Penggera Maksima**: Audio azan dikonfigurasi melalui saluran penggera (`STREAM_ALARM` / `AudioAttributes.USAGE_ALARM`) yang berupaya melepasi mod senyap/getar telefon dan mengekalkan kelantangan azan yang optimum.
-> 2. **Paparan Skrin Penuh Automatik**: Apabila masuk waktu solat, sistem mengaktifkan paparan visual skrin penuh azan secara serta-merta walaupun telefon dalam keadaan berkunci (`showWhenLocked` dan `turnScreenOn`).
-> 3. **Masa Permintaan Kebenaran Runtime**: Kebenaran notifikasi (`POST_NOTIFICATIONS` bagi Android 13 / TargetSDK 33+) dan status penggera tepat diminta sebaik sahaja aplikasi dibuka kali pertama, serta semasa pengguna mengaktifkan suis azan.
+> **Punca Utama Masalah Dikenalpasti**:
+> Pada sistem operasi Android 8.0 hingga 14+ (TargetSDK 33+), suis notifikasi dalam Tetapan Telefon (*App Info*) akan dimalapkan (*greyed out*) atau menyatakan *"Tiada kategori notifikasi didaftarkan"* sekiranya aplikasi belum mendaftarkan `NotificationChannel` ke dalam sistem Android sebaik sahaja aplikasi dipasang. Sebelum ini, saluran notifikasi hanya dibina di dalam `AzanAudioService` yang belum dimulakan semasa aplikasi baru dipasang.
+
+- **Keputusan 1**: Mewujudkan kelas `SolatKiniApplication.java` (`android.app.Application`) untuk mendaftarkan semua saluran notifikasi (`solatkini_azan_channel`, `solatkini_reminder_channel`) secara serta-merta pada saat pertama aplikasi dilancarkan (`Application.onCreate()`).
+- **Keputusan 2**: Menguatkuasakan pencetusan dialog kebenaran `POST_NOTIFICATIONS` secara langsung melalui `ActivityCompat.requestPermissions()` di dalam `MainActivity.onCreate()` dan melalui pemalam Capacitor `AzanAlarmPlugin`.
+- **Keputusan 3**: Menyediakan butang pintas *"Buka Tetapan Notifikasi Sistem"* di dalam aplikasi yang membuka halaman `Settings.ACTION_APP_NOTIFICATION_SETTINGS` peranti secara terus sekiranya pengguna ingin memeriksa status atau mengaktifkannya secara manual.
 
 ---
 
 ## 1. Gambaran Keseluruhan & Konsep Teras
 
-- **Masalah Pengguna**: Sebelum ini, pemasaan azan hanya bergantung kepada kod pelayar (JavaScript Web `setInterval`) di dalam Capacitor WebView. Apabila skrin telefon dipadamkan atau aplikasi berada di latar belakang, sistem operasi Android (Doze Mode / App Standby) membekukan pemprosesan web, menyebabkan azan gagal berbunyi atau berbunyi lewat. Selain itu, ketiadaan kebenaran `POST_NOTIFICATIONS` pada TargetSDK 33+ menyebabkan sebarang notifikasi disekat tanpa disedari.
-- **Penyelesaian Asli (Android Native)**:
-  - Membina **Plugin Asli Capacitor** (`AzanAlarmPlugin.java`) bersama **BroadcastReceiver** (`AzanAlarmReceiver.java`) dan **Perkhidmatan Latar Depan** (`AzanForegroundService.java`) yang memanfaatkan `AlarmManager.setExactAndAllowWhileIdle()`.
-  - Mengemaskini `AndroidManifest.xml` dengan kebenaran rasmi Android 13/14+ bagi notifikasi dan penggera tepat.
-  - Mengemaskini lapisan runtime TypeScript/React untuk menyegerakkan jadual 5 waktu solat harian terus ke dalam perkakasan `AlarmManager` telefon.
+- **Masalah Pengguna**: Pengguna memasang fail APK hasil binaan GitHub, namun apabila memeriksa tetapan notifikasi telefon di *App Info*, suis notifikasi didapati kelabu (*greyed out*) dan tidak boleh dihidupkan.
+- **Penyelesaian**:
+  1. **Pendaftaran Awal Peringkat Aplikasi (`SolatKiniApplication`)**: Membina kelas `SolatKiniApplication` dan mendaftarkannya pada tag `<application android:name=".SolatKiniApplication">` dalam `AndroidManifest.xml`.
+  2. **Penciptaan Pelbagai Saluran Notifikasi**:
+     - `solatkini_azan_channel`: Saluran Prioriti Tertinggi (`IMPORTANCE_HIGH` / `IMPORTANCE_MAX`) khas untuk laungan Azan dengan bypass mod senyap.
+     - `solatkini_reminder_channel`: Saluran Peringatan Masuk Waktu Solat (`IMPORTANCE_DEFAULT`).
+  3. **Pencetus Dialog Kebenaran Android 13+ Asli**: Memanggil dialog sistem `POST_NOTIFICATIONS` tanpa berlengah pada kali pertama aplikasi dibuka.
 
 ---
 
 ## 2. Pengalaman Pengguna & Reka Bentuk Visual (UX/UI)
 
-### Aliran Pengguna (User Flow)
-1. **Langkah 1 (Pelancaran Pertama)**:
-   - Aplikasi memaparkan dialog kebenaran notifikasi Android 13+ (`POST_NOTIFICATIONS`) secara teratur bersama penerangan ringkas manfaat waktu solat.
-   - Pengesanan kebenaran penggera tepat (`SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM`) bagi memastikan telefon tidak menyekat penggera.
-2. **Langkah 2 (Tetapan & Suis Azan)**:
-   - Pengguna memilih pilihan vokal azan rasmi (cth. Makkah, Madinah, JAKIM) dan menukar status suis notifikasi/azan.
-   - Kod runtime menghantar senarai cap waktu (epoch timestamp) bagi 5 waktu solat (Subuh, Syuruk, Zohor, Asar, Maghrib, Isyak) ke plugin `AzanAlarm`.
-3. **Langkah 3 (Penggera Berbunyi & Skrin Penuh)**:
-   - Tepat pada saat masuk waktu, `AlarmManager` membangunkan CPU telefon melalui `WakeLock`.
-   - Audio azan berkumandang pada aras penggera sistem (`STREAM_ALARM`).
-   - Skrin visual azan penuh (*Full-screen Intent*) dipaparkan dengan animasi alun gelombang suara, butang henti, dan paparan Doa Selepas Azan (Sunnah).
-
-### Identiti Visual & Ergonomik Sentuhan (Touch Ergonomics)
-- **Tema & Suasana**: Palet gelap kehijauan zaitun dan emas (`#0a120f` ke `#13221c`), berlatarkan aksen zamrud (`emerald-400`/`emerald-500`) dan ambar (`amber-300`).
-- **Skrin Visual Azan Penuh**:
-  - Zon sentuhan selesa minimum $48\text{px}$ bagi butang kawalan penggera ("Hentikan Azan" & "Tutup").
-  - Tipografi solat yang jelas dengan teks seimbang (`text-wrap: balance`).
-  - Tiada sebarang pill berlebihan atau kod mekanikal palsu, berpandukan piawaian reka bentuk antaramuka moden.
+- **Semasa Pelancaran Pertama**:
+  - Dialog sistem Android 13+ bertajuk *"Allow SolatKini to send you notifications?"* akan muncul serta-merta.
+- **Dalam Tetapan Sistem Telefon (App Info)**:
+  - Suis notifikasi tidak lagi kelabu.
+  - Senarai kategori saluran notifikasi akan terpapar dengan jelas:
+    - *Penggera Azan SolatKini (Audio & Skrin Penuh)*
+    - *Peringatan Waktu Solat*
+- **Dalam Tetapan Azan Aplikasi**:
+  - Status notifikasi sistem dipaparkan secara jelas (Dibenarkan / Perlu Diaktifkan).
+  - Butang *"Buka Tetapan Notifikasi Telefon"* disediakan bagi memudahkan akses pantas.
 
 ---
 
-## 3. Keputusan Produk & Seni Bina Teknikal
+## 3. Seni Bina Teknikal & Perubahan Kod
 
-### Keputusan 1: Penggunaan Android Native `AlarmManager` Berbanding Web Timer
-- *Pendekatan Dipilih*: Menggunakan `AlarmManager.setExactAndAllowWhileIdle()` yang dijadualkan melalui kod Java asli Capacitor.
-- *Rasional*: Android Doze Mode mematikan sebarang proses JavaScript/WebView apabila telefon tidur. Hanya penggera tepat sistem operasi yang dibenarkan membangunkan peranti dari mod tidur lena.
-- *Ketahanan Booting*: Dilengkapi `BootReceiver` (`RECEIVE_BOOT_COMPLETED`) untuk menjadualkan semula penggera solat sekiranya telefon dihidupkan semula (restart).
-
-### Keputusan 2: Saluran Audio `AudioAttributes.USAGE_ALARM` & Notifikasi Keutamaan Tinggi
-- *Pendekatan Dipilih*: Membina `NotificationChannel` dengan aras kepentingan `IMPORTANCE_HIGH` / `IMPORTANCE_MAX` dengan penetapan `AudioAttributes.USAGE_ALARM`.
-- *Rasional*: Membolehkan audio azan berbunyi pada saluran penggera jam telefon (*alarm volume stream*) dan mengabaikan sekatan mod senyap (*silent mode bypass*).
-
-### Keputusan 3: Penyelarasan Kebenaran AndroidManifest (TargetSDK 33+)
-- *Pendekatan Dipilih*: Memasukkan kebenaran deklaratif:
-  - `android.permission.POST_NOTIFICATIONS` (Wajib untuk Android 13+)
-  - `android.permission.SCHEDULE_EXACT_ALARM` & `android.permission.USE_EXACT_ALARM`
-  - `android.permission.WAKE_LOCK` & `android.permission.RECEIVE_BOOT_COMPLETED`
-  - `android.permission.FOREGROUND_SERVICE` & `android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK`
-  - `android.permission.USE_FULL_SCREEN_INTENT`
-
----
-
-## 4. Gambar Rajah Seni Bina Sistem (Architecture Diagram)
+### Gambar Rajah Aliran Pendaftaran Saluran Notifikasi
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   APLIKASI SOLATKINI (REACT + TS)                      │
-│                                                                        │
-│   [PrayerDashboard]  ──►  [audioNotificationService]                   │
-│          │                               │                             │
-│          ▼                               ▼                             │
-│   Semak Waktu Solat          [AzanBridge / Capacitor Native]          │
-└──────────────────────────────────────────┬─────────────────────────────┘
-                                           │ Permintaan Penjadualan Penggera
-                                           ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     LAPISAN ASLI ANDROID (JAVA)                        │
-│                                                                        │
-│   [AzanAlarmPlugin.java]                                               │
-│            │ (Jadualkan 5 Waktu Solat ke OS)                           │
-│            ▼                                                           │
-│   [Android AlarmManager] (Exact & Allow While Idle)                    │
-│            │                                                           │
-│            │ (Apabila Tiba Waktu Solat)                                │
-│            ▼                                                           │
-│   [AzanAlarmReceiver.java] ──► Bangunkan CPU ([WakeLock])              │
-│            │                                                           │
-│            ├──► [AzanService.java] (Mainkan Audio STREAM_ALARM)        │
-│            │                                                           │
-│            └──► [NotificationManager]                                  │
-│                   ├── Saluran Notifikasi Prioriti Tinggi (API 33+)     │
-│                   └── Full-Screen Intent ──► [MainActivity] (Buka UI)  │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│             APLIKASI DIBUKA KALI PERTAMA               │
+│                                                        │
+│            [SolatKiniApplication.java]                 │
+│                         │                              │
+│                         ▼                              │
+│         Daftar Notification Channels ke OS             │
+│        (solatkini_azan_channel & reminder)             │
+│                         │                              │
+│                         ▼                              │
+│             [Tetapan Telefon Android]                  │
+│       Suis AKTIF serta-merta (Tiada lagi kelabu!)      │
+└─────────────────────────┬──────────────────────────────┘
+                          │
+                          ▼
+┌────────────────────────────────────────────────────────┐
+│                 [MainActivity.java]                    │
+│                         │                              │
+│                         ▼                              │
+│          Panggil Dialog POST_NOTIFICATIONS             │
+│            (ActivityCompat.requestPermissions)         │
+│                         │                              │
+│                         ▼                              │
+│         Pengguna Tekan "Allow / Benarkan"              │
+└────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Komponen Yang Akan Dihasilkan & Dikemaskini
+## 4. Komponen Yang Akan Dihasilkan & Dikemaskini
 
-1. **Konfigurasi Android (`android/app/src/main/AndroidManifest.xml`)**:
-   - Menambah semua senarai kebenaran Android 13+ (`POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `WAKE_LOCK`, `RECEIVE_BOOT_COMPLETED`, dsb.).
-   - Mendaftarkan `AzanAlarmReceiver`, `AzanService`, dan `BootReceiver` dalam tag `<application>`.
-   - Menetapkan atribut `android:showWhenLocked="true"` dan `android:turnScreenOn="true"` pada `MainActivity`.
-
-2. **Lapisan Kod Asli Java (`android/app/src/main/java/com/solatkini/app/`)**:
-   - `AzanAlarmPlugin.java`: Jambatan Capacitor untuk mendaftar penggera, memeriksa kebenaran notifikasi, dan menguji penggera serta-merta.
-   - `AzanAlarmReceiver.java`: Penerima isyarat siaran penggera sistem operasi.
-   - `AzanAudioService.java`: Memainkan audio vokal azan menggunakan `MediaPlayer` berasaskan saluran penggera (`STREAM_ALARM`).
-   - `AzanBootReceiver.java`: Menjadualkan semula waktu solat apabila peranti dihidupkan semula.
-   - `MainActivity.java`: Mendaftarkan `AzanAlarmPlugin.class` ke dalam Capacitor Bridge.
-
-3. **Lapisan Runtime Web (`src/services/` & `src/App.tsx`)**:
-   - `src/services/nativeAlarmService.ts`: Panggilan modular ke plugin asli Capacitor dengan fallback pelayar yang kemas.
-   - Mengemaskini `src/App.tsx` & `src/components/PrayerDashboard.tsx` untuk memanggil semakan kebenaran `POST_NOTIFICATIONS` sebaik sahaja aplikasi dimuatkan.
-   - Menyegerakkan jadual waktu solat harian secara automatik ke dalam `AlarmManager` setiap kali waktu solat dikira atau zon berubah.
+1. **`android/app/src/main/java/com/solatkini/app/SolatKiniApplication.java` (BARU)**:
+   - Kelas `Application` rasmi yang mencipta `NotificationChannel` lengkap dengan `AudioAttributes.USAGE_ALARM`, getaran, dan penglihatan skrin kunci sebaik sahaja proses aplikasi dimulakan oleh Android.
+2. **`android/app/src/main/AndroidManifest.xml`**:
+   - Menambah `android:name=".SolatKiniApplication"` ke dalam tag `<application>`.
+3. **`android/app/src/main/java/com/solatkini/app/MainActivity.java`**:
+   - Menambah logik semakan dan pencetusan kebenaran `POST_NOTIFICATIONS` secara langsung menggunakan `ActivityCompat`.
+4. **`android/app/src/main/java/com/solatkini/app/AzanAlarmPlugin.java`**:
+   - Menambah kaedah `openSystemNotificationSettings()` untuk melancarkan `Settings.ACTION_APP_NOTIFICATION_SETTINGS`.
+5. **`src/services/nativeAlarmService.ts` & `src/components/PrayerDashboard.tsx`**:
+   - Menyediakan butang interaktif untuk melancarkan tetapan notifikasi sistem telefon sekiranya diperlukan oleh pengguna.
 
 ---
 
-## 6. Pelan Pengesahan (Verification Plan)
+## 5. Pelan Pengesahan (Verification Plan)
 
-- [ ] **Semakan Sintaks & Pematuhan Kod**: Jalankan `npm run lint` dan `compile_applet` untuk memastikan tiada ralat TypeScript atau pembungkusan Vite.
-- [ ] **Semakan AndroidManifest.xml**: Sahkan kehadiran `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, dan deklarasi komponen penerima siaran penggera.
-- [ ] **Penyegerakan Capacitor**: Jalankan semakan konfigurasi agar kod asli Java dan pemalam terdaftar dengan betul pada fail `MainActivity.java`.
-- [ ] **Ujian GitHub Actions**: Pastikan fail aliran kerja `.github/workflows/build-apk.yml` bersedia untuk membina fail APK tanpa sebarang halangan kod rahsia.
+- [ ] Pastikan `SolatKiniApplication.java` wujud dan didaftarkan dalam `AndroidManifest.xml`.
+- [ ] Sahkan bahawa saluran notifikasi `solatkini_azan_channel` didaftarkan ke `NotificationManager` pada tahap `Application.onCreate()`.
+- [ ] Uji kompilasi dengan `npm run lint` dan `compile_applet`.
+- [ ] Jalankan `npx cap sync android` untuk memastikan konfigurasi terkini disegerakkan ke direktori Android.

@@ -18,6 +18,7 @@ export interface AzanAlarmPluginInterface {
   checkNotificationPermission(): Promise<PermissionStatusResult>;
   requestNotificationPermission(): Promise<{ granted: boolean; status: string }>;
   openExactAlarmSettings(): Promise<{ opened: boolean }>;
+  openNotificationSettings(): Promise<{ opened: boolean }>;
   schedulePrayerAlarms(options: { alarms: NativeAlarmItem[] }): Promise<{ success: boolean; scheduledCount: number }>;
   cancelAllAlarms(): Promise<{ success: boolean }>;
   testAlarmNow(options: { prayerName: string; prayerKey: string; voice: string; delaySeconds: number }): Promise<{ success: boolean }>;
@@ -95,6 +96,20 @@ class NativeAlarmService {
       return !!res.opened;
     } catch (err) {
       console.warn('Gagal membuka tetapan exact alarm:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Membuka halaman Tetapan Notifikasi Sistem Telefon Android (App Info -> Notifications).
+   */
+  public async openNotificationSettings(): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.openNotificationSettings();
+      return !!res.opened;
+    } catch (err) {
+      console.warn('Gagal membuka tetapan notifikasi:', err);
       return false;
     }
   }
