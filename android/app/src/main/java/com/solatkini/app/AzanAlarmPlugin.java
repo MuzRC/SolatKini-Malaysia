@@ -247,6 +247,11 @@ public class AzanAlarmPlugin extends Plugin {
             // Simpan ke SharedPreferences untuk penjadualan semula apabila telefon 'reboot'
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
+            if (alarmsArray.length() > 0) {
+                JSONObject firstObj = alarmsArray.getJSONObject(0);
+                String activeVoice = firstObj.optString("voice", "jakim");
+                prefs.edit().putString("selected_azan_voice", activeVoice).apply();
+            }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -324,6 +329,9 @@ public class AzanAlarmPlugin extends Plugin {
                 }
             }
 
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().putString("selected_azan_voice", voice).apply();
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("delaySeconds", delaySeconds);
@@ -331,6 +339,19 @@ public class AzanAlarmPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Gagal menguji penggera azan: " + e.getMessage(), e);
         }
+    }
+
+    @PluginMethod
+    public void setActiveAzanVoice(PluginCall call) {
+        String voice = call.getString("voice", "jakim");
+        Context context = getContext();
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString("selected_azan_voice", voice).apply();
+        Log.i(TAG, "Nada azan aktif dikemaskini dalam SharedPreferences: " + voice);
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        ret.put("voice", voice);
+        call.resolve(ret);
     }
 
     @PluginMethod

@@ -19,6 +19,7 @@ export interface AzanAlarmPluginInterface {
   requestNotificationPermission(): Promise<{ granted: boolean; status: string }>;
   openExactAlarmSettings(): Promise<{ opened: boolean }>;
   openNotificationSettings(): Promise<{ opened: boolean }>;
+  setActiveAzanVoice(options: { voice: string }): Promise<{ success: boolean; voice: string }>;
   schedulePrayerAlarms(options: { alarms: NativeAlarmItem[] }): Promise<{ success: boolean; scheduledCount: number }>;
   cancelAllAlarms(): Promise<{ success: boolean }>;
   testAlarmNow(options: { prayerName: string; prayerKey: string; voice: string; delaySeconds: number }): Promise<{ success: boolean }>;
@@ -110,6 +111,20 @@ class NativeAlarmService {
       return !!res.opened;
     } catch (err) {
       console.warn('Gagal membuka tetapan notifikasi:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Menyimpan pilihan suara azan ke dalam SharedPreferences perkakasan Android native.
+   */
+  public async setActiveVoice(voice: string): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.setActiveAzanVoice({ voice });
+      return !!res.success;
+    } catch (err) {
+      console.warn('Gagal menetapkan nada azan aktif ke native plugin:', err);
       return false;
     }
   }

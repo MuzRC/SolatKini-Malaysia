@@ -158,6 +158,32 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
     setSelectedVoice(opt.id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_azan_voice', opt.id);
+      localStorage.setItem('solatkini_active_device_voice', opt.id);
+    }
+    nativeAlarmService.setActiveVoice(opt.id);
+
+    // Segerakkan jadual penggera AlarmManager Android dengan suara baharu serta-merta
+    if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
+      const list = PRAYER_KEYS_ORDER.map((k) => ({
+        key: k,
+        label: PRAYER_LABELS[k],
+        time: prayerTimes.times[k],
+        displayTime: formatDisplayTime(prayerTimes.times[k]),
+      }));
+      const enabledMap: Record<PrayerKey, boolean> = {
+        imsak: false,
+        subuh: notificationSettings.preferences.subuh?.enabled ?? true,
+        syuruk: false,
+        zohor: notificationSettings.preferences.zohor?.enabled ?? true,
+        asar: notificationSettings.preferences.asar?.enabled ?? true,
+        maghrib: notificationSettings.preferences.maghrib?.enabled ?? true,
+        isyak: notificationSettings.preferences.isyak?.enabled ?? true,
+      };
+      nativeAlarmService.schedulePrayers(list, opt.id, enabledMap);
+    }
+
     setAudioToast(`Berjaya! ${opt.title} kini ditetapkan sebagai nada azan telefon anda.`);
     setTimeout(() => setAudioToast(null), 4000);
 
@@ -420,13 +446,37 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const completedFardCount = FARD_PRAYERS_ORDER.filter((k) => prayerChecklist[k]).length;
   const fardPercentage = Math.round((completedFardCount / 5) * 100);
 
-  const handleVoiceSelect = (voice: AzanVoice) => {
+  const handleVoiceSelect = async (voice: AzanVoice) => {
     // Stop any active or preview audio immediately when selecting a voice
     audioNotificationService.stopAudio();
     setIsPlayingPreview(false);
     setSelectedVoice(voice);
+    setActiveDeviceVoice(voice);
+    audioStorageService.setActiveDeviceVoice(voice);
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_azan_voice', voice);
+      localStorage.setItem('solatkini_active_device_voice', voice);
+    }
+    nativeAlarmService.setActiveVoice(voice);
+
+    // Segerak semula penggera waktu solat dengan suara pilihan pengguna
+    if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
+      const list = PRAYER_KEYS_ORDER.map((k) => ({
+        key: k,
+        label: PRAYER_LABELS[k],
+        time: prayerTimes.times[k],
+        displayTime: formatDisplayTime(prayerTimes.times[k]),
+      }));
+      const enabledMap: Record<PrayerKey, boolean> = {
+        imsak: false,
+        subuh: notificationSettings.preferences.subuh?.enabled ?? true,
+        syuruk: false,
+        zohor: notificationSettings.preferences.zohor?.enabled ?? true,
+        asar: notificationSettings.preferences.asar?.enabled ?? true,
+        maghrib: notificationSettings.preferences.maghrib?.enabled ?? true,
+        isyak: notificationSettings.preferences.isyak?.enabled ?? true,
+      };
+      nativeAlarmService.schedulePrayers(list, voice, enabledMap);
     }
   };
 
