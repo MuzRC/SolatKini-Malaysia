@@ -16,6 +16,7 @@ import android.os.IBinder;
 import android.os.PowerManager;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import com.solatkini.app.R;
 
 public class AzanAudioService extends Service {
     private static final String TAG = "AzanAudioService";

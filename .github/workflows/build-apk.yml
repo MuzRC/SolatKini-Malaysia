@@ -52,9 +52,10 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: 7. Terima Lesen Android SDK Secara Automatik
+      - name: 7. Terima Lesen & Pastikan SDK Platform Android 34 Dipasang
         run: |
           yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0" || true
 
       - name: 8. Berikan Kebenaran Perlaksanaan Gradle Wrapper
         run: |
