@@ -92,6 +92,15 @@ public class MainActivity extends BridgeActivity {
 
     private void handleAzanIntent(Intent intent) {
         if (intent == null) return;
+
+        String action = intent.getAction();
+        if (SolatWidgetPlugin.ACTION_SYNC_PRAYER.equals(action)) {
+            Log.i(TAG, "Menerima Intent Segerak Waktu Solat daripada widget notifikasi.");
+            if (getBridge() != null) {
+                getBridge().triggerWindowJSEvent("solatSyncRequested", "{}");
+            }
+        }
+
         boolean isAzanTrigger = intent.getBooleanExtra("azan_trigger", false);
         if (isAzanTrigger) {
             String prayerName = intent.getStringExtra("prayer_name");

@@ -14,6 +14,19 @@ interface SolatWidgetPluginInterface {
     maghrib: string;
     isyak: string;
   }): Promise<{ success: boolean }>;
+  updatePersistentNotification(options: {
+    zone: string;
+    hijri?: string;
+    next_label: string;
+    next_time: string;
+    countdown?: string;
+    subuh: string;
+    zohor: string;
+    asar: string;
+    maghrib: string;
+    isyak: string;
+  }): Promise<{ success: boolean }>;
+  cancelPersistentNotification(): Promise<{ success: boolean }>;
 }
 
 const SolatWidget = registerPlugin<SolatWidgetPluginInterface>('SolatWidget');
@@ -60,6 +73,65 @@ export class WidgetService {
       }
     } catch (err) {
       console.warn('[WidgetService] Tidak dapat mengemaskini widget natif Android:', err);
+    }
+  }
+
+  public async syncPersistentNotification(
+    prayerTimes: DayPrayerTimes,
+    zone: JakimZone,
+    hijriFormatted?: string,
+    enabled: boolean = true
+  ): Promise<void> {
+    try {
+      if (!enabled) {
+        await this.cancelPersistentNotification();
+        return;
+      }
+      if (!prayerTimes || !prayerTimes.times) return;
+
+      const now = new Date();
+      const nextPrayer = determineNextPrayer(prayerTimes, now);
+      const nextLabel = nextPrayer ? nextPrayer.nextLabel : 'Waktu Solat';
+      const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
+      const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
+
+      const payload = {
+        zone: `${zone.code} (${zone.daerah.split(',')[0].trim()})`,
+        hijri: hijriFormatted || '',
+        next_label: nextLabel,
+        next_time: nextTime,
+        countdown: countdown,
+        subuh: formatDisplayTime(prayerTimes.times.subuh),
+        zohor: formatDisplayTime(prayerTimes.times.zohor),
+        asar: formatDisplayTime(prayerTimes.times.asar),
+        maghrib: formatDisplayTime(prayerTimes.times.maghrib),
+        isyak: formatDisplayTime(prayerTimes.times.isyak),
+      };
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_persistent_notif_payload', JSON.stringify(payload));
+      }
+
+      if (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'android') {
+        await SolatWidget.updatePersistentNotification(payload);
+        console.info('[WidgetService] Notifikasi tetap 5 waktu solat berjaya dihantar ke sistem:', payload.zone);
+      }
+    } catch (err) {
+      console.warn('[WidgetService] Ralat mengemaskini notifikasi tetap:', err);
+    }
+  }
+
+  public async cancelPersistentNotification(): Promise<void> {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('solatkini_persistent_notif_payload');
+      }
+      if (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'android') {
+        await SolatWidget.cancelPersistentNotification();
+        console.info('[WidgetService] Notifikasi tetap 5 waktu solat dibatalkan.');
+      }
+    } catch (err) {
+      console.warn('[WidgetService] Ralat membatalkan notifikasi tetap:', err);
     }
   }
 }

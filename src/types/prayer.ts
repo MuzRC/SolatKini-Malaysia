@@ -46,6 +46,7 @@ export interface AppNotificationSettings {
   masterEnabled: boolean;
   highPriorityAlarm: boolean;
   vibrate: boolean;
+  persistentNotification?: boolean;
   preferences: Record<PrayerKey, PrayerAlertConfig>;
 }
 

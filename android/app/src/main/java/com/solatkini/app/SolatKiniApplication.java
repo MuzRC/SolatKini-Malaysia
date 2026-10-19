@@ -14,6 +14,7 @@ public class SolatKiniApplication extends Application {
     private static final String TAG = "SolatKiniApp";
     public static final String AZAN_CHANNEL_ID = "solatkini_azan_channel";
     public static final String REMINDER_CHANNEL_ID = "solatkini_reminder_channel";
+    public static final String PERSISTENT_CHANNEL_ID = "solatkini_persistent_channel";
 
     @Override
     public void onCreate() {
@@ -59,10 +60,24 @@ public class SolatKiniApplication extends Application {
             reminderChannel.enableVibration(true);
             reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
+            // 3. Saluran Notifikasi Tetap Waktu Solat (Ongoing Notification Shade Widget)
+            NotificationChannel persistentChannel = new NotificationChannel(
+                PERSISTENT_CHANNEL_ID,
+                "Widget Bar Waktu Solat Tetap",
+                NotificationManager.IMPORTANCE_LOW
+            );
+            persistentChannel.setDescription("Paparan kekal 5 waktu solat harian pada bar notifikasi");
+            persistentChannel.setShowBadge(false);
+            persistentChannel.enableLights(false);
+            persistentChannel.enableVibration(false);
+            persistentChannel.setSound(null, null);
+            persistentChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+
             manager.createNotificationChannel(azanChannel);
             manager.createNotificationChannel(reminderChannel);
+            manager.createNotificationChannel(persistentChannel);
 
-            Log.i(TAG, "Saluran notifikasi Android berjaya didaftarkan ke sistem operasi pada waktu pelancaran.");
+            Log.i(TAG, "Semua saluran notifikasi Android termasuk Widget Tetap berjaya didaftarkan ke sistem operasi.");
         }
     }
 }
