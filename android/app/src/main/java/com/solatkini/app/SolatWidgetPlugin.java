@@ -127,7 +127,11 @@ public class SolatWidgetPlugin extends Plugin {
                 .setContentIntent(openPending)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setSound(null)
+                .setVibrate(new long[]{0})
+                .setDefaults(0)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);

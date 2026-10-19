@@ -1,6 +1,6 @@
 {
-  "summary": "Pelan seni bina dan pelaksanaan Widget Notifikasi Tetap Waktu Solat (Ongoing Notification Shade Widget) yang memaparkan kesemua 5 waktu solat sepanjang hari secara berterusan di kawasan notifikasi telefon Android, lengkap dengan suis kawalan di Tetapan aplikasi dan butang pintasan tindakan pantas.",
-  "updatedAt": "2026-10-19T11:43:21.555781059Z",
+  "summary": "Kemas kini pelan pelaksanaan dengan jaminan azan berkumandang seperti biasa dan perlindungan 'Zero Overlap / Anti-Collision' bagi memastikan tepat 1 azan sahaja berkumandang pada setiap waktu solat tanpa sebarang pertindihan suara antara enjin Android Native dan enjin Web Audio.",
+  "updatedAt": "2026-10-19T12:09:39.860641673Z",
   "requestFeedback": true,
   "userFacing": true
 }

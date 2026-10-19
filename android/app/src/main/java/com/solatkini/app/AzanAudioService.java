@@ -32,6 +32,10 @@ public class AzanAudioService extends Service {
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
 
+    // Kunci anti-pertindihan azan (Anti-overlap lock)
+    private static long sLastAzanTimestamp = 0;
+    private static String sLastPrayerKey = "";
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -55,6 +59,16 @@ public class AzanAudioService extends Service {
         String prayerName = intent.getStringExtra("prayer_name");
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
+
+        long now = System.currentTimeMillis();
+        // Halang pencetusan azan berulang bagi solat yang sama dalam tempoh 90 saat (anti-overlap lock)
+        if (prayerKey != null && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
+            Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu. Mengabaikan cetusan bertindih.");
+            return START_NOT_STICKY;
+        }
+
+        sLastAzanTimestamp = now;
+        sLastPrayerKey = prayerKey != null ? prayerKey : "";
 
         if (voice == null || voice.isEmpty()) {
             SharedPreferences prefs = getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);

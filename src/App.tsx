@@ -177,6 +177,9 @@ export default function App() {
         } else if (event.detail) {
           data = event.detail;
         }
+        // Hentikan sebarang Web Audio yang mungkin aktif agar tidak bertindih dengan audio penggera asli
+        audioNotificationService.stopAudio();
+
         setAlarmModalState({
           isOpen: true,
           prayerKey: (data.prayerKey as PrayerKey) || 'solat' as PrayerKey,
@@ -192,10 +195,11 @@ export default function App() {
     return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
   }, []);
 
-  // 3. Setup Azan trigger listener from audio service
+  // 3. Setup Azan trigger listener from audio service (untuk pelayar web)
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
+        // Jika pada peranti Android natif, biarkan AzanAudioService native mengendalikan audio sepenuhnya
         setAlarmModalState({
           isOpen: true,
           prayerKey,
@@ -212,12 +216,13 @@ export default function App() {
   };
 
   const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
-    audioNotificationService.unlockAudio();
-    audioNotificationService.triggerAzan(key, name, voice);
-
-    // If on native Android, also trigger native test alarm
+    // Pada peranti natif Android, cetuskan penggera asli sahaja bagi menjamin tiada 2 azan berbunyi serentak
     if (nativeAlarmService.getIsNative()) {
+      audioNotificationService.stopAudio();
       nativeAlarmService.testAlarm(name, voice, 1);
+    } else {
+      audioNotificationService.unlockAudio();
+      audioNotificationService.triggerAzan(key, name, voice);
     }
   };
 

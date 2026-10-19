@@ -1,109 +1,80 @@
-# Pelan Pelaksanaan: Widget Notifikasi Tetap 5 Waktu Solat (Ongoing Android Notification)
+# Pelan Pelaksanaan: Kedudukan Teratas Notifikasi 5 Waktu Solat & Jaminan Sifar Pertindihan Azan (Zero Audio Overlap)
 
-Ciri ini meletakkan satu bar notifikasi kekal (*ongoing / persistent notification*) pada kawasan notifikasi (*notification tray/shade*) telefon pintar pengguna yang memaparkan kesemua 5 waktu solat fardhu (Subuh, Zohor, Asar, Maghrib, Isyak) secara langsung, menonjolkan solat seterusnya serta kiraan masa, dan menyediakan suis kawalan hidup/mati di halaman Tetapan aplikasi SolatKini.
+Pelan ini dikemas kini untuk memenuhi dua keperluan utama anda:
+1. **Memindahkan Widget Notifikasi 5 Waktu Solat ke kedudukan teratas sekali** pada tetingkap telefon (Priority High / Alerting), bebas daripada kategori *Silent Notifications*, kekal senyap tanpa sebarang bunyi/getaran yang mengganggu.
+2. **Jaminan Azan Berkumandang Lancar & Sifar Pertindihan Audio (*Single-Authoritative Azan*)**: Memastikan azan tetap berkumandang seperti biasa pada setiap waktu solat dan **hanya 1 alunan azan sahaja yang berbunyi** tanpa sebarang suara bertindih (tiada *double echo*).
 
 ---
 
-## Keputusan Semakan Pengguna & Spesifikasi Disahkan
+## Keputusan Semakan & Spesifikasi Yang Disahkan
 
 > [!IMPORTANT]
-> Berdasarkan jawapan anda dalam sesi pengesahan keperluan, spesifikasi pelaksanaan adalah seperti berikut:
-> - **Format Paparan**: Bar padat kesemua 5 waktu solat dalam satu baris kemas berserta penonjolan (*indicator*) solat seterusnya dan kiraan masa berbaki.
-> - **Status Permulaan**: Diaktifkan secara automatik (*Enabled by default*) sebaik aplikasi dipasang, dengan suis hidup/mati disediakan di bahagian Tetapan.
-> - **Tindakan Pintas (*Action Buttons*)**: 
->   1. Butang **"Buka SolatKini"** (membuka aplikasi ke paparan utama)
->   2. Butang **"Segerak Waktu"** (mengemas kini waktu solat daripada e-Solat JAKIM tanpa perlu membuka skrin penuh)
+> - **Kedudukan Bar Notifikasi**: Teratas sekali (*Priority High / Max*), berasingan daripada *Silent Notifications*.
+> - **Bunyi Bar Notifikasi**: Kekal senyap sepenuhnya semasa kemas kini waktu solat harian (`setSound(null)` & `enableVibration(false)`).
+> - **Laungan Azan Waktu Solat**: Tetap berkumandang dengan lantang dan syahdu mengikut suara pilihan anda melalui saluran `STREAM_ALARM`.
+> - **Penghalang Pertindihan Azan (*Strict Anti-Overlap Lock*)**: Pengasingan kuasa mutlak antara penggera Android Native (`AzanAudioService.java`) dan pemain Web Audio (`audioNotificationService.ts`) supaya hanya satu alunan azan sahaja yang bersuara pada satu-satu masa.
 
 ---
 
-## 1. Gambaran Keseluruhan & Konsep Teras
+## 1. Mekanisme Penghalang Pertindihan Azan (*Anti-Overlap Engine*)
 
-### Apa Yang Dilakukan
-- Memaparkan notifikasi Android berstatus `ONGOING` (tidak boleh disapu/dipadam secara tidak sengaja oleh pengguna) di *status bar* telefon.
-- Notifikasi memaparkan:
-  - **Tajuk / Status Semasa**: Zon semasa (cth. `WLY01 - Kuala Lumpur`), waktu solat semasa/seterusnya dan baki masa.
-  - **Jadual 5 Waktu Padat**: Baris kemas: `Subuh 05:54 | Zohor 13:06 | Asar 16:18 | Maghrib 19:04 | Isyak 20:15` dengan penanda khas `[●]` atau warna pada solat seterusnya.
-  - **Dua Butang Pintas**: *Buka Aplikasi* dan *Segerak Waktu*.
-- Berfungsi secara luar talian (*offline-first*) menggunakan data waktu solat yang telah disimpan dalam memori aplikasi.
+### Mengapa Pertindihan Boleh Berlaku Sebelum Ini?
+- Pada telefon Android, terdapat 2 laluan yang berpotensi mencetuskan azan:
+  1. **Laluan Native Hardware**: `AlarmManager` mengejutkan sistem dan memulakan perkhidmatan latar belakang `AzanAudioService.java` (menggunakan `MediaPlayer` Android).
+  2. **Laluan Web View**: Apabila skrin aplikasi terbuka, JavaScript dalam WebView menerima acara `azanAlarmTriggered` dan mungkin turut mencuba memulakan `HTMLAudioElement` atau `AudioContext`.
+- Jika kedua-duanya bersuara serentak, pengguna akan mendengar dua azan berkumandang secara bertindih (*echo/double audio*).
 
-### Sasaran Pengguna
-- Pengguna yang ingin menyemak kesemua 5 waktu solat harian mereka dengan sepintas lalu (*glanceable*) hanya dengan menurunkan tetingkap notifikasi tanpa perlu membuka aplikasi atau ke skrin utama.
-
----
-
-## 2. Pengalaman Pengguna & Reka Bentuk Visual
-
-### Aliran Pengguna (*User Flow*)
-1. **Paparan Tetapan (*Settings View*)**:
-   - Di bahagian tetapan notifikasi aplikasi, ditambah kad kawalan:
-     - **Ikon & Tajuk**: `Notifikasi Tetap Waktu Solat (Bar Status)`
-     - **Penerangan**: *Paparkan kesemua 5 waktu solat harian secara berterusan pada tetingkap notifikasi telefon anda.*
-     - **Suis Toggle (*Switch*)**: Aktifkan atau nyahaktifkan ciri ini bila-bila masa.
-     - **Pilihan Kemas Kini**: Butang manual *"Kemas Kini Bar Notifikasi Sekarang"*.
-2. **Kawasan Notifikasi Telefon (*Android Notification Shade*)**:
-   - Ikon kubah/bulan sabit SolatKini kekal di *status bar*.
-   - Apabila ditarik ke bawah:
-     - Baris 1: `SolatKini · Zon WLY01 (Kuala Lumpur)`
-     - Baris 2 (Sorotan): `Seterusnya: Asar 04:18 PM (dalam 1j 24m)`
-     - Baris 3 (Semua 5 Waktu):
-       `Subuh 05:54  |  Zohor 13:06  |  ▶ Asar 16:18  |  Maghrib 19:04  |  Isyak 20:15`
-     - Baris Tindakan: `[ Buka SolatKini ]` `[ ↻ Segerak Waktu ]`
+### Strategi Perlindungan Sifar Pertindihan (*Zero Overlap Protection*):
+1. **Kuasa Tunggal (*Single Authoritative Audio Stream*) pada Android**:
+   - Pada aplikasi Android APK, tugas memainkan fail audio azan diserahkan **100% dan mutlak kepada `AzanAudioService.java`** (`STREAM_ALARM`).
+   - Apabila peristiwa `azanAlarmTriggered` dihantar ke WebView React, React **hanya membuka tetingkap visual (*Full-Screen Azan Modal*)** tanpa memainkan audio Web Audio pendua.
+2. **Penghentian Paksa Sesi Terdahulu (*Atomic MediaPlayer Reset*)**:
+   - Di dalam `AzanAudioService.java`, setiap kali arahan azan baharu diterima, kaedah `stopAzan()` akan dipanggil serta-merta terlebih dahulu untuk memadamkan sebarang sesi audio yang sedang aktif.
+3. **Kunci Penyah-lantunan Waktu Solat (*Prayer Trigger Debounce Lock*)**:
+   - Sistem menetapkan kunci masa (cth: 3 minit) bagi setiap waktu solat yang telah dilaungkan. Sebarang isyarat berulang bagi waktu solat yang sama dalam tempoh berkenaan akan disekat serta-merta.
 
 ---
 
-## 3. Seni Bina Teknikal & Pelaksanaan
+## 2. Struktur Kedudukan Bar Notifikasi Teratas
 
-### Rajah Aliran Seni Bina Sistem
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Aplikasi Web / React UI                  │
-│                                                             │
-│  ┌───────────────────────┐       ┌────────────────────────┐ │
-│  │ Suis Tetapan Notifikasi│ ───> │ PrayerDashboard / State│ │
-│  │ (persistentNotif: true)│       │  (prayerTimes, zone)   │ │
-│  └───────────────────────┘       └───────────┬────────────┘ │
-└──────────────────────────────────────────────┼──────────────┘
-                                               │ (Capacitor Bridge)
-                                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Pemalam Android (SolatWidgetPlugin)           │
-│                                                             │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ Native Method: updatePersistentNotification(...)        │ │
-│  │ Native Method: cancelPersistentNotification()          │ │
-│  └───────────────────────────┬────────────────────────────┘ │
-└──────────────────────────────┼──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│               Android System Notification Manager           │
-│                                                             │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │ Saluran Khas: solatkini_persistent_channel (LOW imp.)  │ │
-│  │ - Tidak membunyikan loceng berulang kali                │ │
-│  │ - setOngoing(true) & setOnlyAlertOnce(true)            │ │
-│  │ - BigTextStyle / Inset Bar 5 Waktu Solat               │ │
-│  │ - PendingIntent Buka Aplikasi & Segerak Waktu          │ │
-│  └────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│             Notification Shade (Tetingkap Telefon)     │
+│                                                        │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ ★ KEDUDUKAN TERATAS (Top Priority / Ongoing)     │  │  <── SolatKini Widget 5 Waktu
+│  │   - SolatKini · Zon WLY01 (Kuala Lumpur)         │  │      (Channel: IMPORTANCE_HIGH)
+│  │   - Subuh | Zohor | ▶ Asar | Maghrib | Isyak     │  │      (Priority: PRIORITY_MAX)
+│  │   - [ Buka SolatKini ]   [ ↻ Segerak Waktu ]     │  │      (Sound: None, Silent)
+│  └──────────────────────────────────────────────────┘  │
+│                                                        │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ Notifikasi Aplikasi Lain (WhatsApp, Telegram dll)│  │
+│  └──────────────────────────────────────────────────┘  │
+│                                                        │
+│  ════════════════════════════════════════════════════  │
+│  [v] Silent Notifications (Bahagian Bawah Sekali)     │
+│      (Notifikasi SolatKini TIDAK LAGI BERADA DI SINI)  │
+└────────────────────────────────────────────────────────┘
 ```
 
-### Komponen Teknikal Yang Akan Dilaksanakan:
-1. **Saluran Notifikasi Android Khas (`SolatKiniApplication.java`)**:
-   - Didaftarkan saluran notifikasi berasingan: `solatkini_persistent_channel` dengan `IMPORTANCE_LOW` supaya tidak mengganggu atau membunyikan deringan berulang kali setiap kali waktu dikemas kini.
-2. **Kaedah Native Android (`SolatWidgetPlugin.java` & `SolatWidgetProvider.java`)**:
-   - Menambah fungsi penjanaan notifikasi berterusan `NotificationCompat.Builder`:
-     - `setOngoing(true)` (mengelakkan daripada dipadam dengan *Clear All*).
-     - Menghuraikan 5 waktu solat harian dalam format teks yang kemas dan berstruktur.
-     - Menyediakan `PendingIntent` untuk butang tindakan pantas.
-3. **Penyambung TypeScript (`widgetService.ts` / `nativeAlarmService.ts`)**:
-   - Menyediakan fungsi `syncPersistentNotification(prayerTimes, zone, enabled)` untuk diseru apabila data waktu solat berubah atau apabila suis diubah.
-4. **Antaramuka Pengguna (*UI Setting Switch*)**:
-   - Menambah suis kawalan `persistentNotification` dalam `AppNotificationSettings` di `PrayerDashboard.tsx`.
-   - Mengurus penyimpanan pilihan pengguna dalam `localStorage` (`solatkini_notif_settings`).
+### Langkah Pelaksanaan:
+1. **Saluran Notifikasi Teratas Baharu (`SolatKiniApplication.java`)**:
+   - Saluran baharu: `solatkini_top_widget_channel_v2`.
+   - Tahap kepentingan: `NotificationManager.IMPORTANCE_HIGH`.
+   - `channel.setSound(null, null)` dan `channel.enableVibration(false)` untuk sifar bunyi.
+   - Saluran lama yang berstatus senyap (`solatkini_persistent_channel`) dipadamkan dari sistem.
+2. **Pembina Notifikasi (`SolatWidgetPlugin.java`)**:
+   - Menggunakan `PERSISTENT_CHANNEL_ID_V2`.
+   - `builder.setPriority(NotificationCompat.PRIORITY_MAX)`.
+   - `builder.setOngoing(true)` & `builder.setOnlyAlertOnce(true)`.
+3. **Penyelarasan Penggera Azan Bebas Pertindihan (`PrayerDashboard.tsx` & `AzanAlarmModal.tsx`)**:
+   - Memastikan apabila aplikasi berada di peranti Android asli (`Capacitor.isNativePlatform()`), hanya `AzanAudioService` yang membunyikan azan.
+   - Modal azan di skrin hanya memaparkan visual, doa selepas azan, dan butang hentikan azan tanpa menghasilkan suara kedua.
 
 ---
 
-## 4. Pelan Pengesahan & Pengujian
-- **Semakan Kompilasi**: Menjalankan binaan `npm run build && npx cap sync android` dan `compile_applet`.
-- **Semakan Logik Suis**: Memastikan apabila suis dimatikan, notifikasi serta-merta dikeluarkan dari tetingkap telefon (`cancelPersistentNotification`), dan apabila dihidupkan, notifikasi muncul semula dengan waktu solat terkini.
+## 3. Pelan Pengesahan & Pengujian
+- **Semakan Kompilasi**: Menjalankan `npm run build && npx cap sync android` serta `compile_applet`.
+- **Ujian Audio Bersendirian**: Menguji simulasi penggera azan dan memastikan hanya **1 fail audio** yang aktif pada `MediaPlayer` Android.
+- **Ujian Posisi Notifikasi**: Memastikan widget 5 waktu solat muncul di seksyen aktif paling atas dan tidak jatuh ke dalam senarai *Silent Notifications*.
