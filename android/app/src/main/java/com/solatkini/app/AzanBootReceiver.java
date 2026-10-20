@@ -64,12 +64,15 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
+                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
-                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula pada timestamp: " + timestamp);
+                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula tepat melalui setAlarmClock pada: " + timestamp);
                 }
             }
         } catch (Exception e) {

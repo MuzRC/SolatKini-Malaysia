@@ -59,7 +59,7 @@ interface PrayerDashboardProps {
   lastSyncTime?: string;
   isLiveSyncing?: boolean;
   onLiveSync?: () => void;
-  onNavigateToTab: (tab: 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget') => void;
+  onNavigateToTab: (tab: 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget' | 'tetapan' | string) => void;
   onTriggerTestAlarm: (key: PrayerKey, name: string, voice: AzanVoice) => void;
 }
 
@@ -846,7 +846,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             </button>
 
             <button
-              onClick={() => setIsAudioSettingsOpen(true)}
+              onClick={() => onNavigateToTab('tetapan')}
               className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/80 text-slate-200 font-medium text-xs transition active:scale-95 text-left"
             >
               <div className="flex items-center gap-2">

@@ -26,7 +26,7 @@ public class AzanAudioService extends Service {
     private static final String TAG = "AzanAudioService";
     public static final String ACTION_PLAY_AZAN = "com.solatkini.app.ACTION_PLAY_AZAN";
     public static final String ACTION_STOP_AZAN = "com.solatkini.app.ACTION_STOP_AZAN";
-    public static final String CHANNEL_ID = "solatkini_azan_channel";
+    public static final String CHANNEL_ID = "solatkini_azan_channel_v3";
     private static final int NOTIFICATION_ID = 9901;
 
     private MediaPlayer mediaPlayer;
@@ -127,6 +127,8 @@ public class AzanAudioService extends Service {
                 channel.enableVibration(true);
                 channel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000});
                 channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                // Senyapkan audio notifikasi sistem secara eksplisit
+                channel.setSound(null, null);
                 manager.createNotificationChannel(channel);
             }
         }
@@ -165,6 +167,8 @@ public class AzanAudioService extends Service {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setSilent(true)
+            .setSound(null)
             .setContentIntent(openPendingIntent)
             .setFullScreenIntent(openPendingIntent, true)
             .addAction(android.R.drawable.ic_media_pause, "Hentikan Azan", stopPendingIntent)

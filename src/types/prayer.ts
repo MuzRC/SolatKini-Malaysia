@@ -79,7 +79,7 @@ export interface FastingTrackerState {
   gantiTargetDays: number;
 }
 
-export type ActiveTab = 'solat' | 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget' | 'kredit';
+export type ActiveTab = 'solat' | 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'tetapan' | 'widget' | 'kredit';
 
 export type FardPrayerKey = 'subuh' | 'zohor' | 'asar' | 'maghrib' | 'isyak';
 

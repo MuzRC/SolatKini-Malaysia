@@ -162,8 +162,8 @@ class NativeAlarmService {
         const targetDate = new Date();
         targetDate.setHours(h, m, 0, 0);
 
-        // Jika waktu solat hari ini telah berlalu lebih 5 minit, jadualkan waktu tersebut untuk keesokan harinya
-        if (targetDate.getTime() < now.getTime() - 5 * 60 * 1000) {
+        // Jika waktu solat hari ini telah berlalu (kurang atau sama dengan masa sekarang), jadualkan tepat untuk keesokan harinya
+        if (targetDate.getTime() <= now.getTime()) {
           targetDate.setDate(targetDate.getDate() + 1);
         }
 

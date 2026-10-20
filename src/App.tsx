@@ -13,24 +13,59 @@ import {
   AlertCircle,
   X,
   Award,
-  Heart
+  Heart,
+  Settings
 } from 'lucide-react';
 import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './types/prayer';
 import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
 import { fetchDayPrayerTimes } from './services/prayerService';
 import { audioNotificationService } from './services/audioNotificationService';
+import { audioStorageService } from './services/audioStorageService';
 import { nativeAlarmService } from './services/nativeAlarmService';
+import { widgetService } from './services/widgetService';
 import { PrayerDashboard } from './components/PrayerDashboard';
 import { QiblaCompass } from './components/QiblaCompass';
 import { FastingTracker } from './components/FastingTracker';
 import { TasbihWirid } from './components/TasbihWirid';
 import { DuaCollection } from './components/DuaCollection';
-import { HomeWidgetPreview } from './components/HomeWidgetPreview';
+import { SettingsView } from './components/SettingsView';
 import { CreditsPage } from './components/CreditsPage';
 import { AzanAlarmModal } from './components/AzanAlarmModal';
+import { Language, getSavedLanguage, t, saveLanguage } from './utils/i18n';
+import { ThemeId, getSavedTheme, applyTheme } from './utils/theme';
+import { getHijriDate } from './utils/hijriCalendar';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('solat');
+  const [currentLang, setCurrentLang] = useState<Language>(() => getSavedLanguage());
+  const [currentTheme, setCurrentTheme] = useState<ThemeId>(() => getSavedTheme());
+
+  const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('solatkini_azan_voice') as AzanVoice) || 'jakim';
+    }
+    return 'jakim';
+  });
+
+  const [persistentNotification, setPersistentNotification] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('solatkini_notif_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.persistentNotification ?? true;
+        }
+      } catch {}
+    }
+    return true;
+  });
+
+  const [isDndGuideOpen, setIsDndGuideOpen] = useState(false);
+
+  // Apply initial theme globally
+  useEffect(() => {
+    applyTheme(currentTheme);
+  }, [currentTheme]);
 
   // Active JAKIM zone (defaults to WLY01 Kuala Lumpur & Putrajaya or saved in localStorage)
   const [currentZone, setCurrentZone] = useState<JakimZone>(() => {
@@ -226,14 +261,44 @@ export default function App() {
     }
   };
 
+    const handleVoiceChange = (voice: AzanVoice) => {
+      setSelectedVoice(voice);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_azan_voice', voice);
+        localStorage.setItem('solatkini_active_device_voice', voice);
+      }
+    };
+
+    const handleTogglePersistentNotification = async () => {
+      const nextVal = !persistentNotification;
+      setPersistentNotification(nextVal);
+      if (typeof window !== 'undefined') {
+        try {
+          const saved = localStorage.getItem('solatkini_notif_settings');
+          const parsed = saved ? JSON.parse(saved) : {};
+          parsed.persistentNotification = nextVal;
+          localStorage.setItem('solatkini_notif_settings', JSON.stringify(parsed));
+        } catch {}
+      }
+      if (prayerData && prayerData.times && currentZone) {
+        const hijri = getHijriDate(new Date());
+        await widgetService.syncPersistentNotification(
+          prayerData.times,
+          currentZone,
+          hijri.formatted,
+          nextVal
+        );
+      }
+    };
+
   const navItems = [
-    { id: 'solat', label: 'Waktu Solat', icon: Clock },
-    { id: 'kiblat', label: 'Arah Kiblat', icon: Compass },
-    { id: 'puasa', label: 'Berbuka & Puasa', icon: Moon },
-    { id: 'wirid', label: 'Wirid & Tasbih', icon: Radio },
-    { id: 'doa', label: 'Koleksi Doa', icon: BookOpen },
-    { id: 'widget', label: 'Widget Skrin', icon: Sparkles },
-    { id: 'kredit', label: 'Kredit & Info', icon: Award },
+    { id: 'solat', label: t('nav_solat', currentLang), icon: Clock },
+    { id: 'kiblat', label: t('nav_kiblat', currentLang), icon: Compass },
+    { id: 'puasa', label: t('nav_puasa', currentLang), icon: Moon },
+    { id: 'wirid', label: t('nav_wirid', currentLang), icon: Radio },
+    { id: 'doa', label: t('nav_doa', currentLang), icon: BookOpen },
+    { id: 'tetapan', label: t('nav_tetapan', currentLang), icon: Settings },
+    { id: 'kredit', label: t('nav_kredit', currentLang), icon: Award },
   ] as const;
 
   return (
@@ -302,18 +367,18 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: Primary Action (Quick Azan test / Active Zone Pill) */}
+          {/* Zone 3: Primary Action (Quick Azan test / Settings Pill) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
-              onClick={() => setActiveTab('widget')}
+              onClick={() => setActiveTab('tetapan')}
               className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              Widget Skrin
+              <Settings className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{t('nav_tetapan', currentLang)}</span>
             </button>
 
             <button
-              onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', 'jakim')}
+              onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
               className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition active:scale-95"
             >
               <Volume2 className="w-3.5 h-3.5" />
@@ -341,7 +406,7 @@ export default function App() {
                 lastSyncTime={prayerData.lastSyncTime}
                 isLiveSyncing={isLiveSyncing}
                 onLiveSync={handleLiveSync}
-                onNavigateToTab={(tab) => setActiveTab(tab)}
+                onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)}
                 onTriggerTestAlarm={handleTriggerTestAlarm}
               />
             )}
@@ -356,8 +421,27 @@ export default function App() {
 
             {activeTab === 'doa' && <DuaCollection />}
 
-            {activeTab === 'widget' && (
-              <HomeWidgetPreview prayerTimes={prayerData.times} currentZone={currentZone} />
+            {(activeTab === 'tetapan' || activeTab === 'widget') && (
+              <SettingsView
+                currentLang={currentLang}
+                onLanguageChange={(lang) => {
+                  setCurrentLang(lang);
+                  saveLanguage(lang);
+                }}
+                currentTheme={currentTheme}
+                onThemeChange={(th) => {
+                  setCurrentTheme(th);
+                  applyTheme(th);
+                }}
+                prayerTimes={prayerData.times}
+                currentZone={currentZone}
+                selectedVoice={selectedVoice}
+                onVoiceChange={handleVoiceChange}
+                persistentNotification={persistentNotification}
+                onTogglePersistentNotification={handleTogglePersistentNotification}
+                onOpenDndGuide={() => setIsDndGuideOpen(true)}
+                onTriggerTestAlarm={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
+              />
             )}
 
             {activeTab === 'kredit' && (

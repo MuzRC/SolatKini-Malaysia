@@ -234,13 +234,16 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
+                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
                     scheduledCount++;
-                    Log.i(TAG, "Penggera solat (" + prayerName + ") berjaya ditetapkan pada: " + timestamp);
+                    Log.i(TAG, "Penggera solat (" + prayerName + ") tepat dijadualkan melalui setAlarmClock pada: " + timestamp);
                 }
             }
 
@@ -322,7 +325,10 @@ public class AzanAlarmPlugin extends Plugin {
 
             long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
             if (alarmManager != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent);
+                    alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
                 } else {
                     alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);

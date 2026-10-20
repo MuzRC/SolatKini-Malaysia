@@ -1,6 +1,6 @@
 {
-  "summary": "Kemas kini pelan pelaksanaan dengan jaminan azan berkumandang seperti biasa dan perlindungan 'Zero Overlap / Anti-Collision' bagi memastikan tepat 1 azan sahaja berkumandang pada setiap waktu solat tanpa sebarang pertindihan suara antara enjin Android Native dan enjin Web Audio.",
-  "updatedAt": "2026-10-19T12:09:39.860641673Z",
-  "requestFeedback": true,
-  "userFacing": true
+  "summary":  "Pelan pelaksanaan untuk membetulkan kelengahan masa azan (sifar lengah masa menggunakan AlarmManager.setAlarmClock) dan menghapuskan pertindihan suara azan berganda (mematikan bunyi notifikasi sistem dan membenarkan MediaPlayer memainkan suara pilihan pengguna sahaja secara eksklusif).",
+  "updatedAt":  "2026-10-20T14:01:12.014090109Z",
+  "requestFeedback":  true,
+  "userFacing":  true
 }
