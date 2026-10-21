@@ -3,11 +3,28 @@ import { Search, Bookmark, BookmarkCheck, Copy, Check, Sparkles, BookOpen, Heart
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
 import { DuaItem } from '../types/prayer';
 
+type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
+
 export const DuaCollection: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('semua');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [fontSize, setFontSize] = useState<'normal' | 'large' | 'xlarge'>('large');
+
+  // Ambil pilihan saiz tersimpan dari localStorage (lalai: 'large')
+  const [fontSize, setFontSize] = useState<FontSize>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_dua_font_size') as FontSize;
+      if (saved === 'normal' || saved === 'large' || saved === 'xlarge' || saved === '4xl') return saved;
+    }
+    return 'large';
+  });
+
+  const handleSetFontSize = (s: FontSize) => {
+    setFontSize(s);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_dua_font_size', s);
+    }
+  };
 
   // Bookmarks saved in local storage
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
@@ -70,12 +87,29 @@ export const DuaCollection: React.FC = () => {
     );
   });
 
-  const fontClass =
-    fontSize === 'normal'
-      ? 'text-lg sm:text-xl'
-      : fontSize === 'large'
-      ? 'text-xl sm:text-2xl'
-      : 'text-2xl sm:text-3xl';
+  // Skala saiz berkadaran untuk Arab, Rumi, dan Terjemahan (termasuk 4XL)
+  const fontStyles = {
+    normal: {
+      arabic: 'text-lg sm:text-xl leading-relaxed',
+      rumi: 'text-xs sm:text-sm',
+      translation: 'text-xs sm:text-sm',
+    },
+    large: {
+      arabic: 'text-xl sm:text-2xl leading-loose',
+      rumi: 'text-sm sm:text-base',
+      translation: 'text-sm sm:text-base',
+    },
+    xlarge: {
+      arabic: 'text-2xl sm:text-3xl leading-loose',
+      rumi: 'text-base sm:text-lg',
+      translation: 'text-base sm:text-lg',
+    },
+    '4xl': {
+      arabic: 'text-3xl sm:text-4xl leading-loose',
+      rumi: 'text-lg sm:text-xl',
+      translation: 'text-lg sm:text-xl',
+    },
+  }[fontSize];
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
@@ -95,20 +129,22 @@ export const DuaCollection: React.FC = () => {
             </p>
           </div>
 
-          {/* Font Size Selector */}
-          <div className="flex items-center gap-1.5 self-start sm:self-center bg-slate-900 p-1 rounded-xl border border-slate-800">
-            <span className="text-[11px] text-slate-400 px-2 font-medium">Saiz Tulisan:</span>
-            {(['normal', 'large', 'xlarge'] as const).map((s) => (
+          {/* Font Size Selector (A, A+, A++, A+++ / 4XL) */}
+          <div className="flex items-center gap-1 self-start sm:self-center bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <span className="text-[11px] text-slate-400 px-1.5 font-medium">Saiz:</span>
+            {(['normal', 'large', 'xlarge', '4xl'] as const).map((s) => (
               <button
                 key={s}
-                onClick={() => setFontSize(s)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                type="button"
+                onClick={() => handleSetFontSize(s)}
+                title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 ${
                   fontSize === s
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {s === 'normal' ? 'A' : s === 'large' ? 'A+' : 'A++'}
+                {s === 'normal' ? 'A' : s === 'large' ? 'A+' : s === 'xlarge' ? 'A++' : 'A+++'}
               </button>
             ))}
           </div>
@@ -131,8 +167,9 @@ export const DuaCollection: React.FC = () => {
           {categories.map((c) => (
             <button
               key={c.id}
+              type="button"
               onClick={() => setSelectedCategory(c.id)}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap font-medium transition ${
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap font-medium transition active:scale-95 ${
                 selectedCategory === c.id
                   ? 'bg-emerald-600 text-white font-semibold shadow-md shadow-emerald-950/40'
                   : 'bg-slate-900/70 text-slate-300 hover:bg-slate-800'
@@ -181,8 +218,9 @@ export const DuaCollection: React.FC = () => {
 
                   <div className="flex items-center gap-1.5">
                     <button
+                      type="button"
                       onClick={() => handleToggleBookmark(dua.id)}
-                      className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition ${
+                      className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition active:scale-95 ${
                         isBookmarked
                           ? 'text-red-400 bg-red-950/40'
                           : 'text-slate-400 hover:text-white bg-slate-900/60'
@@ -193,8 +231,9 @@ export const DuaCollection: React.FC = () => {
                     </button>
 
                     <button
+                      type="button"
                       onClick={() => handleCopy(dua)}
-                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-slate-900/60 text-slate-400 hover:text-white transition"
+                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-slate-900/60 text-slate-400 hover:text-white transition active:scale-95"
                       title="Salin Teks Doa"
                     >
                       {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -202,20 +241,20 @@ export const DuaCollection: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Arabic Text with custom dynamic size */}
-                <p className={`font-arabic text-right text-emerald-200 leading-loose ${fontClass}`}>
+                {/* 1. Teks Arab: dinamik mengikut fontStyles.arabic */}
+                <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
                   {dua.arabic}
                 </p>
 
-                {/* Transliteration */}
+                {/* 2. Teks Rumi: dinamik mengikut fontStyles.rumi */}
                 <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                  <p className="text-xs sm:text-sm text-slate-300 italic leading-relaxed">
+                  <p className={`text-slate-300 italic leading-relaxed transition-all duration-150 ${fontStyles.rumi}`}>
                     &quot;{dua.transliteration}&quot;
                   </p>
                 </div>
 
-                {/* Malay Translation */}
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                {/* 3. Teks Terjemahan: dinamik mengikut fontStyles.translation */}
+                <p className={`text-slate-400 leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
                   <strong className="text-slate-300">Terjemahan:</strong> {dua.translation}
                 </p>
 
