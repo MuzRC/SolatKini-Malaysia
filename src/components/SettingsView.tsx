@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Trash2,
   Sliders,
+  Bell,
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
@@ -38,8 +39,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onLanguageChange,
   currentTheme,
   onThemeChange,
-  prayerTimes,
-  currentZone,
+  prayerTimes: _prayerTimes, // Ditanda _ jika disimpan untuk kegunaan versi akan datang
+  currentZone: _currentZone,
   selectedVoice,
   onVoiceChange,
   persistentNotification,
@@ -48,7 +49,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onTriggerTestAlarm,
 }) => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [cachedVoiceIds, setCachedVoiceIds] = useState<string[]>([]);
   const [activeDeviceVoice, setActiveDeviceVoice] = useState<string | null>(() => {
     return audioStorageService.getActiveDeviceVoice();
   });
@@ -59,12 +59,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   useEffect(() => {
-    audioStorageService.getAllCachedVoiceIds().then(setCachedVoiceIds).catch(() => {});
     const devVoice = audioStorageService.getActiveDeviceVoice();
     if (devVoice) setActiveDeviceVoice(devVoice);
   }, []);
-
-
 
   const handleSelectLanguage = (lang: Language) => {
     saveLanguage(lang);
@@ -85,13 +82,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     showToast(`${t('theme_title', currentLang)}: ${themeName}`);
   };
 
-
-
   const handleClearAudioCache = async () => {
     try {
       audioNotificationService.stopAudio();
       await audioStorageService.clearAllAudioCache();
-      setCachedVoiceIds([]);
       showToast(
         currentLang === 'ms'
           ? 'Memori cache audio dikosongkan.'
@@ -103,6 +97,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       showToast(e.message || 'Ralat');
     }
   };
+
+  const currentVoiceData = AZAN_OPTIONS.find(
+    (v) => v.id === (activeDeviceVoice || selectedVoice)
+  ) || AZAN_OPTIONS[0];
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12 select-none animate-in fade-in duration-300">
@@ -131,7 +129,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 1. KAD PILIHAN BAHASA (LANGUAGE / 语言选择) */}
+      {/* 1. KAD PILIHAN BAHASA */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
@@ -153,6 +151,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             return (
               <button
                 key={lang.id}
+                type="button"
                 onClick={() => handleSelectLanguage(lang.id)}
                 className={`p-4 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
                   isSelected
@@ -178,7 +177,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 2. KAD TEMA WARNA APLIKASI (7 PILIHAN WARNA) */}
+      {/* 2. KAD TEMA WARNA APLIKASI */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
@@ -218,10 +217,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             return (
               <button
                 key={theme.id}
+                type="button"
                 onClick={() => handleSelectTheme(theme.id)}
                 className={`p-3.5 rounded-2xl border text-left transition flex flex-col justify-between gap-3 ${
                   isSelected
-                    ? 'bg-slate-850 border-white/40 ring-2 ring-white/30 shadow-lg shadow-black/60'
+                    ? 'bg-slate-800 border-white/40 ring-2 ring-white/30 shadow-lg shadow-black/60'
                     : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800/60'
                 }`}
               >
@@ -235,7 +235,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                   {isSelected && (
                     <span className="w-5 h-5 rounded-full bg-white text-slate-950 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </span>
                   )}
                 </div>
@@ -248,7 +248,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
+      {/* 3. KAD NOTIFIKASI BERTERUSAN (STATUS BAR ANDROID) */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Notifikasi Waktu Solat Berterusan
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Paparkan waktu solat seterusnya secara kekal pada panel notifikasi telefon
+              </p>
+            </div>
+          </div>
 
+          <button
+            type="button"
+            onClick={onTogglePersistentNotification}
+            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 shrink-0 ${
+              persistentNotification ? 'bg-emerald-500' : 'bg-slate-800 border border-slate-700'
+            }`}
+          >
+            <div
+              className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                persistentNotification ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
       {/* 4. KAD PENGGERA AZAN & MUADZIN TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
@@ -273,14 +304,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               {t('current_device_azan', currentLang)}
             </span>
             <h4 className="text-sm font-extrabold text-white mt-0.5">
-              {AZAN_OPTIONS.find((v) => v.id === (activeDeviceVoice || selectedVoice))?.title}
+              {currentVoiceData.title}
             </h4>
             <p className="text-[11px] text-slate-300">
-              {AZAN_OPTIONS.find((v) => v.id === (activeDeviceVoice || selectedVoice))?.reciter} · STREAM_ALARM
+              {currentVoiceData.reciter} · STREAM_ALARM
             </p>
           </div>
 
           <button
+            type="button"
             onClick={onTriggerTestAlarm}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shrink-0 shadow-md transition active:scale-95"
           >
@@ -333,6 +365,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Android Hardware Settings & DND bypass */}
         <div className="pt-2 border-t border-slate-800 flex flex-wrap gap-2">
           <button
+            type="button"
             onClick={async () => {
               await nativeAlarmService.openExactAlarmSettings();
             }}
@@ -343,6 +376,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={onOpenDndGuide}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-medium border border-slate-700 transition"
           >
@@ -351,6 +385,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleClearAudioCache}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-red-950/40 text-slate-300 hover:text-red-300 text-xs font-medium border border-slate-700 transition ml-auto"
             title="Kosongkan memori audio luar talian IndexedDB"
@@ -361,7 +396,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 5. KAD WIDGET SKRIN UTAMA TELEFON (HOME SCREEN) */}
+      {/* 5. KAD WIDGET SKRIN UTAMA TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
