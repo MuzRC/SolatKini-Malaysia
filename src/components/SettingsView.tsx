@@ -2,18 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   Globe,
   Palette,
-  BellRing,
   Volume2,
   Tv,
   Check,
   Sparkles,
   ExternalLink,
   ShieldCheck,
-  RefreshCw,
-  HardDrive,
   Trash2,
   Sliders,
-  Maximize2
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
@@ -21,10 +17,6 @@ import { ThemeId, THEME_OPTIONS, applyTheme } from '../utils/theme';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
 import { audioStorageService } from '../services/audioStorageService';
 import { nativeAlarmService } from '../services/nativeAlarmService';
-import { widgetService } from '../services/widgetService';
-import { formatDisplayTime } from '../utils/prayerCalculator';
-import { determineNextPrayer } from '../services/prayerService';
-import { getHijriDate } from '../utils/hijriCalendar';
 
 interface SettingsViewProps {
   currentLang: Language;
@@ -72,9 +64,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (devVoice) setActiveDeviceVoice(devVoice);
   }, []);
 
-  const now = new Date();
-  const nextPrayer = determineNextPrayer(prayerTimes, now);
-  const hijri = getHijriDate(now);
+
 
   const handleSelectLanguage = (lang: Language) => {
     saveLanguage(lang);
@@ -95,23 +85,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     showToast(`${t('theme_title', currentLang)}: ${themeName}`);
   };
 
-  const handleManualSyncBar = async () => {
-    if (prayerTimes && currentZone) {
-      await widgetService.syncPersistentNotification(
-        prayerTimes,
-        currentZone,
-        hijri.formatted,
-        true
-      );
-      showToast(
-        currentLang === 'ms'
-          ? 'Bar notifikasi teratas berjaya disegarkan!'
-          : currentLang === 'en'
-          ? 'Notification bar updated successfully!'
-          : '通知栏组件已成功更新！'
-      );
-    }
-  };
+
 
   const handleClearAudioCache = async () => {
     try {
@@ -274,100 +248,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. KAD WIDGET BAR NOTIFIKASI TETAP (TOP PRIORITY) */}
-      <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
-              <BellRing className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-bold text-white">
-                  {t('notif_card_title', currentLang)}
-                </h3>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/30 text-emerald-300 font-bold">
-                  Top Priority (Silent)
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                {t('notif_card_desc', currentLang)}
-              </p>
-            </div>
-          </div>
 
-          {/* Toggle Switch */}
-          <button
-            onClick={onTogglePersistentNotification}
-            role="switch"
-            aria-checked={persistentNotification}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              persistentNotification ? 'bg-emerald-500' : 'bg-slate-700'
-            }`}
-          >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                persistentNotification ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Live Notification Mockup Preview */}
-        {persistentNotification && (
-          <div className="pt-2 border-t border-slate-800/80 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
-              <span className="font-semibold">{t('notif_preview_label', currentLang)}</span>
-              <span className="font-mono text-[9px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 font-bold">
-                ONGOING · DI ATAS SEKALI
-              </span>
-            </div>
-
-            <div className="rounded-2xl bg-black/75 border border-slate-800 p-3.5 text-xs space-y-2 shadow-inner">
-              <div className="flex items-center justify-between text-slate-300 font-semibold">
-                <span className="text-white">
-                  SolatKini · Zon {currentZone.code} ({currentZone.daerah.split(',')[0]})
-                </span>
-                <span className="text-[10px] text-slate-400">{hijri.formatted}</span>
-              </div>
-
-              <div className="text-emerald-400 font-bold text-xs">
-                ▶ {t('next_prayer', currentLang)}: {nextPrayer?.nextLabel} ({nextPrayer?.nextDisplayTime}){' '}
-                {nextPrayer?.countdownFormatted && `· ${nextPrayer.countdownFormatted}`}
-              </div>
-
-              <div className="font-mono text-[11px] text-slate-200 bg-slate-900/90 py-1.5 px-3 rounded-xl border border-slate-800 flex items-center justify-between overflow-x-auto gap-1">
-                <span>Subuh <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.subuh)}</strong></span>
-                <span className="text-slate-600">|</span>
-                <span>Zohor <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.zohor)}</strong></span>
-                <span className="text-slate-600">|</span>
-                <span>Asar <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.asar)}</strong></span>
-                <span className="text-slate-600">|</span>
-                <span>Maghrib <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.maghrib)}</strong></span>
-                <span className="text-slate-600">|</span>
-                <span>Isyak <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.isyak)}</strong></span>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-medium">
-                  [ {t('open_app', currentLang)} ]
-                </span>
-                <span className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-medium">
-                  [ ↻ {t('sync_prayer', currentLang)} ]
-                </span>
-
-                <button
-                  onClick={handleManualSyncBar}
-                  className="ml-auto flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition active:scale-95"
-                >
-                  <RefreshCw className="w-3 h-3 text-emerald-400" />
-                  <span>{t('sync_now', currentLang)}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* 4. KAD PENGGERA AZAN & MUADZIN TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">

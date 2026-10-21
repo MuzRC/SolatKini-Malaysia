@@ -70,6 +70,7 @@ export interface WiridItem {
   translation: string;
   targetCount: number;
   note?: string;
+  audioUrl?: string;
 }
 
 export interface FastingTrackerState {

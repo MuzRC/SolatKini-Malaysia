@@ -10,6 +10,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Aku memohon ampun kepada Allah Yang Maha Agung, tiada Tuhan selain Dia Yang Maha Hidup lagi Maha Berdiri Sendiri, dan aku bertaubat kepada-Nya.',
     targetCount: 3,
     note: 'Dibaca sebanyak 3 kali selepas salam.',
+    audioUrl: '/audio/istighfar.mp3',
   },
   {
     id: 'wirid-2',
@@ -20,6 +21,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Tiada Tuhan selain Allah yang Maha Esa, tiada sekutu bagi-Nya. Bagi-Nyalah kerajaan dan bagi-Nyalah segala pujian. Dia yang menghidupkan dan mematikan, dan Dia Maha Kuasa atas segala sesuatu.',
     targetCount: 3,
     note: 'Dibaca 3 kali (atau 10 kali selepas solat Subuh & Maghrib).',
+    audioUrl: '/audio/tahlil.mp3',
   },
   {
     id: 'wirid-3',
@@ -30,6 +32,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Ya Allah, selamatkanlah dan jauhkanlah kami daripada seksaan api neraka.',
     targetCount: 3,
     note: 'Dibaca 3 kali atau 7 kali selepas Subuh dan Maghrib.',
+    audioUrl: '/audio/perlindungan_neraka.mp3',
   },
   {
     id: 'wirid-4',
@@ -40,6 +43,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Ya Allah Engkaulah penyelamat sejahtera, daripada Engkaulah datangnya kesejahteraan, kepada Engkaulah kembalinya kesejahteraan itu, oleh yang demikian hidupkanlah kami dengan selamat sejahtera dan masukkan kami ke syurga, negara yang aman sejahtera, bertambah-tambah berkatMu Ya Allah Tuhan kami dan Maha Tinggi, ya Allah yang empunya segala kebesaran dan kemuliaan.',
     targetCount: 1,
     note: 'Dibaca 1 kali dengan penuh penghayatan selepas salam.',
+    audioUrl: '/audio/as_salam.mp3',
   },
   {
     id: 'wirid-taawuz',
@@ -50,6 +54,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Aku berlindung dengan Allah daripada syaitan yang direjam.',
     targetCount: 1,
     note: 'Memohon perlindungan Allah daripada godaan syaitan sebelum membaca ayat-ayat Al-Quran.',
+    audioUrl: '/audio/taawuz.mp3',
   },
   {
     id: 'wirid-fatihah',
@@ -60,6 +65,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani. Segala puji tertentu bagi Allah, Tuhan yang memelihara dan mentadbirkan sekalian alam. Yang Maha Pemurah, lagi Maha Mengasihani. Yang Menguasai pemerintahan hari Pembalasan (hari Akhirat). Engkaulah sahaja (Ya Allah) Yang Kami sembah, dan kepada Engkaulah sahaja kami memohon pertolongan. Tunjukilah kami jalan yang lurus. Iaitu jalan orang-orang yang Engkau telah kurniakan nikmat kepada mereka, bukan (jalan) orang-orang yang Engkau telah murkai, dan bukan pula (jalan) orang-orang yang sesat.',
     targetCount: 1,
     note: 'Ummul Kitab dibaca dengan tartil selepas solat fardhu.',
+    audioUrl: '/audio/al_fatihah.mp3',
   },
   {
     id: 'wirid-baqarah-163',
@@ -70,6 +76,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Dan Tuhan kamu ialah Tuhan yang Maha Esa, tiada Tuhan (Yang berhak disembah) selain dari Allah, yang Maha Pemurah, lagi Maha Mengasihani.',
     targetCount: 1,
     note: 'Penegasan tauhid dan sifat rahmat Allah sebelum membaca Ayat Al-Kursi.',
+    audioUrl: '/audio/baqarah_163.mp3',
   },
   {
     id: 'wirid-5',
@@ -80,6 +87,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Allah, tiada Tuhan melainkan Dia, Yang Tetap Hidup, Yang Kekal selama-lamanya mentadbirkan sekalian makhluk-Nya. Yang tidak mengantuk usahkan tidur. Kepunyaan-Nya apa yang ada di langit dan di bumi...',
     targetCount: 1,
     note: 'Sesiapa membaca Ayat Kursi setiap kali selepas solat fardhu, tiada yang menghalangnya masuk syurga melainkan mati (HR An-Nasa\'i).',
+    audioUrl: '/audio/ayat_kursi.mp3',
   },
   {
     id: 'wirid-6',
@@ -90,6 +98,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Maha Suci Allah.',
     targetCount: 33,
     note: 'Ucapkan sebanyak 33 kali.',
+    audioUrl: '/audio/tasbih.mp3',
   },
   {
     id: 'wirid-7',
@@ -100,6 +109,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Segala puji tertentu bagi Allah.',
     targetCount: 33,
     note: 'Ucapkan sebanyak 33 kali.',
+    audioUrl: '/audio/tahmid.mp3',
   },
   {
     id: 'wirid-8',
@@ -110,6 +120,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Allah Maha Besar.',
     targetCount: 33,
     note: 'Ucapkan sebanyak 33 kali.',
+    audioUrl: '/audio/takbir.mp3',
   },
   {
     id: 'wirid-9',
@@ -120,6 +131,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Tiada Tuhan melainkan Allah semata-mata, tiada sekutu bagi-Nya. Bagi-Nyalah segala kerajaan dan segala puji, dan Dia Maha Berkuasa atas segala sesuatu.',
     targetCount: 1,
     note: 'Penyempurna bilangan seratus. Dihapuskan dosanya walaupun sebanyak buih di lautan.',
+    audioUrl: '/audio/zikir_100.mp3',
   },
 ];
 
