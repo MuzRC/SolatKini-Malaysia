@@ -347,8 +347,8 @@ export default function App() {
             </span>
           </div>
 
-          {/* Zone 2: Desktop Navigation Links (IKON SAHAJA) */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
+          {/* Zone 2: Navigation Links (Muncul di Telefon & Komputer) */}
+          <nav className="flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner overflow-x-auto max-w-[200px] sm:max-w-none scrollbar-none">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -356,19 +356,18 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  title={item.label} // Nama menu tetap dipaparkan bila tetikus hover di atas ikon
+                  title={item.label}
                   aria-label={item.label}
-                  className={`relative p-2.5 rounded-xl transition-all duration-200 group flex items-center justify-center ${
+                  className={`relative p-2 rounded-xl shrink-0 transition-all duration-200 active:scale-95 flex items-center justify-center ${
                     isActive
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-950/50'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
 
-                  {/* Titik penunjuk kecil bila menu tersebut sedang aktif */}
                   {isActive && (
-                    <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm" />
+                    <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-emerald-400" />
                   )}
                 </button>
               );
@@ -497,9 +496,9 @@ export default function App() {
         </div>
       </footer>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR (Thumb Zone Optimized - 7 Tabs) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070d0b]/95 backdrop-blur-xl border-t border-emerald-950/80 px-1 py-1.5 pb-safe shadow-2xl">
-        <div className="grid grid-cols-7 items-center">
+     {/* MOBILE BOTTOM NAVIGATION BAR (IKON SAHAJA - MINIMALIS & SELESA) */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070d0b]/95 backdrop-blur-xl border-t border-emerald-900/30 px-2 py-2 pb-safe shadow-2xl">
+        <div className="grid grid-cols-7 items-center gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -507,22 +506,21 @@ export default function App() {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`min-h-[46px] flex flex-col items-center justify-center rounded-xl transition px-0.5 ${
+                title={item.label}
+                aria-label={item.label}
+                className={`relative h-12 flex items-center justify-center rounded-2xl transition-all duration-200 active:scale-90 ${
                   isActive
-                    ? 'text-emerald-400 font-semibold'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-950/50'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
-                    isActive ? 'bg-emerald-500/20 text-emerald-400' : ''
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                </div>
-                <span className="text-[8px] tracking-tight truncate max-w-[46px] text-center mt-0.5">
-                  {item.label.split(' ')[0]}
-                </span>
+                {/* Ikon bersaiz lebih besar dan jelas di telefon */}
+                <Icon className="w-5 h-5 transition-transform" />
+
+                {/* Titik penunjuk kecil bila tab sedang aktif */}
+                {isActive && (
+                  <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-emerald-400 shadow-sm" />
+                )}
               </button>
             );
           })}
