@@ -92,16 +92,15 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
 ];
 
-// Palet warna sokongan untuk override kelas Tailwind 'emerald'
 interface ThemeColorSet {
-  primary: string;       // untuk text-emerald-400 / border
-  primaryDark: string;   // untuk bg-emerald-600
-  primaryHover: string;  // untuk hover:bg-emerald-500
-  primaryLight: string;  // untuk text-emerald-200 / 300
-  surface: string;       // untuk bg-emerald-950
-  surfaceAlt: string;    // untuk bg-emerald-900/60
-  mutedBg: string;       // untuk bg-emerald-500/20
-  border: string;        // untuk border-emerald-500/30
+  primary: string;       // Untuk text-emerald-400 / border
+  primaryDark: string;   // Untuk bg-emerald-600
+  primaryHover: string;  // Untuk hover:bg-emerald-500
+  primaryLight: string;  // Untuk text-emerald-200 / 300
+  surface: string;       // Untuk bg-emerald-950
+  surfaceAlt: string;    // Untuk bg-emerald-900/60
+  mutedBg: string;       // Untuk bg-emerald-500/20
+  border: string;        // Untuk border-emerald-500/30
 }
 
 const PALETTES: Record<string, ThemeColorSet> = {
@@ -110,18 +109,8 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#d97706',
     primaryHover: '#b45309',
     primaryLight: '#fde68a',
-    surface: '#2e1903',
-    surfaceAlt: '#451a03',
-    mutedBg: 'rgba(245, 158, 11, 0.18)',
-    border: 'rgba(245, 158, 11, 0.35)',
-  },
-  emas: {
-    primary: '#f59e0b',
-    primaryDark: '#d97706',
-    primaryHover: '#b45309',
-    primaryLight: '#fde68a',
-    surface: '#2e1903',
-    surfaceAlt: '#451a03',
+    surface: '#241402',
+    surfaceAlt: '#3d1d03',
     mutedBg: 'rgba(245, 158, 11, 0.18)',
     border: 'rgba(245, 158, 11, 0.35)',
   },
@@ -130,17 +119,7 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#2563eb',
     primaryHover: '#1d4ed8',
     primaryLight: '#bfdbfe',
-    surface: '#081735',
-    surfaceAlt: '#0c224e',
-    mutedBg: 'rgba(59, 130, 246, 0.18)',
-    border: 'rgba(59, 130, 246, 0.35)',
-  },
-  biru: {
-    primary: '#3b82f6',
-    primaryDark: '#2563eb',
-    primaryHover: '#1d4ed8',
-    primaryLight: '#bfdbfe',
-    surface: '#081735',
+    surface: '#06132b',
     surfaceAlt: '#0c224e',
     mutedBg: 'rgba(59, 130, 246, 0.18)',
     border: 'rgba(59, 130, 246, 0.35)',
@@ -150,7 +129,7 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#0d9488',
     primaryHover: '#0f766e',
     primaryLight: '#99f6e4',
-    surface: '#04221f',
+    surface: '#04201c',
     surfaceAlt: '#07332f',
     mutedBg: 'rgba(20, 184, 166, 0.18)',
     border: 'rgba(20, 184, 166, 0.35)',
@@ -160,18 +139,8 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#9333ea',
     primaryHover: '#7e22ce',
     primaryLight: '#e9d5ff',
-    surface: '#200938',
-    surfaceAlt: '#300f53',
-    mutedBg: 'rgba(168, 85, 247, 0.18)',
-    border: 'rgba(168, 85, 247, 0.35)',
-  },
-  ungu: {
-    primary: '#a855f7',
-    primaryDark: '#9333ea',
-    primaryHover: '#7e22ce',
-    primaryLight: '#e9d5ff',
-    surface: '#200938',
-    surfaceAlt: '#300f53',
+    surface: '#1d0733',
+    surfaceAlt: '#2e0d52',
     mutedBg: 'rgba(168, 85, 247, 0.18)',
     border: 'rgba(168, 85, 247, 0.35)',
   },
@@ -180,18 +149,8 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#e11d48',
     primaryHover: '#be123c',
     primaryLight: '#fecdd3',
-    surface: '#330813',
-    surfaceAlt: '#4c0c1c',
-    mutedBg: 'rgba(244, 63, 94, 0.18)',
-    border: 'rgba(244, 63, 94, 0.35)',
-  },
-  merah: {
-    primary: '#f43f5e',
-    primaryDark: '#e11d48',
-    primaryHover: '#be123c',
-    primaryLight: '#fecdd3',
-    surface: '#330813',
-    surfaceAlt: '#4c0c1c',
+    surface: '#29050e',
+    surfaceAlt: '#400917',
     mutedBg: 'rgba(244, 63, 94, 0.18)',
     border: 'rgba(244, 63, 94, 0.35)',
   },
@@ -200,18 +159,8 @@ const PALETTES: Record<string, ThemeColorSet> = {
     primaryDark: '#64748b',
     primaryHover: '#475569',
     primaryLight: '#e2e8f0',
-    surface: '#141a24',
-    surfaceAlt: '#1e293b',
-    mutedBg: 'rgba(148, 163, 184, 0.18)',
-    border: 'rgba(148, 163, 184, 0.35)',
-  },
-  karbon: {
-    primary: '#94a3b8',
-    primaryDark: '#64748b',
-    primaryHover: '#475569',
-    primaryLight: '#e2e8f0',
-    surface: '#141a24',
-    surfaceAlt: '#1e293b',
+    surface: '#111620',
+    surfaceAlt: '#1e2636',
     mutedBg: 'rgba(148, 163, 184, 0.18)',
     border: 'rgba(148, 163, 184, 0.35)',
   },
@@ -227,11 +176,9 @@ export const getSavedTheme = (): ThemeId => {
 export const applyTheme = (themeId: ThemeId): void => {
   if (typeof window === 'undefined') return;
 
-  // 1. Simpan pilihan pengguna
   localStorage.setItem('solatkini_theme', themeId);
   document.documentElement.setAttribute('data-theme', themeId);
 
-  // 2. Dapatkan atau bina tag <style id="solatkini-theme-style">
   let styleTag = document.getElementById('solatkini-theme-style') as HTMLStyleElement | null;
   if (!styleTag) {
     styleTag = document.createElement('style');
@@ -239,7 +186,6 @@ export const applyTheme = (themeId: ThemeId): void => {
     document.head.appendChild(styleTag);
   }
 
-  // 3. Jika tema ialah Emerald Zamrud (default), kosongkan override style
   const normalizedId = themeId.toLowerCase();
   if (normalizedId === 'emerald' || !PALETTES[normalizedId]) {
     styleTag.innerHTML = '';
@@ -248,7 +194,6 @@ export const applyTheme = (themeId: ThemeId): void => {
 
   const p = PALETTES[normalizedId];
 
-  // 4. Override secara automatik semua elemen Tailwind emerald di seluruh aplikasi
   styleTag.innerHTML = `
     /* Teks dan Ikon Berwarna */
     .text-emerald-400, .text-emerald-300, .fill-emerald-400 {
@@ -321,15 +266,33 @@ export const applyTheme = (themeId: ThemeId): void => {
       --tw-ring-color: ${p.primary} !important;
     }
 
-    /* Kecerunan (Gradient) Bar & Header */
+    /* Kecerunan (Gradient) Logo & Butang - Ditetapkan Secara Langsung */
+    .bg-gradient-to-tr.from-emerald-600.to-emerald-400 {
+      background-image: linear-gradient(to top right, ${p.primaryDark}, ${p.primary}) !important;
+    }
+    .bg-gradient-to-r.from-emerald-600.to-emerald-500 {
+      background-image: linear-gradient(to right, ${p.primaryDark}, ${p.primary}) !important;
+    }
+    .bg-gradient-to-r.from-emerald-600.via-emerald-500.to-emerald-400 {
+      background-image: linear-gradient(to right, ${p.primaryDark}, ${p.primary}, ${p.primaryLight}) !important;
+    }
+
+    /* Fallback Kecerunan Biasa */
     .from-emerald-600 {
-      --tw-gradient-from: ${p.primaryDark} var(--tw-gradient-from-position) !important;
+      --tw-gradient-from: ${p.primaryDark} !important;
+      --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, ${p.primary}) !important;
     }
     .to-emerald-400 {
-      --tw-gradient-to: ${p.primary} var(--tw-gradient-to-position) !important;
+      --tw-gradient-to: ${p.primary} !important;
     }
-    .via-emerald-500 {
-      --tw-gradient-via: ${p.primary} var(--tw-gradient-via-position) !important;
+
+    /* Bayang Logo (Shadow) */
+    .shadow-emerald-900\\/40,
+    .shadow-emerald-950\\/40,
+    .shadow-emerald-950\\/50,
+    .shadow-emerald-950\\/60,
+    .shadow-emerald-950\\/70 {
+      --tw-shadow-color: ${p.surfaceAlt} !important;
     }
 
     /* Text Selection Highlight */
