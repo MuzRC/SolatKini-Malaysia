@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff } from 'lucide-react';
 import { WIRID_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
+import { ArabicQuranText } from './QuranAyahBadge';
 
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
@@ -417,11 +418,11 @@ export const TasbihWirid: React.FC = () => {
                   </div>
 
                   {/* 1. Teks Arab (Boleh Collapse) */}
-                  {showArabic && (
-                    <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
-                      {item.arabic}
-                    </p>
-                  )}
+{showArabic && (
+  <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
+    {item.arabic}
+  </p>
+)}
 
                   {/* 2. Teks Rumi (Boleh Collapse) */}
                   {showRumi && (
