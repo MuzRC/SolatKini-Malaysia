@@ -28,6 +28,11 @@ export const TasbihWirid: React.FC = () => {
   };
 
   const handleToggleAudio = (item: { id: string; audioUrl?: string; title: string }) => {
+    // 1. Jika tiada audioUrl, jangan buat apa-apa dan terus keluar
+    if (!item.audioUrl) {
+      return;
+    }
+
     if (playingAudioId === item.id) {
       stopCurrentAudio();
       return;
@@ -36,8 +41,8 @@ export const TasbihWirid: React.FC = () => {
     // Hentikan sebarang zikir sebelumnya agar tidak bertindih
     stopCurrentAudio();
 
-    const audioSrc = item.audioUrl || '/audio/istighfar.mp3';
-    const audio = new Audio(audioSrc);
+    // 2. Guna audioUrl terus tanpa fallback ke istighfar
+    const audio = new Audio(item.audioUrl);
     audioRef.current = audio;
     setPlayingAudioId(item.id);
 
@@ -79,7 +84,6 @@ export const TasbihWirid: React.FC = () => {
     // Haptic feedback
     if (vibrateEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       if (targetCount > 0 && nextCount % targetCount === 0) {
-        // Double pulse on lap completion
         navigator.vibrate([80, 40, 120]);
       } else {
         navigator.vibrate(35);
@@ -201,7 +205,6 @@ export const TasbihWirid: React.FC = () => {
                 onClick={handleTap}
                 className="relative group w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-gradient-to-br from-[#12241d] to-[#07110d] border-4 border-emerald-500/30 hover:border-emerald-400/60 shadow-2xl shadow-emerald-950/70 flex flex-col items-center justify-center transition-all duration-150 active:scale-95 focus:outline-none select-none"
               >
-                {/* Subtle ripple rings */}
                 <div className="absolute inset-3 rounded-full border border-emerald-500/10 pointer-events-none" />
                 <div className="absolute inset-7 rounded-full border border-dashed border-emerald-500/20 pointer-events-none" />
 
@@ -290,8 +293,10 @@ export const TasbihWirid: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {WIRID_LIST.map((item, idx) => {
+            {WIRID_LIST.map((item) => {
               const isPlaying = playingAudioId === item.id;
+              const hasAudio = Boolean(item.audioUrl);
+
               return (
                 <div
                   key={item.id}
@@ -321,56 +326,57 @@ export const TasbihWirid: React.FC = () => {
                     <strong>Terjemahan:</strong> {item.translation}
                   </p>
 
-                  {/* Butang Audio Play / Pause di Posisi Bawah Selepas Terjemahan */}
-                  <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleAudio(item)}
-                      aria-label={
-                        isPlaying
-                          ? `Hentikan audio ${item.title}`
-                          : `Mainkan audio ${item.title}`
-                      }
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer shadow-sm select-none ${
-                        isPlaying
-                          ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400/50 shadow-md shadow-emerald-950/60'
-                          : 'bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 text-emerald-300 hover:text-white'
-                      }`}
-                    >
-                      {isPlaying ? (
-                        <>
-                          <Pause className="w-4 h-4 fill-current text-white animate-pulse" />
-                          <span>Hentikan Audio</span>
-                          {/* Equalizer animation */}
-                          <div className="flex items-end gap-0.5 h-3.5 ml-1">
-                            <span className="w-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s] h-3"></span>
-                            <span className="w-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s] h-4"></span>
-                            <span className="w-1 bg-white rounded-full animate-bounce h-2.5"></span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <Volume2 className="w-4 h-4 text-emerald-400" />
-                          <span>Dengar Alunan</span>
-                          <Play className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/60 ml-0.5" />
-                        </>
-                      )}
-                    </button>
+                  {/* Butang Audio HANYA dipaparkan jika item mempunyai audioUrl */}
+                  {hasAudio && (
+                    <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAudio(item)}
+                        aria-label={
+                          isPlaying
+                            ? `Hentikan audio ${item.title}`
+                            : `Mainkan audio ${item.title}`
+                        }
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer shadow-sm select-none ${
+                          isPlaying
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white ring-2 ring-emerald-400/50 shadow-md shadow-emerald-950/60'
+                            : 'bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/30 text-emerald-300 hover:text-white'
+                        }`}
+                      >
+                        {isPlaying ? (
+                          <>
+                            <Pause className="w-4 h-4 fill-current text-white animate-pulse" />
+                            <span>Hentikan Audio</span>
+                            <div className="flex items-end gap-0.5 h-3.5 ml-1">
+                              <span className="w-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s] h-3"></span>
+                              <span className="w-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s] h-4"></span>
+                              <span className="w-1 bg-white rounded-full animate-bounce h-2.5"></span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-4 h-4 text-emerald-400" />
+                            <span>Dengar Alunan</span>
+                            <Play className="w-3.5 h-3.5 text-emerald-300 fill-emerald-300/60 ml-0.5" />
+                          </>
+                        )}
+                      </button>
 
-                    <div className="flex items-center gap-1.5 text-[11px] font-mono">
-                      {isPlaying ? (
-                        <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                          Sedang Berputar...
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 flex items-center gap-1">
-                          <Volume2 className="w-3.5 h-3.5 text-slate-500" />
-                          Audio Bacaan Arab
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono">
+                        {isPlaying ? (
+                          <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                            Sedang Berputar...
+                          </span>
+                        ) : (
+                          <span className="text-slate-500 flex items-center gap-1">
+                            <Volume2 className="w-3.5 h-3.5 text-slate-500" />
+                            Audio Bacaan Arab
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {item.note && (
                     <div className="mt-3 pt-2.5 border-t border-slate-800 text-[11px] text-emerald-400/90">
