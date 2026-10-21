@@ -846,19 +846,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             </button>
 
             <button
-              onClick={() => onNavigateToTab('tetapan')}
-              className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-700/80 text-slate-200 font-medium text-xs transition active:scale-95 text-left"
-            >
-              <div className="flex items-center gap-2">
-                <BellRing className={`w-4 h-4 ${(notificationSettings.persistentNotification ?? true) ? 'text-emerald-400' : 'text-slate-400'}`} />
-                <span>Bar Notifikasi 5 Waktu</span>
-              </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${(notificationSettings.persistentNotification ?? true) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
-                {(notificationSettings.persistentNotification ?? true) ? 'AKTIF' : 'MATI'}
-              </span>
-            </button>
-
-            <button
               onClick={() => setIsDndGuideOpen(true)}
               className="flex items-center justify-center gap-1.5 text-[11px] text-amber-300/90 hover:text-amber-200 font-medium py-1 transition"
             >
@@ -1195,9 +1182,9 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           <div className="relative w-full max-w-lg rounded-3xl bg-[#0f1a16] border border-emerald-500/20 p-6 shadow-2xl">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div>
-                <h3 className="text-xl font-bold text-white">Tetapan Azan & Widget Notifikasi</h3>
+                <h3 className="text-xl font-bold text-white">Pilihan Audio Azan</h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Urus pilihan muadzin, penggera solat dan widget bar notifikasi kekal telefon
+                  Pilih alunan muadzin kegemaran anda untuk laungan azan
                 </p>
               </div>
               <button
@@ -1223,100 +1210,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             )}
 
             <div className="mt-4 space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
-              {/* KAD TETAPAN WIDGET BAR NOTIFIKASI TETAP (ONGOING NOTIFICATION SHADE) */}
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1813] to-[#08120e] border border-emerald-500/30 text-left space-y-3 shadow-lg">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
-                      <BellRing className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-bold text-white">Widget Bar Notifikasi Tetap</h4>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/30 text-emerald-300 font-semibold">
-                          5 Waktu Solat
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                        Memaparkan kesemua 5 waktu solat sepanjang hari secara berterusan pada tetingkap notifikasi telefon anda tanpa perlu membuka aplikasi.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Toggle Switch */}
-                  <button
-                    onClick={handleTogglePersistentNotification}
-                    role="switch"
-                    aria-checked={notificationSettings.persistentNotification ?? true}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      (notificationSettings.persistentNotification ?? true)
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-700'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        (notificationSettings.persistentNotification ?? true)
-                          ? 'translate-x-5'
-                          : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                {/* Live Preview of the notification shade */}
-                {(notificationSettings.persistentNotification ?? true) && (
-                  <div className="mt-2 pt-2 border-t border-slate-800/80">
-                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Rupa Sebenar di Bar Notifikasi Telefon:</span>
-                      <span className="text-emerald-400 font-mono text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/30">KEKAL / ONGOING</span>
-                    </div>
-                    <div className="rounded-xl bg-black/60 border border-slate-800 p-3 text-xs space-y-1.5 shadow-inner">
-                      <div className="flex items-center justify-between text-slate-300 font-semibold">
-                        <span className="text-white">SolatKini · Zon {currentZone.code} ({currentZone.daerah.split(',')[0]})</span>
-                        <span className="text-[10px] text-slate-400">{hijri.formatted}</span>
-                      </div>
-                      <div className="text-emerald-400 font-bold text-[11px]">
-                        ▶ Seterusnya: {nextPrayerInfo.nextLabel} ({nextPrayerInfo.nextDisplayTime}) {nextPrayerInfo.countdownFormatted && `· ${nextPrayerInfo.countdownFormatted}`}
-                      </div>
-                      <div className="font-mono text-[11px] text-slate-200 bg-slate-900/90 py-1.5 px-2.5 rounded-lg border border-slate-800 flex items-center justify-between overflow-x-auto gap-1">
-                        <span>Subuh <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.subuh)}</strong></span>
-                        <span className="text-slate-600">|</span>
-                        <span>Zohor <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.zohor)}</strong></span>
-                        <span className="text-slate-600">|</span>
-                        <span>Asar <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.asar)}</strong></span>
-                        <span className="text-slate-600">|</span>
-                        <span>Maghrib <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.maghrib)}</strong></span>
-                        <span className="text-slate-600">|</span>
-                        <span>Isyak <strong className="text-emerald-300">{formatDisplayTime(prayerTimes.times.isyak)}</strong></span>
-                      </div>
-                      <div className="flex items-center gap-2 pt-1">
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-medium">
-                          [ Buka SolatKini ]
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-medium">
-                          [ ↻ Segerak Waktu ]
-                        </span>
-                        <button
-                          onClick={async () => {
-                            await widgetService.syncPersistentNotification(
-                              prayerTimes,
-                              currentZone,
-                              hijri.formatted,
-                              true
-                            );
-                            setAudioToast('Bar notifikasi berjaya disegarkan ke peranti!');
-                            setTimeout(() => setAudioToast(null), 3000);
-                          }}
-                          className="ml-auto text-[10px] text-emerald-400 hover:text-emerald-300 font-semibold underline underline-offset-2"
-                        >
-                          Segerak Sekarang
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
 
               <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
