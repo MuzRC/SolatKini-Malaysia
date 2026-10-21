@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bookmark, BookmarkCheck, Copy, Check, Sparkles, BookOpen, Heart } from 'lucide-react';
+import { Search, Bookmark, BookmarkCheck, Copy, Check, Sparkles, BookOpen, Heart, Eye, EyeOff } from 'lucide-react';
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
 import { DuaItem } from '../types/prayer';
 
@@ -10,7 +10,7 @@ export const DuaCollection: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('semua');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Ambil pilihan saiz tersimpan dari localStorage (lalai: 'large')
+  // Saiz Tulisan
   const [fontSize, setFontSize] = useState<FontSize>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('solatkini_dua_font_size') as FontSize;
@@ -26,7 +26,56 @@ export const DuaCollection: React.FC = () => {
     }
   };
 
-  // Bookmarks saved in local storage
+  // Kawalan Collapse / Expand Paparan (Arab, Rumi, Terjemahan)
+  const [showArabic, setShowArabic] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_show_arabic');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [showRumi, setShowRumi] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_show_rumi');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [showTranslation, setShowTranslation] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_show_translation');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const toggleArabic = () => {
+    setShowArabic((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') localStorage.setItem('solatkini_show_arabic', String(next));
+      return next;
+    });
+  };
+
+  const toggleRumi = () => {
+    setShowRumi((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') localStorage.setItem('solatkini_show_rumi', String(next));
+      return next;
+    });
+  };
+
+  const toggleTranslation = () => {
+    setShowTranslation((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') localStorage.setItem('solatkini_show_translation', String(next));
+      return next;
+    });
+  };
+
+  // Bookmarks
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -87,7 +136,6 @@ export const DuaCollection: React.FC = () => {
     );
   });
 
-  // Skala saiz berkadaran untuk Arab, Rumi, dan Terjemahan (termasuk 4XL)
   const fontStyles = {
     normal: {
       arabic: 'text-lg sm:text-xl leading-relaxed',
@@ -113,9 +161,9 @@ export const DuaCollection: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10">
-      {/* Header and Search */}
+      {/* Header, Controls & Search */}
       <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase mb-2">
               <BookOpen className="w-3.5 h-3.5 text-amber-300" />
@@ -129,24 +177,72 @@ export const DuaCollection: React.FC = () => {
             </p>
           </div>
 
-          {/* Font Size Selector (A, A+, A++, A+++ / 4XL) */}
-          <div className="flex items-center gap-1 self-start sm:self-center bg-slate-900 p-1 rounded-xl border border-slate-800">
-            <span className="text-[11px] text-slate-400 px-1.5 font-medium">Saiz:</span>
-            {(['normal', 'large', 'xlarge', '4xl'] as const).map((s) => (
+          {/* Action Toolbar: Saiz Tulisan & Togol Collapse Teks */}
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
+            {/* 1. Selector Saiz Tulisan */}
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 px-1.5 font-medium">Saiz:</span>
+              {(['normal', 'large', 'xlarge', '4xl'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => handleSetFontSize(s)}
+                  title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 ${
+                    fontSize === s
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {s === 'normal' ? 'A' : s === 'large' ? 'A+' : s === 'xlarge' ? 'A++' : 'A+++'}
+                </button>
+              ))}
+            </div>
+
+            {/* 2. Selector Collapse/Expand: Jawi/Arab, Rumi, Terjemahan */}
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
               <button
-                key={s}
                 type="button"
-                onClick={() => handleSetFontSize(s)}
-                title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
-                className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 ${
-                  fontSize === s
+                onClick={toggleArabic}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  showArabic
                     ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
                 }`}
+                title={showArabic ? 'Sorokkan teks Arab' : 'Tunjukkan teks Arab'}
               >
-                {s === 'normal' ? 'A' : s === 'large' ? 'A+' : s === 'xlarge' ? 'A++' : 'A+++'}
+                {showArabic ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Jawi</span>
               </button>
-            ))}
+
+              <button
+                type="button"
+                onClick={toggleRumi}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  showRumi
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
+                }`}
+                title={showRumi ? 'Sorokkan teks Rumi' : 'Tunjukkan teks Rumi'}
+              >
+                {showRumi ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Rumi</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={toggleTranslation}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  showTranslation
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
+                }`}
+                title={showTranslation ? 'Sorokkan Terjemahan' : 'Tunjukkan Terjemahan'}
+              >
+                {showTranslation ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Maksud</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -241,22 +337,35 @@ export const DuaCollection: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 1. Teks Arab: dinamik mengikut fontStyles.arabic */}
-                <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
-                  {dua.arabic}
-                </p>
-
-                {/* 2. Teks Rumi: dinamik mengikut fontStyles.rumi */}
-                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
-                  <p className={`text-slate-300 italic leading-relaxed transition-all duration-150 ${fontStyles.rumi}`}>
-                    &quot;{dua.transliteration}&quot;
+                {/* 1. Teks Arab / Jawi (Boleh Collapse) */}
+                {showArabic && (
+                  <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
+                    {dua.arabic}
                   </p>
-                </div>
+                )}
 
-                {/* 3. Teks Terjemahan: dinamik mengikut fontStyles.translation */}
-                <p className={`text-slate-400 leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
-                  <strong className="text-slate-300">Terjemahan:</strong> {dua.translation}
-                </p>
+                {/* 2. Teks Rumi (Boleh Collapse) */}
+                {showRumi && (
+                  <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                    <p className={`text-slate-300 italic leading-relaxed transition-all duration-150 ${fontStyles.rumi}`}>
+                      &quot;{dua.transliteration}&quot;
+                    </p>
+                  </div>
+                )}
+
+                {/* 3. Teks Terjemahan / Maksud (Boleh Collapse) */}
+                {showTranslation && (
+                  <p className={`text-slate-400 leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
+                    <strong className="text-slate-300">Terjemahan:</strong> {dua.translation}
+                  </p>
+                )}
+
+                {/* Amaran ringkas jika pengguna collapse ketiga-tiga bahagian */}
+                {!showArabic && !showRumi && !showTranslation && (
+                  <div className="py-3 px-4 rounded-xl bg-slate-900/50 border border-dashed border-slate-800 text-center text-xs text-slate-500 italic">
+                    Semua teks disorokkan. Klik butang <strong>Jawi</strong>, <strong>Rumi</strong>, atau <strong>Maksud</strong> di atas untuk memaparkan kembali.
+                  </div>
+                )}
 
                 {/* Reference */}
                 {dua.reference && (
