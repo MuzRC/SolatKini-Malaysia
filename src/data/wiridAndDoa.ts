@@ -241,7 +241,6 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Maha Suci Allah, aku bertasbih sambil memuji-muji kekal sentiasa selama-lamanya — segala pujian hanya bagi Allah.',
     targetCount: 1,
     note: 'Lafaz pengantar sebelum memulakan tahmid 33 kali.',
-    audioUrl: '/audio/tahmid_pembuka.mp3',
   },
   {
     id: 'wirid-tahmid-33',
