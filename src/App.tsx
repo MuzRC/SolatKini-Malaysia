@@ -347,8 +347,8 @@ export default function App() {
             </span>
           </div>
 
-          {/* Zone 2: Navigation Links (Muncul di Telefon & Komputer) */}
-          <nav className="flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner overflow-x-auto max-w-[200px] sm:max-w-none scrollbar-none">
+          {/* Zone 2: Navigation Links (Disorokkan di telefon, hanya muncul di desktop) */}
+          <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -358,16 +358,15 @@ export default function App() {
                   onClick={() => setActiveTab(item.id)}
                   title={item.label}
                   aria-label={item.label}
-                  className={`relative p-2 rounded-xl shrink-0 transition-all duration-200 active:scale-95 flex items-center justify-center ${
+                  className={`relative p-2.5 rounded-xl transition-all duration-200 group flex items-center justify-center ${
                     isActive
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-
+                  <Icon className="w-5 h-5 transition-transform group-hover:scale-110" />
                   {isActive && (
-                    <span className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-emerald-400" />
+                    <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   )}
                 </button>
               );
