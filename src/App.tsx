@@ -330,8 +330,10 @@ export default function App() {
       )}
 
       {/* TOP DESKTOP HEADER (Zone 1: Wordmark, Zone 2: Navigation Links, Zone 3: Action) */}
+      {/* TOP DESKTOP HEADER (Zone 1: Logo, Zone 2: Navigation Ikon Sahaja, Zone 3: Uji Azan) */}
       <header className="sticky top-0 z-40 bg-[#070d0b]/80 backdrop-blur-xl border-b border-emerald-900/30 px-4 sm:px-6 lg:px-8 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 lg:gap-8">
+          
           {/* Zone 1: Brand Wordmark */}
           <div
             onClick={() => setActiveTab('solat')}
@@ -345,8 +347,8 @@ export default function App() {
             </span>
           </div>
 
-          {/* Zone 2: Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-4 lg:gap-6 text-xs lg:text-sm font-medium text-slate-300">
+          {/* Zone 2: Desktop Navigation Links (IKON SAHAJA) */}
+          <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
@@ -354,29 +356,27 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                  title={item.label} // Nama menu tetap dipaparkan bila tetikus hover di atas ikon
+                  aria-label={item.label}
+                  className={`relative p-2.5 rounded-xl transition-all duration-200 group flex items-center justify-center ${
                     isActive
-                      ? 'text-emerald-400 font-semibold'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-950/50'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  {item.label}
+                  <Icon className="w-5 h-5 transition-transform duration-200 group-hover:scale-110" />
+
+                  {/* Titik penunjuk kecil bila menu tersebut sedang aktif */}
+                  {isActive && (
+                    <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm" />
+                  )}
                 </button>
               );
             })}
           </nav>
 
-          {/* Zone 3: Primary Action (Quick Azan test / Settings Pill) */}
+          {/* Zone 3: Primary Action (Quick Azan test) */}
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              onClick={() => setActiveTab('tetapan')}
-              className="hidden sm:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition"
-            >
-              <Settings className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{t('nav_tetapan', currentLang)}</span>
-            </button>
-
             <button
               onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
               className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition active:scale-95"
@@ -385,6 +385,7 @@ export default function App() {
               <span className="hidden sm:inline">Uji</span> Azan
             </button>
           </div>
+
         </div>
       </header>
 
