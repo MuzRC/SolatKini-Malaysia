@@ -12,25 +12,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Ambil kod projek dari repo
+      # 1. Ambil kod projek
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      # 2. Setup Node.js v22 (Syarat Capacitor 8)
+      # 2. Pasang Node.js v22 (Syarat Capacitor 8)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'npm'
 
-      # 3. Pasang dependency & segerakkan kod ke folder android
+      # 3. Build aset web React & segerakkan ke folder Android
       - name: Install Dependencies & Build Web
         run: |
           npm ci --legacy-peer-deps || npm install
           npm run build
           npx cap sync android
 
-      # 4. Setup Java 21 (Padan dengan keperluan sumber Capacitor 8)
+      # 4. Pasang Java JDK 21
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
@@ -45,21 +45,37 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
 
-      # 6. Tandatangan (Sign) APK menggunakan Keystore dari GitHub Secrets
+      # 6. Tandatangan (Sign) APK menggunakan apksigner rasmi Android SDK
       - name: Sign Release APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: android/app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # 1. Tukar base64 kembali kepada fail keystore
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.jks
 
-      # 7. Muat naik fail APK yang telah siap ditandatangani ke Artifacts
+          # 2. Kesan folder Android Build-Tools versi terkini dalam runner GitHub
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          echo "Using Android Build Tools: $BUILD_TOOLS"
+
+          # 3. Cari fail APK unsigned yang baru sahaja siap dibina
+          UNSIGNED_APK=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Signing APK: $UNSIGNED_APK"
+
+          # 4. Sign APK menggunakan apksigner
+          $BUILD_TOOLS/apksigner sign \
+            --ks release.jks \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --out SolatKini-Release.apk \
+            "$UNSIGNED_APK"
+
+          # 5. Sahkan integriti tandatangan digital
+          $BUILD_TOOLS/apksigner verify SolatKini-Release.apk
+          echo "APK berjaya ditandatangani dan disahkan!"
+
+      # 7. Muat naik fail APK rasmi ke bahagian Artifacts
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
           name: SolatKini-Signed-Release-APK
-          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          path: SolatKini-Release.apk
           retention-days: 14
