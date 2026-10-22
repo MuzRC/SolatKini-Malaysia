@@ -1,75 +1,60 @@
-name: Build SolatKini Android APK
+name: Build SolatKini Release APK
 
 on:
+  workflow_dispatch: # Membolehkan anda tekan butang "Run" bila-bila masa
   push:
     branches:
       - main
-      - master
-  pull_request:
-    branches:
-      - main
-      - master
-  workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
-  build-apk:
-    name: Build Android APK (Debug)
+  build:
+    name: Build & Sign APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Checkout Kod Sumber
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: 2. Sediakan Persekitaran Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: 20
+          cache: 'npm'
 
-      - name: 3. Pasang Kebergantungan NPM
+      - name: Install Dependencies & Build Web
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci || npm install
-          else
-            npm install
-          fi
-
-      - name: 4. Bina Aplikasi Web
-        run: |
+          npm ci --legacy-peer-deps || npm install
           npm run build
-
-      - name: 5. Sinkronisasi Kod ke Projek Android & Jana Ikon Rasmi
-        run: |
           npx cap sync android
-          node scripts/generate-android-icons.js
 
-      - name: 6. Sediakan Persekitaran Java JDK 21 (Diperlukan oleh Capacitor 8)
+      - name: Setup Java JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
+          java-version: 17
 
-      - name: 7. Terima Lesen & Pastikan SDK Platform Android Dipasang
-        run: |
-          yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "platforms;android-35" "platforms;android-34" || true
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: 8. Berikan Kebenaran Perlaksanaan Gradle Wrapper
-        run: |
-          chmod +x android/gradlew
-
-      - name: 9. Kompil Fail APK Android (Gradle Assemble Debug)
+      - name: Build Android Release APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
 
-      - name: 10. Muat Naik Fail APK Sebagai Artifak GitHub
+      - name: Sign Release APK
+        uses: r0adkll/sign-android-release@v1
+        id: sign_app
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
+          alias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: SolatKini-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 30
+          name: SolatKini-Signed-Release-APK
+          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          retention-days: 14
