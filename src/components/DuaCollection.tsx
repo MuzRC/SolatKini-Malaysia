@@ -75,7 +75,7 @@ export const DuaCollection: React.FC = () => {
     });
   };
 
-  // Bookmarks
+  // Penanda Buku (Bookmarks)
   const [bookmarks, setBookmarks] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -99,10 +99,12 @@ export const DuaCollection: React.FC = () => {
   };
 
   const handleCopy = (dua: DuaItem) => {
-    const textToCopy = `${dua.title}\n\n${dua.arabic}\n\n"${dua.transliteration}"\n\nTerjemahan:\n${dua.translation}\n\n(${dua.reference || 'SolatKini Malaysia'})`;
-    navigator.clipboard.writeText(textToCopy);
-    setCopiedId(dua.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    const textToCopy = `${dua.title}\n\n${dua.arabic}\n\n"${dua.transliteration || ''}"\n\nTerjemahan:\n${dua.translation || ''}\n\n(${dua.reference || 'SolatKini Malaysia'})`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedId(dua.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   const categories = [
@@ -116,7 +118,7 @@ export const DuaCollection: React.FC = () => {
     { id: 'perlindungan_rezeki', label: 'Rezeki & Perlindungan' },
   ];
 
-  const filteredDuas = DUA_COLLECTION.filter((item) => {
+  const filteredDuas = (DUA_COLLECTION || []).filter((item) => {
     const isBookmarked = bookmarks.includes(item.id);
 
     if (selectedCategory === 'kegemaran' && !isBookmarked) {
@@ -130,9 +132,9 @@ export const DuaCollection: React.FC = () => {
 
     const q = searchQuery.toLowerCase();
     return (
-      item.title.toLowerCase().includes(q) ||
-      item.transliteration.toLowerCase().includes(q) ||
-      item.translation.toLowerCase().includes(q)
+      (item.title || '').toLowerCase().includes(q) ||
+      (item.transliteration || '').toLowerCase().includes(q) ||
+      (item.translation || '').toLowerCase().includes(q)
     );
   });
 
@@ -160,7 +162,7 @@ export const DuaCollection: React.FC = () => {
   }[fontSize];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
       {/* Header, Controls & Search */}
       <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -188,7 +190,7 @@ export const DuaCollection: React.FC = () => {
                   type="button"
                   onClick={() => handleSetFontSize(s)}
                   title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
-                  className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 ${
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer ${
                     fontSize === s
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-400 hover:text-white'
@@ -204,7 +206,7 @@ export const DuaCollection: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleArabic}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                   showArabic
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -218,7 +220,7 @@ export const DuaCollection: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleRumi}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                   showRumi
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -232,7 +234,7 @@ export const DuaCollection: React.FC = () => {
               <button
                 type="button"
                 onClick={toggleTranslation}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                   showTranslation
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -265,7 +267,7 @@ export const DuaCollection: React.FC = () => {
               key={c.id}
               type="button"
               onClick={() => setSelectedCategory(c.id)}
-              className={`px-3.5 py-2 rounded-xl whitespace-nowrap font-medium transition active:scale-95 ${
+              className={`px-3.5 py-2 rounded-xl whitespace-nowrap font-medium transition active:scale-95 cursor-pointer ${
                 selectedCategory === c.id
                   ? 'bg-emerald-600 text-white font-semibold shadow-md shadow-emerald-950/40'
                   : 'bg-slate-900/70 text-slate-300 hover:bg-slate-800'
@@ -316,7 +318,7 @@ export const DuaCollection: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleToggleBookmark(dua.id)}
-                      className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition active:scale-95 ${
+                      className={`min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition active:scale-95 cursor-pointer ${
                         isBookmarked
                           ? 'text-red-400 bg-red-950/40'
                           : 'text-slate-400 hover:text-white bg-slate-900/60'
@@ -329,7 +331,7 @@ export const DuaCollection: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleCopy(dua)}
-                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-slate-900/60 text-slate-400 hover:text-white transition active:scale-95"
+                      className="min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl bg-slate-900/60 text-slate-400 hover:text-white transition active:scale-95 cursor-pointer"
                       title="Salin Teks Doa"
                     >
                       {isCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
