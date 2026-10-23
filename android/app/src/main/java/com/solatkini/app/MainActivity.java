@@ -20,7 +20,6 @@ import com.getcapacitor.JSObject;
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivity";
     public static final int NOTIFICATION_PERMISSION_CODE = 101;
-    private boolean permissionRequested = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -36,7 +35,6 @@ public class MainActivity extends BridgeActivity {
         clearInitialBootNotification();
 
         // 4. Tangani intent pelancaran (Cold Start) dengan kelewatan selamat
-        // Memberi ruang ~1.2 saat untuk Capacitor WebView & React App.tsx siap sedia mendengar acara
         final Intent launchIntent = getIntent();
         if (launchIntent != null) {
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -51,18 +49,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        // Padamkan juga semasa aplikasi kembali ke latar depan (foreground)
         clearInitialBootNotification();
-
-        if (!permissionRequested) {
-            permissionRequested = true;
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    requestNotificationPermissionImmediate();
-                }
-            }, 700);
-        }
+        // Pemasa automatik 700ms dikeluarkan agar dialog dipicu secara teratur oleh OnboardingChecklist
     }
 
     /**
@@ -84,7 +72,7 @@ public class MainActivity extends BridgeActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
-                Log.i(TAG, "Mencetuskan dialog kebenaran POST_NOTIFICATIONS pada onResume...");
+                Log.i(TAG, "Mencetuskan dialog kebenaran POST_NOTIFICATIONS...");
                 ActivityCompat.requestPermissions(
                     this,
                     new String[]{Manifest.permission.POST_NOTIFICATIONS},
@@ -100,7 +88,6 @@ public class MainActivity extends BridgeActivity {
         setIntent(intent);
         configureWakeAndLockScreen();
         clearInitialBootNotification();
-        // Bila app memang sedia dibuka di latar belakang, cetuskan serta-merta
         handleAzanIntent(intent);
     }
 
@@ -139,7 +126,6 @@ public class MainActivity extends BridgeActivity {
 
         boolean isAzanTrigger = intent.getBooleanExtra("azan_trigger", false);
         if (isAzanTrigger) {
-            // Padam bendera trigger supaya tidak berulang jika aktiviti dimuat semula
             intent.removeExtra("azan_trigger");
 
             String prayerName = intent.getStringExtra("prayer_name");
@@ -149,7 +135,6 @@ public class MainActivity extends BridgeActivity {
             if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
             if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
 
-            // Kunci kebal Subuh Khas
             if ("subuh".equalsIgnoreCase(prayerKey)) {
                 voice = "subuh_special";
             } else if (voice == null || voice.isEmpty()) {
