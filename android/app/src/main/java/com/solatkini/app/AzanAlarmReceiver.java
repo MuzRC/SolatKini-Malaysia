@@ -6,10 +6,12 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.PowerManager;
 import android.util.Log;
+import java.util.Calendar;
 
 public class AzanAlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AzanAlarmReceiver";
     public static final String ACTION_TRIGGER_AZAN = "com.solatkini.app.TRIGGER_AZAN_ALARM";
+    public static final String ACTION_TRIGGER_AZAN_ALT = "com.solatkini.app.TRIGGER_AZAN";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -24,9 +26,58 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         String prayerName = intent.getStringExtra("prayer_name");
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
+        long scheduledTimestamp = intent.getLongExtra("scheduled_timestamp", 0);
 
         if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
         if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
+
+        // =========================================================================
+        // KAWALAN 1: PENAPIS PENGGERA BASI / ANJAKAN JAM SISTEM (STALE ALARM GUARD)
+        // =========================================================================
+        long now = System.currentTimeMillis();
+        if (scheduledTimestamp > 0 && !"test".equalsIgnoreCase(prayerKey)) {
+            long diff = Math.abs(now - scheduledTimestamp);
+            // Had toleransi 10 minit (600,000 ms). Jika jam telefon dianjak secara manual
+            // atau penggera terlewat basi lebih 10 minit, batalkan segera!
+            if (diff > 10 * 60 * 1000L) {
+                Log.w(TAG, "Membatalkan azan basi untuk " + prayerName + " [" + prayerKey + "]. " +
+                           "Beza masa dikesan: " + (diff / 1000) + "s (Kemungkinan jam telefon dianjak).");
+                return;
+            }
+        }
+
+        // =========================================================================
+        // KAWALAN 2: SEMAKAN WAKTU MUNASABAH SOLAT (PLAUSIBLE HOUR GUARD)
+        // Menjamin solat Maghrib/Isyak tidak berbunyi pada jam 3 pagi, atau Subuh pada petang!
+        // =========================================================================
+        if (!"test".equalsIgnoreCase(prayerKey)) {
+            Calendar cal = Calendar.getInstance();
+            int currentHour = cal.get(Calendar.HOUR_OF_DAY);
+
+            boolean isValidTime = true;
+            if ("subuh".equalsIgnoreCase(prayerKey)) {
+                // Subuh Malaysia antara 04:15 - 06:45 pagi
+                isValidTime = (currentHour >= 4 && currentHour <= 6);
+            } else if ("zohor".equalsIgnoreCase(prayerKey)) {
+                // Zohor Malaysia antara 11:45 pagi - 02:30 petang
+                isValidTime = (currentHour >= 11 && currentHour <= 14);
+            } else if ("asar".equalsIgnoreCase(prayerKey)) {
+                // Asar Malaysia antara 03:15 petang - 05:45 petang
+                isValidTime = (currentHour >= 14 && currentHour <= 18);
+            } else if ("maghrib".equalsIgnoreCase(prayerKey)) {
+                // Maghrib Malaysia antara 05:50 petang - 07:45 malam
+                isValidTime = (currentHour >= 17 && currentHour <= 20);
+            } else if ("isyak".equalsIgnoreCase(prayerKey)) {
+                // Isyak Malaysia antara 07:00 malam - 11:00 malam
+                isValidTime = (currentHour >= 18 && currentHour <= 23);
+            }
+
+            if (!isValidTime) {
+                Log.w(TAG, "Membatalkan azan di luar waktu munasabah untuk " + prayerName +
+                           " pada jam " + currentHour + ":00. Mengelakkan azan tersalah waktu akibat anjakan sistem.");
+                return;
+            }
+        }
 
         // Kunci Azan Subuh Khas sebagai perlindungan tambahan
         if ("subuh".equalsIgnoreCase(prayerKey)) {
