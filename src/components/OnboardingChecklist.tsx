@@ -7,6 +7,7 @@ import {
   ChevronRight,
   BatteryCharging,
 } from 'lucide-react';
+import { nativeAlarmService } from '../services/nativeAlarmService';
 
 interface OnboardingChecklistProps {
   onComplete: () => void;
@@ -16,20 +17,50 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
   const [notifGranted, setNotifGranted] = useState<boolean>(false);
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
 
-  // Semak status kebenaran sedia ada bila skrin dibuka
+  // Semak status kebenaran sedia ada secara berkala semasa skrin dibuka
   useEffect(() => {
-    checkInitialPermissions();
+    checkPermissions();
+
+    // Pantau apabila pengguna kembali ke app selepas menekan 'Allow' pada popup sistem Android
+    const handleResumeOrFocus = () => {
+      checkPermissions();
+    };
+
+    window.addEventListener('focus', handleResumeOrFocus);
+    document.addEventListener('visibilitychange', handleResumeOrFocus);
+    window.addEventListener('resume', handleResumeOrFocus);
+
+    // Semakan berkala automatik setiap 800ms supaya status terus bertukar hijau sebaik sahaja popup Android ditekan
+    const pollInterval = setInterval(() => {
+      checkPermissions();
+    }, 800);
+
+    return () => {
+      window.removeEventListener('focus', handleResumeOrFocus);
+      document.removeEventListener('visibilitychange', handleResumeOrFocus);
+      window.removeEventListener('resume', handleResumeOrFocus);
+      clearInterval(pollInterval);
+    };
   }, []);
 
-  const checkInitialPermissions = async () => {
-    // 1. Semak Notifikasi
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'granted') {
-        setNotifGranted(true);
+  const checkPermissions = async () => {
+    // 1. Semak Kebenaran Notifikasi Asli Android melalui nativeAlarmService
+    try {
+      if (nativeAlarmService && typeof nativeAlarmService.checkPermissions === 'function') {
+        const status = await nativeAlarmService.checkPermissions();
+        if (status && status.notificationsGranted) {
+          setNotifGranted(true);
+        }
+      } else if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          setNotifGranted(true);
+        }
       }
+    } catch (e) {
+      console.warn('Ralat semakan notifikasi asli:', e);
     }
 
-    // 2. Semak Lokasi GPS
+    // 2. Semak Kebenaran Lokasi GPS
     if (typeof navigator !== 'undefined' && navigator.permissions) {
       try {
         const locStatus = await navigator.permissions.query({ name: 'geolocation' });
@@ -40,23 +71,27 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
           setLocationGranted(locStatus.state === 'granted');
         };
       } catch {
-        // Pelayar atau Android WebView versi lama
+        // Fallback untuk pelayar / Android WebView tertentu
       }
     }
   };
 
-  // Minta Kebenaran Notifikasi (Android 13+)
+  // Minta Kebenaran Notifikasi Asli
   const handleRequestNotification = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const res = await Notification.requestPermission();
-        if (res === 'granted') {
-          setNotifGranted(true);
-        }
-      } catch (err) {
-        console.warn('Gagal meminta kebenaran notifikasi:', err);
+    try {
+      if (nativeAlarmService && typeof nativeAlarmService.requestNotificationPermission === 'function') {
+        await nativeAlarmService.requestNotificationPermission();
+      } else if (typeof window !== 'undefined' && 'Notification' in window) {
+        await Notification.requestPermission();
       }
+    } catch (err) {
+      console.warn('Gagal meminta kebenaran notifikasi:', err);
     }
+
+    // Semak serta-merta selepas tindakan
+    setTimeout(() => {
+      checkPermissions();
+    }, 500);
   };
 
   // Minta Kebenaran Lokasi GPS
@@ -75,7 +110,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     }
   };
 
-  // Kunci status siap onboarding ke storan kekal & buka app
+  // Simpan status siap onboarding ke storan kekal & tutup skrin
   const handleFinish = () => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_onboarding_completed', 'true');
@@ -138,8 +173,9 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               </div>
 
               {notifGranted ? (
-                <div className="flex items-center gap-1 text-emerald-400 shrink-0 text-xs font-bold pt-1">
+                <div className="flex items-center gap-1.5 text-emerald-400 shrink-0 text-xs font-bold pt-1">
                   <CheckCircle2 className="w-5 h-5 fill-emerald-500/20" />
+                  <span className="text-xs">Aktif</span>
                 </div>
               ) : (
                 <button
@@ -186,8 +222,9 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               </div>
 
               {locationGranted ? (
-                <div className="flex items-center gap-1 text-teal-400 shrink-0 text-xs font-bold pt-1">
+                <div className="flex items-center gap-1.5 text-teal-400 shrink-0 text-xs font-bold pt-1">
                   <CheckCircle2 className="w-5 h-5 fill-teal-500/20" />
+                  <span className="text-xs">Aktif</span>
                 </div>
               ) : (
                 <button
