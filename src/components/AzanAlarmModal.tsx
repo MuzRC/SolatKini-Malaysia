@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX, BellRing, Sparkles, Check, Play, Square, Sliders } from 'lucide-react';
+import { Volume2, VolumeX, BellRing, Sparkles, Play, Square } from 'lucide-react';
 import { AzanVoice, PrayerKey } from '../types/prayer';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
 import { nativeAlarmService } from '../services/nativeAlarmService';
@@ -15,6 +15,7 @@ interface AzanAlarmModalProps {
 
 export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   isOpen,
+  prayerKey,
   prayerName,
   voice,
   onClose,
@@ -24,12 +25,17 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   const [volume, setVolume] = useState(1.0);
   const [showDoa, setShowDoa] = useState(false);
 
-  const selectedVoice = AZAN_OPTIONS.find((v) => v.id === voice) || AZAN_OPTIONS[2];
-  const doaAzan = DUA_COLLECTION.find((d) => d.id === 'dua-selepas-azan');
+  // Subuh sentiasa menggunakan 'subuh_special', manakala solat lain mengikut prop 'voice'
+  const effectiveVoice: AzanVoice = prayerKey === 'subuh' ? 'subuh_special' : voice;
+
+  const selectedVoice =
+    AZAN_OPTIONS.find((v) => v.id === effectiveVoice) || AZAN_OPTIONS[0];
+  const doaAzan = DUA_COLLECTION?.find((d) => d.id === 'dua-selepas-azan');
 
   useEffect(() => {
     if (isOpen) {
       setIsPlaying(true);
+      setShowDoa(false);
       const unsubscribe = audioNotificationService.addAudioStateListener(
         (playing, cur, dur) => {
           setIsPlaying(playing);
@@ -50,7 +56,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
 
   const handlePlayAudio = () => {
     audioNotificationService.unlockAudio();
-    audioNotificationService.playAzan(voice, () => setIsPlaying(false));
+    audioNotificationService.playAzan(effectiveVoice, () => setIsPlaying(false));
     setIsPlaying(true);
   };
 
@@ -73,7 +79,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300 select-none">
       <div className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-[#13221c] to-[#0a120f] border border-emerald-500/30 p-6 sm:p-8 shadow-2xl shadow-emerald-950/60 text-center overflow-hidden">
         {/* Subtle decorative glow */}
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
@@ -139,8 +145,9 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
         {/* Volume Slider */}
         <div className="mb-5 flex items-center justify-center gap-3 px-6">
           <button
+            type="button"
             onClick={() => handleVolumeChange(volume === 0 ? 1 : 0)}
-            className="text-slate-400 hover:text-white"
+            className="text-slate-400 hover:text-white transition cursor-pointer"
           >
             {volume === 0 ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
           </button>
@@ -160,16 +167,18 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
         <div className="flex flex-col sm:flex-row items-center gap-3 justify-center mb-6">
           {isPlaying ? (
             <button
+              type="button"
               onClick={handleStopAudio}
-              className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95"
+              className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
             >
               <Square className="w-4 h-4 fill-red-400 text-red-400" />
               Hentikan Azan
             </button>
           ) : (
             <button
+              type="button"
               onClick={handlePlayAudio}
-              className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-950/40"
+              className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-950/40 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-white text-white" />
               Mainkan Azan (MP3)
@@ -177,8 +186,9 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           )}
 
           <button
+            type="button"
             onClick={() => setShowDoa(!showDoa)}
-            className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2 transition-transform active:scale-95"
+            className="w-full sm:w-auto min-h-[48px] px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-lg shadow-emerald-900/50 flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
           >
             {showDoa ? 'Tutup Doa Azan' : 'Baca Doa Selepas Azan'}
           </button>
@@ -190,7 +200,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
             <h4 className="text-xs uppercase font-bold text-amber-300 tracking-wider mb-2">
               Doa Selepas Azan (Sunnah)
             </h4>
-            <p className="font-arabic text-xl text-right text-emerald-200 leading-loose mb-3">
+            <p className="font-arabic text-xl text-right text-emerald-200 leading-loose mb-3" dir="rtl">
               {doaAzan.arabic}
             </p>
             <p className="text-xs text-slate-300 italic mb-2 leading-relaxed">
@@ -209,8 +219,9 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
         <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <span>Mod Penggera Prioriti Tinggi</span>
           <button
+            type="button"
             onClick={handleCloseAll}
-            className="px-4 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 font-medium transition"
+            className="px-4 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/80 font-medium transition cursor-pointer"
           >
             Tutup Paparan
           </button>
