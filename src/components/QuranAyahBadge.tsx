@@ -1,5 +1,11 @@
 import React from 'react';
 
+// Fungsi penukar angka rumi (0-9) kepada angka Arab Timur (٠-٩) secara automatik
+const toArabicDigits = (numStr: string): string => {
+  const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+  return numStr.replace(/\d/g, (d) => arabicDigits[parseInt(d, 10)]);
+};
+
 interface QuranAyahBadgeProps {
   number: string;
 }
@@ -10,6 +16,8 @@ interface QuranAyahBadgeProps {
  * bingkai bulatan emas berhias, 4 kelopak bunga kardinal, dan nombor Arab di tengah.
  */
 export const QuranAyahBadge: React.FC<QuranAyahBadgeProps> = ({ number }) => {
+  const displayArabicNumber = toArabicDigits(number);
+
   return (
     <span
       className="inline-flex items-center justify-center align-middle mx-1.5 my-0.5 select-none"
@@ -67,7 +75,7 @@ export const QuranAyahBadge: React.FC<QuranAyahBadgeProps> = ({ number }) => {
         <circle cx="7" cy="31" r="0.9" fill="#fde047" opacity="0.85" />
         <circle cx="31" cy="31" r="0.9" fill="#fde047" opacity="0.85" />
 
-        {/* Nombor Ayat Arab / Angka di Tengah-Tengah Bulatan */}
+        {/* Nombor Ayat Arab di Tengah-Tengah Bulatan */}
         <text
           x="19"
           y="20.5"
@@ -76,10 +84,10 @@ export const QuranAyahBadge: React.FC<QuranAyahBadgeProps> = ({ number }) => {
           fill="#fef08a"
           fontWeight="bold"
           fontFamily="'Amiri', 'Scheherazade New', serif"
-          fontSize={number.length >= 3 ? '10' : number.length === 2 ? '11.5' : '13.5'}
+          fontSize={displayArabicNumber.length >= 3 ? '10' : displayArabicNumber.length === 2 ? '11.5' : '13.5'}
           className="select-none"
         >
-          {number}
+          {displayArabicNumber}
         </text>
       </svg>
     </span>
@@ -99,14 +107,12 @@ export const ArabicQuranText: React.FC<ArabicQuranTextProps> = ({
   text,
   className = 'font-arabic text-xl sm:text-2xl text-right text-emerald-100 leading-loose mb-3',
 }) => {
-  // Regex mengesan:
-  // 1. Simbol End of Ayah berserta nombor Arab (contoh: ۝١, ۝٢, ۝١٦٣, ۝255)
-  // 2. Nombor Arab bersendirian di akhir atau antara ayat (contoh: ١٦٣, ٢٥٥)
-  // 3. Simbol End of Ayah bersendirian (۝)
-  const regex = /(۝[\u0660-\u0669\d]+|(?<=\s)[\u0660-\u0669]{1,4}(?=\s|$)|۝)/g;
+  if (!text) return null;
+
+  // Regex mengesan simbol akhir ayat atau angka Arab di celah perkataan
+  const regex = /(۝[\u0660-\u0669\d]+|(?<=\s)[\u0660-\u0669\d]{1,4}(?=\s|$)|۝)/g;
   const parts = text.split(regex);
 
-  // Jika teks tidak mempunyai tanda ayat, paparkan teks biasa dengan gaya font Arab yang indah
   if (parts.length === 1) {
     return (
       <p className={className} dir="rtl">
@@ -120,7 +126,7 @@ export const ArabicQuranText: React.FC<ArabicQuranTextProps> = ({
       {parts.map((part, index) => {
         if (!part) return null;
 
-        // Semak sama ada bahagian ini adalah nombor ayat berserta simbol
+        // Semak jika bahagian ini mewakili nombor ayat
         if (part.startsWith('۝') || /^[\u0660-\u0669\d]+$/.test(part.trim())) {
           const num = part.replace(/^۝/, '').trim();
           if (num) {
