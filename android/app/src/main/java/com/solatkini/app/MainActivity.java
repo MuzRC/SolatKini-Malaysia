@@ -116,6 +116,9 @@ public class MainActivity extends BridgeActivity {
 
         boolean isAzanTrigger = intent.getBooleanExtra("azan_trigger", false);
         if (isAzanTrigger) {
+            // Padam bendera trigger supaya tidak berulang jika aktiviti dimuat semula
+            intent.removeExtra("azan_trigger");
+
             String prayerName = intent.getStringExtra("prayer_name");
             String prayerKey = intent.getStringExtra("prayer_key");
             String voice = intent.getStringExtra("voice");
