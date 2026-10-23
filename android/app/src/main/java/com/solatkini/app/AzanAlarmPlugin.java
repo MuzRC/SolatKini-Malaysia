@@ -561,4 +561,56 @@ public class AzanAlarmPlugin extends Plugin {
             call.reject("Gagal menghentikan audio azan: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Semak sama ada suis 'Set time automatically' dihidupkan dalam Settings telefon
+     */
+    @PluginMethod
+    public void checkAutoTime(PluginCall call) {
+        Context context = getContext();
+        boolean autoTime = true;
+        boolean autoTimeZone = true;
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                autoTime = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME, 1) == 1;
+                autoTimeZone = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME_ZONE, 1) == 1;
+            } else {
+                autoTime = Settings.System.getInt(context.getContentResolver(), Settings.System.AUTO_TIME, 1) == 1;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal menyemak status masa automatik", e);
+        }
+
+        JSObject ret = new JSObject();
+        ret.put("isAutoTimeEnabled", autoTime);
+        ret.put("isAutoTimeZoneEnabled", autoTimeZone);
+        call.resolve(ret);
+    }
+
+    /**
+     * Buka terus halaman 'Date & time' dalam Tetapan telefon
+     */
+    @PluginMethod
+    public void openDateSettings(PluginCall call) {
+        Context context = getContext();
+        try {
+            Intent intent = new Intent(Settings.ACTION_DATE_SETTINGS);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent(Settings.ACTION_SETTINGS);
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(fallback);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+            } catch (Exception ex) {
+                call.reject("Tidak dapat membuka tetapan tarikh: " + ex.getMessage());
+            }
+        }
+    }
 }
