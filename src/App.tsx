@@ -5,7 +5,6 @@ import {
   Moon,
   Radio,
   BookOpen,
-  Sparkles,
   Download,
   Volume2,
   MapPin,
@@ -32,13 +31,17 @@ import { SettingsView } from './components/SettingsView';
 import { CreditsPage } from './components/CreditsPage';
 import { AzanAlarmModal } from './components/AzanAlarmModal';
 import { Language, getSavedLanguage, t, saveLanguage } from './utils/i18n';
-import { ThemeId, getSavedTheme, applyTheme } from './utils/theme';
+import { ThemeId, getSavedTheme, applyTheme, THEME_OPTIONS } from './utils/theme';
 import { getHijriDate } from './utils/hijriCalendar';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('solat');
   const [currentLang, setCurrentLang] = useState<Language>(() => getSavedLanguage());
   const [currentTheme, setCurrentTheme] = useState<ThemeId>(() => getSavedTheme());
+
+  // Warna tema aktif mengikut pilihan pengguna di Pusat Tetapan
+  const currentThemeAccent =
+    THEME_OPTIONS?.find((t) => t.id === currentTheme)?.accentHex || '#10b981';
 
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
     if (typeof window !== 'undefined') {
@@ -135,7 +138,6 @@ export default function App() {
           }, 5000);
         },
         (error) => {
-          // Graceful fallback: Keep current or saved zone
           console.info('Geolocation notice:', error.message);
         },
         {
@@ -175,7 +177,6 @@ export default function App() {
       const currentDate = new Date().getDate();
       if (currentDate !== lastDate) {
         lastDate = currentDate;
-        // Day has rolled over, automatically fetch fresh schedule for the new day
         fetchDayPrayerTimes(currentZone, new Date(), true).then((data) => {
           setPrayerData(data);
         });
@@ -196,14 +197,12 @@ export default function App() {
 
   // 4. Request Android 13+ Notification Permission on App Startup & Listen for Native Azan Trigger
   useEffect(() => {
-    // Check and request notification permissions as soon as app opens
     nativeAlarmService.checkPermissions().then((status) => {
       if (!status.notificationsGranted) {
         nativeAlarmService.requestNotificationPermission();
       }
     });
 
-    // Window event listener dispatched by MainActivity when Azan Intent arrives
     const handleNativeAzanTrigger = (event: any) => {
       try {
         let data: { prayerName?: string; prayerKey?: PrayerKey; voice?: AzanVoice } = {};
@@ -212,7 +211,6 @@ export default function App() {
         } else if (event.detail) {
           data = event.detail;
         }
-        // Hentikan sebarang Web Audio yang mungkin aktif agar tidak bertindih dengan audio penggera asli
         audioNotificationService.stopAudio();
 
         setAlarmModalState({
@@ -230,11 +228,10 @@ export default function App() {
     return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
   }, []);
 
-  // 3. Setup Azan trigger listener from audio service (untuk pelayar web)
+  // 5. Setup Azan trigger listener from audio service (untuk pelayar web)
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
-        // Jika pada peranti Android natif, biarkan AzanAudioService native mengendalikan audio sepenuhnya
         setAlarmModalState({
           isOpen: true,
           prayerKey,
@@ -251,7 +248,6 @@ export default function App() {
   };
 
   const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
-    // Pada peranti natif Android, cetuskan penggera asli sahaja bagi menjamin tiada 2 azan berbunyi serentak
     if (nativeAlarmService.getIsNative()) {
       audioNotificationService.stopAudio();
       nativeAlarmService.testAlarm(name, voice, 1);
@@ -261,35 +257,35 @@ export default function App() {
     }
   };
 
-    const handleVoiceChange = (voice: AzanVoice) => {
-      setSelectedVoice(voice);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('solatkini_azan_voice', voice);
-        localStorage.setItem('solatkini_active_device_voice', voice);
-      }
-    };
+  const handleVoiceChange = (voice: AzanVoice) => {
+    setSelectedVoice(voice);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_azan_voice', voice);
+      localStorage.setItem('solatkini_active_device_voice', voice);
+    }
+  };
 
-    const handleTogglePersistentNotification = async () => {
-      const nextVal = !persistentNotification;
-      setPersistentNotification(nextVal);
-      if (typeof window !== 'undefined') {
-        try {
-          const saved = localStorage.getItem('solatkini_notif_settings');
-          const parsed = saved ? JSON.parse(saved) : {};
-          parsed.persistentNotification = nextVal;
-          localStorage.setItem('solatkini_notif_settings', JSON.stringify(parsed));
-        } catch {}
-      }
-      if (prayerData && prayerData.times && currentZone) {
-        const hijri = getHijriDate(new Date());
-        await widgetService.syncPersistentNotification(
-          prayerData.times,
-          currentZone,
-          hijri.formatted,
-          nextVal
-        );
-      }
-    };
+  const handleTogglePersistentNotification = async () => {
+    const nextVal = !persistentNotification;
+    setPersistentNotification(nextVal);
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('solatkini_notif_settings');
+        const parsed = saved ? JSON.parse(saved) : {};
+        parsed.persistentNotification = nextVal;
+        localStorage.setItem('solatkini_notif_settings', JSON.stringify(parsed));
+      } catch {}
+    }
+    if (prayerData && prayerData.times && currentZone) {
+      const hijri = getHijriDate(new Date());
+      await widgetService.syncPersistentNotification(
+        prayerData.times,
+        currentZone,
+        hijri.formatted,
+        nextVal
+      );
+    }
+  };
 
   const navItems = [
     { id: 'solat', label: t('nav_solat', currentLang), icon: Clock },
@@ -329,25 +325,48 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP DESKTOP HEADER (Zone 1: Wordmark, Zone 2: Navigation Links, Zone 3: Action) */}
-      {/* TOP DESKTOP HEADER (Zone 1: Logo, Zone 2: Navigation Ikon Sahaja, Zone 3: Uji Azan) */}
+      {/* TOP DESKTOP & MOBILE HEADER */}
       <header className="sticky top-0 z-40 bg-[#070d0b]/80 backdrop-blur-xl border-b border-emerald-900/30 px-4 sm:px-6 lg:px-8 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 lg:gap-8">
           
-          {/* Zone 1: Brand Wordmark */}
+          {/* Zone 1: Logo Geometri Rub el Hizb (۞) & Jenama SolatKini */}
           <div
             onClick={() => setActiveTab('solat')}
-            className="flex items-center gap-2 cursor-pointer select-none shrink-0"
+            className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
           >
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-slate-950 font-black shadow-md shadow-emerald-900/40">
-              <Sparkles className="w-4 h-4 fill-slate-950 text-slate-950" />
+            <div
+              className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/20 shadow-md transition-all duration-300"
+              style={{
+                backgroundColor: currentThemeAccent,
+                boxShadow: `0 4px 14px ${currentThemeAccent}55`,
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="w-[18px] h-[18px] text-white"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="4.5" y="4.5" width="15" height="15" rx="1.2" />
+                <rect x="4.5" y="4.5" width="15" height="15" rx="1.2" transform="rotate(45 12 12)" />
+                <circle cx="12" cy="12" r="2.2" className="fill-white stroke-none" />
+              </svg>
             </div>
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap">
-              SolatKini <span className="text-emerald-400 font-normal text-xs ml-1">Malaysia</span>
+              SolatKini{' '}
+              <span
+                className="font-bold text-xs ml-1 transition-colors duration-300"
+                style={{ color: currentThemeAccent }}
+              >
+                Malaysia
+              </span>
             </span>
           </div>
 
-          {/* Zone 2: Navigation Links (Disorokkan di telefon, hanya muncul di desktop) */}
+          {/* Zone 2: Navigation Links (Desktop sahaja) */}
           <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -373,11 +392,15 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: Primary Action (Quick Azan test) */}
+          {/* Zone 3: Primary Action (Butang Uji Azan turut mengikut warna tema) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-emerald-950/50 transition active:scale-95"
+              className="px-3.5 py-1.5 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition active:scale-95"
+              style={{
+                backgroundColor: currentThemeAccent,
+                boxShadow: `0 4px 12px ${currentThemeAccent}40`,
+              }}
             >
               <Volume2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Uji</span> Azan
@@ -450,7 +473,7 @@ export default function App() {
         )}
       </main>
 
-      {/* GLOBAL FOOTER (Desktop & Mobile accessible) */}
+      {/* GLOBAL FOOTER */}
       <footer className="mt-auto border-t border-emerald-950/60 bg-[#060a08]/90 backdrop-blur-md py-6 px-4 sm:px-6 mb-16 md:mb-0">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="space-y-1">
@@ -495,7 +518,7 @@ export default function App() {
         </div>
       </footer>
 
-     {/* MOBILE BOTTOM NAVIGATION BAR (IKON SAHAJA - MINIMALIS & SELESA) */}
+      {/* MOBILE BOTTOM NAVIGATION BAR */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070d0b]/95 backdrop-blur-xl border-t border-emerald-900/30 px-2 py-2 pb-safe shadow-2xl">
         <div className="grid grid-cols-7 items-center gap-1">
           {navItems.map((item) => {
@@ -513,10 +536,7 @@ export default function App() {
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                {/* Ikon bersaiz lebih besar dan jelas di telefon */}
                 <Icon className="w-5 h-5 transition-transform" />
-
-                {/* Titik penunjuk kecil bila tab sedang aktif */}
                 {isActive && (
                   <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-emerald-400 shadow-sm" />
                 )}
