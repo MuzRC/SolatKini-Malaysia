@@ -23,13 +23,25 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 1. Daftarkan plugin asli sebelum super.onCreate
         registerPlugin(SolatWidgetPlugin.class);
         registerPlugin(AzanAlarmPlugin.class);
 
+        // 2. Hidupkan dan buka skrin kunci untuk paparan azan
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
-        handleAzanIntent(getIntent());
+        // 3. Tangani intent pelancaran (Cold Start) dengan kelewatan selamat
+        // Memberi ruang ~1.2 saat untuk Capacitor WebView & React App.tsx siap sedia mendengar acara
+        final Intent launchIntent = getIntent();
+        if (launchIntent != null) {
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    handleAzanIntent(launchIntent);
+                }
+            }, 1200);
+        }
     }
 
     @Override
@@ -65,6 +77,7 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         configureWakeAndLockScreen();
+        // Bila app memang sedia dibuka di latar belakang, cetuskan serta-merta
         handleAzanIntent(intent);
     }
 
@@ -107,14 +120,26 @@ public class MainActivity extends BridgeActivity {
             String prayerKey = intent.getStringExtra("prayer_key");
             String voice = intent.getStringExtra("voice");
 
-            Log.i(TAG, "Menerima Intent Azan untuk solat: " + prayerName);
+            if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
+            if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
+
+            // Kunci kebal Subuh Khas
+            if ("subuh".equalsIgnoreCase(prayerKey)) {
+                voice = "subuh_special";
+            } else if (voice == null || voice.isEmpty()) {
+                voice = "jakim";
+            }
+
+            Log.i(TAG, "Meneruskan acara azan ke antaramuka React untuk: " + prayerName + " [" + voice + "]");
 
             if (getBridge() != null) {
                 JSObject data = new JSObject();
-                data.put("prayerName", prayerName != null ? prayerName : "Solat");
-                data.put("prayerKey", prayerKey != null ? prayerKey : "solat");
-                data.put("voice", voice != null ? voice : "jakim");
+                data.put("prayerName", prayerName);
+                data.put("prayerKey", prayerKey);
+                data.put("voice", voice);
                 getBridge().triggerWindowJSEvent("azanAlarmTriggered", data.toString());
+            } else {
+                Log.w(TAG, "Capacitor Bridge belum bersedia semasa cubaan menghantar azanAlarmTriggered.");
             }
         }
     }
