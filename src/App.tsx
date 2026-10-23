@@ -26,11 +26,20 @@ import { DuaCollection } from './components/DuaCollection';
 import { SettingsView } from './components/SettingsView';
 import { CreditsPage } from './components/CreditsPage';
 import { AzanAlarmModal } from './components/AzanAlarmModal';
+import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { Language, getSavedLanguage, t, saveLanguage } from './utils/i18n';
 import { ThemeId, getSavedTheme, applyTheme, THEME_OPTIONS } from './utils/theme';
 import { getHijriDate } from './utils/hijriCalendar';
 
 export default function App() {
+  // Semak status permulaan (hanya dipaparkan jika pemasangan baru kali pertama)
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('solatkini_onboarding_completed') !== 'true';
+    }
+    return false;
+  });
+
   const [activeTab, setActiveTab] = useState<ActiveTab>('solat');
   const [currentLang, setCurrentLang] = useState<Language>(() => getSavedLanguage());
   const [currentTheme, setCurrentTheme] = useState<ThemeId>(() => getSavedTheme());
@@ -108,8 +117,9 @@ export default function App() {
     voice: 'jakim',
   });
 
-  // 1. Pengesanan GPS automatik ketika aplikasi mula dibuka
+  // 1. Pengesanan GPS automatik ketika aplikasi mula dibuka (hanya selepas onboarding selesai)
   useEffect(() => {
+    if (showOnboarding) return;
     if (hasAutoLocatedRef.current) return;
     hasAutoLocatedRef.current = true;
 
@@ -142,7 +152,7 @@ export default function App() {
         }
       );
     }
-  }, []);
+  }, [showOnboarding]);
 
   // 2. Muat data waktu solat semasa pelancaran & bila zon bertukar
   useEffect(() => {
@@ -281,6 +291,18 @@ export default function App() {
       );
     }
   };
+
+  const handleOnboardingComplete = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_onboarding_completed', 'true');
+    }
+    setShowOnboarding(false);
+  };
+
+  // Paparkan checklist kebenaran hanya untuk pengguna baru
+  if (showOnboarding) {
+    return <OnboardingChecklist onComplete={handleOnboardingComplete} />;
+  }
 
   const navItems = [
     { id: 'solat', label: t('nav_solat', currentLang), icon: Clock },
