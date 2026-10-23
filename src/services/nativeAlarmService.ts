@@ -133,7 +133,7 @@ class NativeAlarmService {
    * Menyegerakkan senarai jadual waktu solat harian terus ke dalam perkakasan AlarmManager Android.
    */
   public async schedulePrayers(
-    prayerTimes: PrayerTimeItem[],
+    prayerTimes: (PrayerTimeItem & { voice?: AzanVoice })[],
     voice: AzanVoice = 'jakim',
     enabledPrayers?: Record<PrayerKey, boolean>
   ): Promise<number> {
@@ -162,13 +162,14 @@ class NativeAlarmService {
         const targetDate = new Date();
         targetDate.setHours(h, m, 0, 0);
 
-        // Jika waktu solat hari ini telah berlalu (kurang atau sama dengan masa sekarang), jadualkan tepat untuk keesokan harinya
+        // Jika waktu solat hari ini telah berlalu, jadualkan untuk keesokan harinya
         if (targetDate.getTime() <= now.getTime()) {
           targetDate.setDate(targetDate.getDate() + 1);
         }
 
-        // Khas bagi Subuh, jika pengguna memilih 'jakim' tetapi mahukan laungan khas Subuh
-        const resolvedVoice: AzanVoice = (item.key === 'subuh' && voice === 'jakim') ? 'subuh_special' : voice;
+        // Subuh sentiasa dikunci ke 'subuh_special'. Solat lain mengikut suara pilihan pengguna.
+        const resolvedVoice: AzanVoice =
+          item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
 
         alarms.push({
           prayerKey: item.key,
@@ -208,7 +209,11 @@ class NativeAlarmService {
   /**
    * Uji penggera azan secara langsung pada telefon pengguna.
    */
-  public async testAlarm(prayerName: string = 'Zohor', voice: AzanVoice = 'jakim', delaySeconds: number = 2): Promise<boolean> {
+  public async testAlarm(
+    prayerName: string = 'Zohor',
+    voice: AzanVoice = 'jakim',
+    delaySeconds: number = 2
+  ): Promise<boolean> {
     if (!this.isNative) {
       console.info('Ujian penggera di pelayar web...');
       return false;
