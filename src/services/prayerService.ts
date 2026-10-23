@@ -4,12 +4,18 @@ import { getHijriDate } from '../utils/hijriCalendar';
 
 const CACHE_KEY_PREFIX = 'solatkini_prayer_times_';
 
+/**
+ * Mendapatkan koordinat selamat (lat/lng) daripada zon JAKIM atau sandaran lalai
+ */
 function getSafeZoneCoordinates(zone: JakimZone): { lat: number; lng: number } {
   const lat = typeof (zone as any).lat === 'number' && !isNaN((zone as any).lat) ? (zone as any).lat : 5.347;
   const lng = typeof (zone as any).lng === 'number' && !isNaN((zone as any).lng) ? (zone as any).lng : 115.743;
   return { lat, lng };
 }
 
+/**
+ * Format timestamp saat atau teks waktu kepada 'HH:mm' tepat waktu Malaysia (UTC+8)
+ */
 const formatFromTimestampOrStr = (val: string | number | undefined): string => {
   if (typeof val === 'number') {
     const mytDate = new Date((val + 8 * 3600) * 1000);
@@ -24,6 +30,12 @@ const formatFromTimestampOrStr = (val: string | number | undefined): string => {
   return '00:00';
 };
 
+/**
+ * Mengambil jadual waktu solat harian dengan perlindungan dwi-lapisan luar talian:
+ * 1. Semakan cache storan peranti (30 hari tersimpan)
+ * 2. Percubaan rangkaian API e-Solat (dengan semakan status navigator.onLine pantas)
+ * 3. Enjin sandaran falak matematik tempatan (JAKIM Standard) sekiranya tiada sambungan
+ */
 export async function fetchDayPrayerTimes(
   zone: JakimZone,
   date: Date = new Date(),
@@ -36,14 +48,13 @@ export async function fetchDayPrayerTimes(
   // Semak status sambungan internet telefon
   const isNetworkOnline = typeof navigator !== 'undefined' ? (navigator.onLine ?? true) : true;
 
-  // 1. Semak cache tempatan
+  // 1. Semak cache tempatan terlebih dahulu jika bukan paksaan kemas kini (forceLive)
   if (!forceLive && typeof window !== 'undefined') {
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const parsed: DayPrayerTimes = JSON.parse(cached);
         const lastSync = localStorage.getItem(`${cacheKey}_sync`) || nowTimeStr;
-        // Jika telefon sedang offline (Airplane Mode), tanda terus sebagai mod luar talian
         return {
           times: parsed,
           isOfflineCalculated: !isNetworkOnline,
@@ -128,7 +139,7 @@ export async function fetchDayPrayerTimes(
     } catch {}
   }
 
-  // 3. Sandaran Cache jika gagal sedut data
+  // 3. Sandaran Cache jika muat turun internet gagal
   if (!fetchedTimes && typeof window !== 'undefined') {
     try {
       const existingCached = localStorage.getItem(cacheKey);
@@ -144,11 +155,20 @@ export async function fetchDayPrayerTimes(
     } catch {}
   }
 
-  // 4. Sandaran Pengiraan Matematik Falak
+  // 4. Sandaran Pengiraan Matematik Falak (Piawaian JAKIM)
   const coords = getSafeZoneCoordinates(zone);
   if (!fetchedTimes) {
     fetchedTimes = calculateLocalPrayerTimes(date, coords.lat, coords.lng, 8);
     isOffline = true;
+  }
+
+  // Semakan ketulenan Asar
+  if (fetchedTimes && fetchedTimes.asar) {
+    const asarHour = parseInt(fetchedTimes.asar.split(':')[0], 10);
+    if (isNaN(asarHour) || asarHour < 15 || asarHour > 18) {
+      const fixedTimes = calculateLocalPrayerTimes(date, coords.lat, coords.lng, 8);
+      fetchedTimes.asar = fixedTimes.asar;
+    }
   }
 
   const hijri = getHijriDate(date);
@@ -158,6 +178,13 @@ export async function fetchDayPrayerTimes(
     zone: zone.code,
     times: fetchedTimes,
   };
+
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(result));
+      localStorage.setItem(`${cacheKey}_sync`, nowTimeStr);
+    } catch {}
+  }
 
   return {
     times: result,
@@ -188,8 +215,18 @@ export const PRAYER_LABELS: Record<PrayerKey, string> = {
   isyak: 'Isyak',
 };
 
-// KUNCI UTAMA: HANYA 5 SOLAT FARDHU YANG DIKIRA SEBAGAI "SOLAT SETERUSNYA"
-// Imsak dan Syuruk bukan waktu solat fardhu!
+// Senarai penuh semua 7 waktu untuk paparan kad dan tetapan (PrayerDashboard & SettingsView)
+export const PRAYER_KEYS_ORDER: PrayerKey[] = [
+  'imsak',
+  'subuh',
+  'syuruk',
+  'zohor',
+  'asar',
+  'maghrib',
+  'isyak',
+];
+
+// 5 Waktu Solat Fardhu Sahaja untuk pengiraan "Solat Seterusnya" (Imsak & Syuruk tidak akan dipanggil sebagai Solat Seterusnya)
 export const OBLIGATORY_PRAYERS_ORDER: PrayerKey[] = [
   'subuh',
   'zohor',
@@ -243,7 +280,7 @@ export function determineNextPrayer(
     }
   }
 
-  // Jika semua waktu solat hari ini selesai (selepas Isyak), waktu solat seterusnya ialah Subuh esok!
+  // Jika semua waktu solat fardhu hari ini telah berlalu (selepas Isyak), waktu solat fardhu seterusnya ialah Subuh esok
   const tomorrowSubuhStr = prayerTimes?.times?.subuh || '05:00';
   const tomorrowSubuh = getPrayerDateObj(currentTime, tomorrowSubuhStr);
   tomorrowSubuh.setDate(tomorrowSubuh.getDate() + 1);
@@ -262,5 +299,87 @@ export function determineNextPrayer(
     currentKey: 'isyak',
     currentLabel: PRAYER_LABELS.isyak,
     isPassedToday: true,
+  };
+}
+
+export interface FastingCountdownOptions {
+  isRamadan?: boolean;
+  isUserFasting?: boolean;
+}
+
+export function getFastingCountdown(
+  prayerTimes: DayPrayerTimes,
+  currentTime: Date = new Date(),
+  options?: FastingCountdownOptions
+): {
+  phase: 'fasting' | 'eating' | 'imsak_alert';
+  title: string;
+  targetTimeStr: string;
+  targetDisplayTime: string;
+  remainingFormatted: string;
+  percentage: number;
+  isCurrentlyFasting: boolean;
+} {
+  const now = currentTime.getTime();
+  const subuhStr = prayerTimes?.times?.subuh || '05:30';
+  const maghribStr = prayerTimes?.times?.maghrib || '18:30';
+  const imsakStr = prayerTimes?.times?.imsak || '05:20';
+
+  const subuhDate = getPrayerDateObj(currentTime, subuhStr).getTime();
+  const maghribDate = getPrayerDateObj(currentTime, maghribStr).getTime();
+  const imsakDate = getPrayerDateObj(currentTime, imsakStr).getTime();
+
+  const isFastingDay = Boolean(options?.isRamadan || options?.isUserFasting);
+
+  if (now >= imsakDate && now < subuhDate) {
+    const secLeft = Math.floor((subuhDate - now) / 1000);
+    const m = Math.floor(secLeft / 60);
+    const s = secLeft % 60;
+    return {
+      phase: 'imsak_alert',
+      title: isFastingDay ? 'Waktu Imsak (Tamat Sahur)' : 'Waktu Imsak Hari Ini',
+      targetTimeStr: subuhStr,
+      targetDisplayTime: formatDisplayTime(subuhStr),
+      remainingFormatted: `${m}m ${s}s lagi ke Subuh`,
+      percentage: 95,
+      isCurrentlyFasting: isFastingDay,
+    };
+  }
+
+  if (now >= subuhDate && now < maghribDate) {
+    const totalDuration = Math.max(1, maghribDate - subuhDate);
+    const elapsed = now - subuhDate;
+    const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+    const secLeft = Math.floor((maghribDate - now) / 1000);
+    const h = Math.floor(secLeft / 3600);
+    const m = Math.floor((secLeft % 3600) / 60);
+    const s = secLeft % 60;
+
+    let title = 'Kiraan Menuju Maghrib';
+    if (options?.isRamadan) {
+      title = 'Sedang Berpuasa Ramadan';
+    } else if (options?.isUserFasting) {
+      title = 'Sedang Berpuasa (Sunat / Ganti)';
+    }
+
+    return {
+      phase: 'fasting',
+      title,
+      targetTimeStr: maghribStr,
+      targetDisplayTime: formatDisplayTime(maghribStr),
+      remainingFormatted: `${h}j ${m}m ${s}s lagi`,
+      percentage: Math.round(progress),
+      isCurrentlyFasting: isFastingDay,
+    };
+  }
+
+  return {
+    phase: 'eating',
+    title: isFastingDay ? 'Waktu Berbuka / Sahur' : 'Waktu Menuju Imsak Esok',
+    targetTimeStr: imsakStr,
+    targetDisplayTime: formatDisplayTime(imsakStr),
+    remainingFormatted: 'Sila bersedia untuk sahur & imsak',
+    percentage: 100,
+    isCurrentlyFasting: false,
   };
 }
