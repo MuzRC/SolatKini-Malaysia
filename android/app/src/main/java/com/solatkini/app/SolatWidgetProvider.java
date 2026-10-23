@@ -16,6 +16,8 @@ public class SolatWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
+        if (appWidgetIds == null || appWidgetIds.length == 0) return;
+
         for (int appWidgetId : appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId);
         }
@@ -25,14 +27,16 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_solat);
 
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String zone = prefs.getString("zone", "WLY01");
+        String zone = prefs.getString("zone", "SolatKini");
         String nextLabel = prefs.getString("next_label", "Waktu Solat");
         String nextTime = prefs.getString("next_time", "--:--");
-        String subuh = prefs.getString("subuh", "05:50");
-        String zohor = prefs.getString("zohor", "13:10");
-        String asar = prefs.getString("asar", "16:20");
-        String maghrib = prefs.getString("maghrib", "19:15");
-        String isyak = prefs.getString("isyak", "20:25");
+        
+        // Gunakan "--:--" sebagai lalai untuk mengelakkan kekeliruan waktu solat palsu
+        String subuh = prefs.getString("subuh", "--:--");
+        String zohor = prefs.getString("zohor", "--:--");
+        String asar = prefs.getString("asar", "--:--");
+        String maghrib = prefs.getString("maghrib", "--:--");
+        String isyak = prefs.getString("isyak", "--:--");
 
         views.setTextViewText(R.id.widget_zone, zone);
         views.setTextViewText(R.id.widget_next_label, nextLabel);
@@ -43,12 +47,12 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_maghrib, maghrib);
         views.setTextViewText(R.id.widget_isyak, isyak);
 
-        // Click on widget opens SolatKini app
+        // Menekan widget akan membuka aplikasi SolatKini ke skrin utama
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            appWidgetId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
@@ -61,7 +65,7 @@ public class SolatWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
 
-        if (ACTION_UPDATE_PRAYER_TIMES.equals(intent.getAction())) {
+        if (intent != null && ACTION_UPDATE_PRAYER_TIMES.equals(intent.getAction())) {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = prefs.edit();
 
@@ -76,10 +80,14 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             editor.apply();
 
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            ComponentName thisWidget = new ComponentName(context, SolatWidgetProvider.class);
-            int[] appWidgetIds = manager.getAppWidgetIds(thisWidget);
-            for (int appWidgetId : appWidgetIds) {
-                updateAppWidget(context, manager, appWidgetId);
+            if (manager != null) {
+                ComponentName thisWidget = new ComponentName(context, SolatWidgetProvider.class);
+                int[] appWidgetIds = manager.getAppWidgetIds(thisWidget);
+                if (appWidgetIds != null && appWidgetIds.length > 0) {
+                    for (int appWidgetId : appWidgetIds) {
+                        updateAppWidget(context, manager, appWidgetId);
+                    }
+                }
             }
         }
     }
