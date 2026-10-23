@@ -14,6 +14,10 @@ export interface PermissionStatusResult {
   sdkInt?: number;
 }
 
+export interface BatteryStatusResult {
+  isIgnoringBatteryOptimizations: boolean;
+}
+
 export interface AzanAlarmPluginInterface {
   checkNotificationPermission(): Promise<PermissionStatusResult>;
   requestNotificationPermission(): Promise<{ granted: boolean; status: string }>;
@@ -24,6 +28,10 @@ export interface AzanAlarmPluginInterface {
   cancelAllAlarms(): Promise<{ success: boolean }>;
   testAlarmNow(options: { prayerName: string; prayerKey: string; voice: string; delaySeconds: number }): Promise<{ success: boolean }>;
   stopAzanAudio(): Promise<{ success: boolean }>;
+  // Kaedah natif pengoptimuman bateri & autostart
+  isBatteryOptimized(): Promise<BatteryStatusResult>;
+  requestIgnoreBatteryOptimization(): Promise<{ opened: boolean }>;
+  openAutostartSettings(): Promise<{ opened: boolean }>;
 }
 
 const AzanAlarm = registerPlugin<AzanAlarmPluginInterface>('AzanAlarm');
@@ -116,6 +124,48 @@ class NativeAlarmService {
   }
 
   /**
+   * Semak sama ada aplikasi telah dikecualikan daripada sekatan bateri peranti.
+   */
+  public async isBatteryOptimized(): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.isBatteryOptimized();
+      return !!res.isIgnoringBatteryOptimizations;
+    } catch (err) {
+      console.warn('Gagal menyemak status sekatan bateri:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Membuka dialog sistem Android untuk meminta pengecualian pengoptimuman bateri terus.
+   */
+  public async requestIgnoreBatteryOptimization(): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.requestIgnoreBatteryOptimization();
+      return !!res.opened;
+    } catch (err) {
+      console.warn('Gagal meminta pengecualian bateri:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Membuka pintasan terus ke tetapan Autostart mengikut jenama peranti (Xiaomi/Oppo/Vivo/Realme/Samsung).
+   */
+  public async openAutostartSettings(): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.openAutostartSettings();
+      return !!res.opened;
+    } catch (err) {
+      console.warn('Gagal membuka tetapan autostart jenama peranti:', err);
+      return false;
+    }
+  }
+
+  /**
    * Menyimpan pilihan suara azan ke dalam SharedPreferences perkakasan Android native.
    */
   public async setActiveVoice(voice: string): Promise<boolean> {
@@ -147,10 +197,7 @@ class NativeAlarmService {
       const alarms: NativeAlarmItem[] = [];
 
       for (const item of prayerTimes) {
-        // Abaikan imsak/syuruk daripada laungan azan penuh jika bukan solat fardhu
         if (item.key === 'imsak' || item.key === 'syuruk') continue;
-
-        // Semak sekiranya pengguna mematikan suis solat berkenaan
         if (enabledPrayers && enabledPrayers[item.key] === false) continue;
 
         const [hoursStr, minutesStr] = item.time.split(':');
@@ -162,12 +209,10 @@ class NativeAlarmService {
         const targetDate = new Date();
         targetDate.setHours(h, m, 0, 0);
 
-        // Jika waktu solat hari ini telah berlalu, jadualkan untuk keesokan harinya
         if (targetDate.getTime() <= now.getTime()) {
           targetDate.setDate(targetDate.getDate() + 1);
         }
 
-        // Subuh sentiasa dikunci ke 'subuh_special'. Solat lain mengikut suara pilihan pengguna.
         const resolvedVoice: AzanVoice =
           item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
 
