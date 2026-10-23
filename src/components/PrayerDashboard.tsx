@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   MapPin,
-  Compass,
   Bell,
   BellOff,
   Volume2,
-  VolumeX,
   Play,
   Square,
   Sparkles,
@@ -15,7 +13,6 @@ import {
   ChevronDown,
   Navigation,
   CheckCircle2,
-  Radio,
   Sliders,
   X,
   Moon,
@@ -24,8 +21,7 @@ import {
   HardDrive,
   Trash2,
   Check,
-  RefreshCw,
-  BellRing
+  RefreshCw
 } from 'lucide-react';
 import {
   DayPrayerTimes,
@@ -59,7 +55,7 @@ interface PrayerDashboardProps {
   lastSyncTime?: string;
   isLiveSyncing?: boolean;
   onLiveSync?: () => void;
-  onNavigateToTab: (tab: 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget' | 'tetapan' | string) => void;
+  onNavigateToTab?: (tab: 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'widget' | 'tetapan' | string) => void;
   onTriggerTestAlarm: (key: PrayerKey, name: string, voice: AzanVoice) => void;
 }
 
@@ -71,7 +67,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   lastSyncTime,
   isLiveSyncing,
   onLiveSync,
-  onNavigateToTab,
+  onNavigateToTab: _onNavigateToTab,
   onTriggerTestAlarm,
 }) => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -226,7 +222,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         opt.id,
         opt.audioUrl,
         opt.filename,
-        true, // trigger disk download
+        true,
         (p) => setDownloadProgress(p),
         opt.fallbackUrl
       );
@@ -256,7 +252,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           opt.id,
           opt.audioUrl,
           opt.filename,
-          false, // cache only
+          false,
           (p) => setDownloadProgress(p),
           opt.fallbackUrl
         );
@@ -358,44 +354,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     window.addEventListener('solatSyncRequested', handleRemoteSync);
     return () => window.removeEventListener('solatSyncRequested', handleRemoteSync);
   }, [onLiveSync]);
-
-  const handleTogglePersistentNotification = async () => {
-    const currentVal = notificationSettings.persistentNotification ?? true;
-    const nextVal = !currentVal;
-
-    // Pastikan kebenaran notifikasi diberikan jika pengguna mengaktifkannya
-    if (nextVal) {
-      const perms = await nativeAlarmService.checkPermissions();
-      if (!perms.notificationsGranted) {
-        await nativeAlarmService.requestNotificationPermission();
-      }
-    }
-
-    const updated: AppNotificationSettings = {
-      ...notificationSettings,
-      persistentNotification: nextVal,
-    };
-    setNotificationSettings(updated);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_notif_settings', JSON.stringify(updated));
-    }
-
-    if (prayerTimes && currentZone) {
-      await widgetService.syncPersistentNotification(
-        prayerTimes,
-        currentZone,
-        hijri.formatted,
-        nextVal
-      );
-    }
-
-    setAudioToast(
-      nextVal
-        ? 'Widget bar 5 waktu solat tetap kini aktif di kawasan notifikasi telefon anda!'
-        : 'Widget bar notifikasi tetap telah dimatikan.'
-    );
-    setTimeout(() => setAudioToast(null), 4000);
-  };
 
   const [isUserFastingToday, setIsUserFastingToday] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -519,7 +477,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const fardPercentage = Math.round((completedFardCount / 5) * 100);
 
   const handleVoiceSelect = async (voice: AzanVoice) => {
-    // Stop any active or preview audio immediately when selecting a voice
     audioNotificationService.stopAudio();
     setIsPlayingPreview(false);
     setSelectedVoice(voice);
@@ -555,7 +512,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const handleTogglePrayerNotif = async (key: PrayerKey) => {
     const isCurrentlyEnabled = notificationSettings.preferences[key]?.enabled;
     if (!isCurrentlyEnabled) {
-      // User is activating an azan alarm: check & prompt for Android 13+ permission
       const perms = await nativeAlarmService.checkPermissions();
       if (!perms.notificationsGranted) {
         await nativeAlarmService.requestNotificationPermission();
@@ -607,7 +563,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         const nearest = findNearestZone(pos.coords.latitude, pos.coords.longitude);
         onZoneChange(nearest);
       },
-      (err) => {
+      () => {
         setIsLocating(false);
         setLocationError('Gagal mengesan lokasi automatik. Sila pilih zon secara manual.');
       },
@@ -765,7 +721,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
       {/* Hero Countdown & Next Prayer Spotlight Card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e241c] via-[#091712] to-[#060c0a] border border-emerald-500/20 p-6 sm:p-8 shadow-2xl">
-        {/* Subtle decorative background lights */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
@@ -789,7 +744,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               ({currentZone.daerah})
             </p>
 
-            {/* Fasting Quick Snippet - Only active during Ramadan, if user enabled fasting mode, or optional Sunnah reminder */}
+            {/* Fasting Quick Snippet */}
             {isFastingActive ? (
               <div className="mt-4 flex items-center justify-between gap-3 text-xs text-emerald-200/90 bg-emerald-950/60 border border-emerald-500/30 px-3.5 py-2.5 rounded-xl shadow-inner">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -1045,53 +1000,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
       </div>
 
-      {/* Quick Navigation Cards Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-        <button
-          onClick={() => onNavigateToTab('kiblat')}
-          className="glass-card hover:bg-emerald-950/40 p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition active:scale-95"
-        >
-          <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2 group-hover:bg-emerald-500/20 text-emerald-400">
-            <Compass className="w-5 h-5" />
-          </div>
-          <span className="text-sm font-bold text-white">Kompas Kiblat</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Arah tepat ke Kaabah</span>
-        </button>
-
-        <button
-          onClick={() => onNavigateToTab('puasa')}
-          className="glass-card hover:bg-emerald-950/40 p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition active:scale-95"
-        >
-          <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center mb-2 group-hover:bg-amber-500/20 text-amber-400">
-            <Moon className="w-5 h-5" />
-          </div>
-          <span className="text-sm font-bold text-white">Penjejak Puasa</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Waktu berbuka & niat</span>
-        </button>
-
-        <button
-          onClick={() => onNavigateToTab('wirid')}
-          className="glass-card hover:bg-emerald-950/40 p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition active:scale-95"
-        >
-          <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2 group-hover:bg-emerald-500/20 text-emerald-400">
-            <Radio className="w-5 h-5" />
-          </div>
-          <span className="text-sm font-bold text-white">Wirid & Tasbih</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Zikir bergetar haptik</span>
-        </button>
-
-        <button
-          onClick={() => onNavigateToTab('widget')}
-          className="glass-card hover:bg-emerald-950/40 p-4 rounded-2xl flex flex-col items-center justify-center text-center group transition active:scale-95"
-        >
-          <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2 group-hover:bg-emerald-500/20 text-emerald-400">
-            <Sparkles className="w-5 h-5" />
-          </div>
-          <span className="text-sm font-bold text-white">Widget Skrin</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Widget Telefon & Jam Meja</span>
-        </button>
-      </div>
-
       {/* ZONE SELECTOR MODAL */}
       {isZoneModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -1246,7 +1154,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 </button>
               </div>
 
-              {/* Native Android AlarmManager & TargetSDK 33 Status Card */}
+              {/* Native Android AlarmManager Status Card */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1813] to-[#08120e] border border-emerald-500/30 text-left space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -1357,7 +1265,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                       </button>
                     </div>
 
-                    {/* Download Progress Bar if downloading */}
                     {isDownloading && (
                       <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                         <div
@@ -1369,7 +1276,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
                     {/* Action Toolbar for Phone Azan, Offline & Download */}
                     <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap text-xs">
-                      {/* Set as Active Device Azan Button */}
                       {isDeviceActive ? (
                         <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
                           <Check className="w-3.5 h-3.5" /> Digunakan untuk waktu solat
@@ -1389,7 +1295,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                       )}
 
                       <div className="flex items-center gap-1.5 ml-auto">
-                        {/* Offline Cache Button */}
                         <button
                           disabled={isDownloading}
                           onClick={(e) => {
@@ -1407,7 +1312,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                           <span>{isCached ? 'Padam Memori' : 'Simpan'}</span>
                         </button>
 
-                        {/* Download .MP3 File to Device Disk */}
                         <button
                           disabled={isDownloading}
                           onClick={(e) => {
