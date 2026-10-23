@@ -22,7 +22,8 @@ import {
   Trash2,
   Check,
   RefreshCw,
-  WifiOff
+  WifiOff,
+  AlertTriangle
 } from 'lucide-react';
 import {
   DayPrayerTimes,
@@ -83,6 +84,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [notificationsGranted, setNotificationsGranted] = useState<boolean>(true);
+  const [isAutoTimeEnabled, setIsAutoTimeEnabled] = useState<boolean>(true);
 
   // Status sambungan internet langsung peranti
   const [isOnline, setIsOnline] = useState<boolean>(() => {
@@ -104,12 +106,17 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     };
   }, []);
 
-  // Semak status kebenaran notifikasi dan pantau apabila aplikasi dibuka semula (fokus)
+  // Semak status kebenaran notifikasi, masa automatik dan pantau apabila aplikasi dibuka semula (fokus)
   useEffect(() => {
     const checkPermsAndState = () => {
       nativeAlarmService.checkPermissions().then((res) => {
         setNotificationsGranted(res.notificationsGranted);
       });
+      if (typeof nativeAlarmService.checkAutoTime === 'function') {
+        nativeAlarmService.checkAutoTime().then((enabled) => {
+          setIsAutoTimeEnabled(enabled);
+        });
+      }
       if (typeof navigator !== 'undefined') {
         setIsOnline(navigator.onLine ?? true);
       }
@@ -748,6 +755,48 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* WARNING BANNER: MASA AUTOMATIK DIMATIKAN (SET TIME AUTOMATICALLY OFF) */}
+      {!isAutoTimeEnabled && (
+        <div className="rounded-2xl p-4 bg-gradient-to-r from-rose-950/80 via-amber-950/70 to-[#1f0f0a] border border-rose-500/50 text-left space-y-2.5 shadow-xl animate-in fade-in duration-300">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 animate-pulse" />
+              <h4 className="text-sm font-bold text-white">
+                Masa Automatik Telefon Dimatikan
+              </h4>
+            </div>
+            <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold uppercase tracking-wider">
+              Risiko Waktu Tersasar
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Pilihan <strong>&quot;Set time automatically&quot;</strong> dimatikan di tetapan telefon anda[span_4](start_span)[span_4](end_span). Sekiranya jam telefon dianjak secara manual, jadual waktu solat dan laungan azan mungkin tidak tepat.
+          </p>
+          <div className="pt-1 flex flex-wrap items-center gap-2">
+            <button
+              onClick={async () => {
+                await nativeAlarmService.openDateSettings();
+              }}
+              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-rose-950/40 cursor-pointer"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Buka Tetapan Tarikh & Masa Telefon
+            </button>
+            <button
+              onClick={() => {
+                nativeAlarmService.checkAutoTime().then((enabled) => {
+                  setIsAutoTimeEnabled(enabled);
+                });
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Semak Semula
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* NOTIFICATION PERMISSION WARNING BANNER IF NOT GRANTED */}
       {!notificationsGranted && (
