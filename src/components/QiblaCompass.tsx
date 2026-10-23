@@ -26,15 +26,18 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
   const [showCalibrateModal, setShowCalibrateModal] = useState<boolean>(false);
   const [manualHeading, setManualHeading] = useState<number>(0);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
+  
   const lastVibrateRef = useRef<number>(0);
+  const prevHeadingRef = useRef<number>(0);
+  const continuousHeadingRef = useRef<number>(0);
 
-  const qiblaAngle = calculateQiblaDirection(currentZone.lat, currentZone.lng);
-  const distanceKm = calculateDistanceToKaaba(currentZone.lat, currentZone.lng);
+  const qiblaAngle = calculateQiblaDirection(currentZone?.lat || 5.34, currentZone?.lng || 115.74);
+  const distanceKm = calculateDistanceToKaaba(currentZone?.lat || 5.34, currentZone?.lng || 115.74);
 
   // Active heading: sensor sebenar atau peluncur ujian manual
   const activeHeading = hasSensor ? deviceHeading : manualHeading;
   
-  // Beza sudut antara arah telefon dengan Kaabah
+  // Beza sudut antara arah telefon dengan Kaabah (0° - 359°)
   const angleDiff = (qiblaAngle - activeHeading + 360) % 360;
   const isAligned = angleDiff <= 4 || angleDiff >= 356;
 
@@ -45,11 +48,66 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
       if (now - lastVibrateRef.current > 1500) {
         lastVibrateRef.current = now;
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-          navigator.vibrate([100, 50, 150]);
+          try {
+            navigator.vibrate([100, 50, 150]);
+          } catch {}
         }
       }
     }
   }, [isAligned]);
+
+  const setupSensorListener = () => {
+    const handleOrientation = (e: DeviceOrientationEvent) => {
+      let heading = 0;
+      
+      // 1. iOS Safari / WebKit True North
+      if ('webkitCompassHeading' in e && typeof (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading === 'number') {
+        heading = (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading;
+        setHasSensor(true);
+      } else if (e.alpha !== null) {
+        // 2. Android (Absolute orientation)
+        heading = (360 - e.alpha) % 360;
+        setHasSensor(true);
+      }
+
+      const roundedHeading = Math.round(heading);
+
+      // Logik Anti-Spin: Elak putaran 360° liar semasa melintasi 0°/360°
+      let diff = roundedHeading - prevHeadingRef.current;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+      continuousHeadingRef.current += diff;
+      prevHeadingRef.current = roundedHeading;
+
+      setDeviceHeading(roundedHeading);
+
+      // Semakan kualiti penentukuran sensor
+      const acc = (e as unknown as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
+      if (typeof acc === 'number') {
+        if (acc > 0 && acc <= 15) {
+          setAccuracy('high');
+        } else if (acc > 15 && acc <= 30) {
+          setAccuracy('medium');
+        } else {
+          setAccuracy('low');
+        }
+      } else {
+        if (e.absolute === false) {
+          setAccuracy('medium');
+        } else {
+          setAccuracy('high');
+        }
+      }
+    };
+
+    // Gunakan 'deviceorientationabsolute' untuk Android jika disokong bagi ketepatan kompas mutlak
+    const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(eventName, handleOrientation as EventListener, true);
+
+    return () => {
+      window.removeEventListener(eventName, handleOrientation as EventListener, true);
+    };
+  };
 
   const requestCompassPermission = async () => {
     if (
@@ -73,56 +131,19 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
     }
   };
 
-  const setupSensorListener = () => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      let heading = 0;
-      // iOS webkitCompassHeading (True North)
-      if ('webkitCompassHeading' in e && typeof (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading === 'number') {
-        heading = (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading;
-        setHasSensor(true);
-      } else if (e.alpha !== null) {
-        // Android absolute orientation
-        heading = 360 - e.alpha;
-        setHasSensor(true);
-      }
-      setDeviceHeading(Math.round(heading));
-
-      // Semak status ketepatan penentukuran sensor
-      const acc = (e as unknown as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
-      if (typeof acc === 'number') {
-        if (acc > 0 && acc <= 15) {
-          setAccuracy('high');
-        } else if (acc > 15 && acc <= 30) {
-          setAccuracy('medium');
-        } else {
-          setAccuracy('low');
-        }
-      } else {
-        // Pada Android WebView, semak jika orientasi mutlak (absolute)
-        if (e.absolute === false) {
-          setAccuracy('medium');
-        } else {
-          setAccuracy('high');
-        }
-      }
-    };
-
-    window.addEventListener('deviceorientation', handleOrientation, true);
-    return () => {
-      window.removeEventListener('deviceorientation', handleOrientation, true);
-    };
-  };
-
   useEffect(() => {
     if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
       if (typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission !== 'function') {
-        setupSensorListener();
+        const cleanup = setupSensorListener();
+        return () => {
+          if (cleanup) cleanup();
+        };
       }
     }
   }, []);
 
   return (
-    <div className="space-y-6 max-w-xl mx-auto pb-10">
+    <div className="space-y-6 max-w-xl mx-auto pb-10 select-none">
       {/* Header Info */}
       <div className="glass-panel rounded-3xl p-6 text-center shadow-xl border border-white/5">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase mb-2">
@@ -133,7 +154,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           Arah Kaabah di Makkah
         </h2>
         <p className="text-xs sm:text-sm text-slate-300 mt-1">
-          Zon: <strong className="text-emerald-300">{currentZone.daerah} ({currentZone.code})</strong>
+          Zon: <strong className="text-emerald-300">{currentZone?.daerah} ({currentZone?.code})</strong>
         </p>
 
         {/* Big Degrees & Distance Metrics */}
@@ -160,7 +181,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         <div
           className={`mb-3 w-full max-w-sm px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300 text-center ${
             isAligned
-              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-102'
+              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-[1.02]'
               : 'bg-slate-800/80 text-slate-300'
           }`}
         >
@@ -214,7 +235,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           <button
             type="button"
             onClick={() => setShowCalibrateModal(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold border border-slate-700 transition active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold border border-slate-700 transition active:scale-95 cursor-pointer"
             title="Buka panduan kalibrasi sensor kompas"
           >
             <RefreshCw className="w-3 h-3" />
@@ -313,8 +334,9 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         <div className="mt-6 flex flex-col items-center gap-3">
           {permissionState === 'prompt' && !hasSensor && (
             <button
+              type="button"
               onClick={requestCompassPermission}
-              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/40 transition active:scale-95"
+              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/40 transition active:scale-95 cursor-pointer"
             >
               Aktifkan Penderia Kompas Telefon
             </button>
@@ -374,8 +396,9 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="relative w-full max-w-sm rounded-3xl bg-[#0d1713] border border-emerald-500/30 p-6 text-center space-y-4 shadow-2xl">
             <button
+              type="button"
               onClick={() => setShowCalibrateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -406,7 +429,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
                 setAccuracy('high');
                 setShowCalibrateModal(false);
               }}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition active:scale-95 shadow-md shadow-emerald-950/50"
+              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition active:scale-95 shadow-md shadow-emerald-950/50 cursor-pointer"
             >
               Selesai Kalibrasi
             </button>
