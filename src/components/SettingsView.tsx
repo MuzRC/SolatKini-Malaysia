@@ -11,7 +11,10 @@ import {
   Trash2,
   Sliders,
   Bell,
+  Power,
+  ShieldAlert,
 } from 'lucide-react';
+import { Preferences } from '@capacitor/preferences';
 import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
 import { ThemeId, THEME_OPTIONS, applyTheme } from '../utils/theme';
@@ -39,7 +42,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onLanguageChange,
   currentTheme,
   onThemeChange,
-  prayerTimes: _prayerTimes, // Ditanda _ jika disimpan untuk kegunaan versi akan datang
+  prayerTimes: _prayerTimes,
   currentZone: _currentZone,
   selectedVoice,
   onVoiceChange,
@@ -53,6 +56,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return audioStorageService.getActiveDeviceVoice();
   });
 
+  // State untuk Auto-Start Selepas Restart Telefon (Lalai / Default: TRUE)
+  const [autoStartBoot, setAutoStartBoot] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_autostart_boot');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -61,7 +73,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   useEffect(() => {
     const devVoice = audioStorageService.getActiveDeviceVoice();
     if (devVoice) setActiveDeviceVoice(devVoice);
+
+    // Pastikan nilai lalai (true) disimpan ke dalam storan Capacitor untuk dibaca oleh Java
+    const initAutoStart = async () => {
+      try {
+        const { value } = await Preferences.get({ key: 'solatkini_autostart_boot' });
+        if (value !== null) {
+          setAutoStartBoot(value === 'true');
+        } else {
+          await Preferences.set({ key: 'solatkini_autostart_boot', value: 'true' });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('solatkini_autostart_boot', 'true');
+          }
+        }
+      } catch {
+        // Fallback jika dijalankan di pelayar web biasa
+      }
+    };
+    initAutoStart();
   }, []);
+
+  const handleToggleAutoStart = async () => {
+    const nextVal = !autoStartBoot;
+    setAutoStartBoot(nextVal);
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_autostart_boot', String(nextVal));
+    }
+
+    try {
+      await Preferences.set({
+        key: 'solatkini_autostart_boot',
+        value: String(nextVal),
+      });
+    } catch (e) {
+      console.error('Gagal simpan ke Preferences', e);
+    }
+
+    showToast(
+      nextVal
+        ? 'Auto-start selepas restart telefon diaktifkan.'
+        : 'Auto-start selepas restart telefon dimatikan.'
+    );
+  };
 
   const handleSelectLanguage = (lang: Language) => {
     saveLanguage(lang);
@@ -281,7 +335,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 4. KAD PENGGERA AZAN & MUADZIN TELEFON */}
+      {/* 4. KAD AUTO-START SELEPAS RESTART TELEFON */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Power className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Auto-Start Selepas Restart Telefon
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Jadualkan semula azan dan mulakan aplikasi secara automatik bila peranti dihidupkan
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggleAutoStart}
+            className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 shrink-0 ${
+              autoStartBoot ? 'bg-emerald-500' : 'bg-slate-800 border border-slate-700'
+            }`}
+          >
+            <div
+              className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${
+                autoStartBoot ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Nota Tambahan Mesra Pengguna untuk Peranti Sekatan Agresif */}
+        <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-slate-300 space-y-1">
+          <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
+            <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+            <span>Perhatian untuk Pengguna Xiaomi / Vivo / Oppo / Realme:</span>
+          </div>
+          <p className="leading-relaxed text-slate-400">
+            Sila pastikan anda mengaktifkan kebenaran <strong>&quot;Autostart / Mulakan Sendiri&quot;</strong> dan menetapkan <strong>&quot;Tiada Sekatan Bateri&quot;</strong> di Tetapan Telefon agar azan tidak disekat daripada berbunyi tepat pada waktunya.
+          </p>
+        </div>
+      </div>
+
+      {/* 5. KAD PENGGERA AZAN & MUADZIN TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
@@ -351,7 +449,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                   {isActive ? (
                     <span className="w-5 h-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0">
-                      <Check className="w-3 h-3 stroke-[3]" />
+                      <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </span>
                   ) : (
                     <span className="text-[10px] text-slate-400">Pilih</span>
@@ -396,7 +494,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 5. KAD WIDGET SKRIN UTAMA TELEFON */}
+      {/* 6. KAD WIDGET SKRIN UTAMA TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
