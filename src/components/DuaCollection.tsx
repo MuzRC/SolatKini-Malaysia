@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Bookmark, BookmarkCheck, Copy, Check, Sparkles, BookOpen, Heart, Eye, EyeOff } from 'lucide-react';
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
 import { DuaItem } from '../types/prayer';
+import { ArabicQuranText } from './QuranAyahBadge';
 
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
@@ -339,11 +340,12 @@ export const DuaCollection: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 1. Teks Arab / Jawi (Boleh Collapse) */}
+                {/* 1. Teks Arab / Jawi dengan Sokongan Roset Emas Mushaf Quran */}
                 {showArabic && (
-                  <p className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}>
-                    {dua.arabic}
-                  </p>
+                  <ArabicQuranText
+                    text={dua.arabic}
+                    className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}
+                  />
                 )}
 
                 {/* 2. Teks Rumi (Boleh Collapse) */}
