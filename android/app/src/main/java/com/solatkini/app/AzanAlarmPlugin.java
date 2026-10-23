@@ -212,6 +212,7 @@ public class AzanAlarmPlugin extends Plugin {
                 long timestamp = obj.optLong("timestamp", 0);
                 int requestCode = 2000 + i;
 
+                // Simpan setiap rekod bersama jenis suaranya secara tersendiri
                 JSONObject storedObj = new JSONObject();
                 storedObj.put("prayerKey", prayerKey);
                 storedObj.put("prayerName", prayerName);
@@ -243,18 +244,13 @@ public class AzanAlarmPlugin extends Plugin {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
                     scheduledCount++;
-                    Log.i(TAG, "Penggera solat (" + prayerName + ") tepat dijadualkan melalui setAlarmClock pada: " + timestamp);
+                    Log.i(TAG, "Penggera solat (" + prayerName + ") suara [" + voice + "] dijadualkan pada: " + timestamp);
                 }
             }
 
-            // Simpan ke SharedPreferences untuk penjadualan semula apabila telefon 'reboot'
+            // Simpan keseluruhan jadual ke SharedPreferences untuk penjadualan semula bila telefon di-reboot
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
-            if (alarmsArray.length() > 0) {
-                JSONObject firstObj = alarmsArray.getJSONObject(0);
-                String activeVoice = firstObj.optString("voice", "jakim");
-                prefs.edit().putString("selected_azan_voice", activeVoice).apply();
-            }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -305,7 +301,7 @@ public class AzanAlarmPlugin extends Plugin {
         try {
             Context context = getContext();
             String prayerName = call.getString("prayerName", "Ujian Azan");
-            String prayerKey = call.getString("prayerKey", "subuh");
+            String prayerKey = call.getString("prayerKey", "test");
             String voice = call.getString("voice", "jakim");
             int delaySeconds = call.getInt("delaySeconds", 2);
 
@@ -335,9 +331,6 @@ public class AzanAlarmPlugin extends Plugin {
                 }
             }
 
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            prefs.edit().putString("selected_azan_voice", voice).apply();
-
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("delaySeconds", delaySeconds);
@@ -353,7 +346,7 @@ public class AzanAlarmPlugin extends Plugin {
         Context context = getContext();
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit().putString("selected_azan_voice", voice).apply();
-        Log.i(TAG, "Nada azan aktif dikemaskini dalam SharedPreferences: " + voice);
+        Log.i(TAG, "Nada azan harian aktif dikemaskini dalam SharedPreferences: " + voice);
         JSObject ret = new JSObject();
         ret.put("success", true);
         ret.put("voice", voice);
