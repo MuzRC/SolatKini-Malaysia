@@ -4,12 +4,14 @@ import android.Manifest;
 import android.app.AlarmManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 import androidx.core.app.ActivityCompat;
@@ -181,6 +183,194 @@ public class AzanAlarmPlugin extends Plugin {
             } catch (Exception err) {
                 call.reject("Tidak dapat membuka tetapan sistem: " + err.getMessage());
             }
+        }
+    }
+
+    /**
+     * Semak sama ada aplikasi telah dikecualikan daripada sekatan bateri (Doze mode)
+     */
+    @PluginMethod
+    public void isBatteryOptimized(PluginCall call) {
+        try {
+            Context context = getContext();
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            boolean isIgnoring = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
+                isIgnoring = pm.isIgnoringBatteryOptimizations(context.getPackageName());
+            }
+            JSObject ret = new JSObject();
+            ret.put("isIgnoringBatteryOptimizations", isIgnoring);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal menyemak status bateri: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Membuka dialog sistem untuk meminta pengecualian sekatan bateri secara langsung
+     */
+    @PluginMethod
+    public void requestIgnoreBatteryOptimization(PluginCall call) {
+        try {
+            Context context = getContext();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                if (pm != null && !pm.isIgnoringBatteryOptimizations(context.getPackageName())) {
+                    Intent intent = new Intent();
+                    intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + context.getPackageName()));
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(intent);
+                } else {
+                    openGeneralBatterySettings(context);
+                }
+            } else {
+                openGeneralBatterySettings(context);
+            }
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal meminta pengecualian bateri langsung, membuka tetapan umum", e);
+            openGeneralBatterySettings(getContext());
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        }
+    }
+
+    /**
+     * Pintasan Deep Link terus ke menu 'Autostart' atau pengurusan latar belakang mengikut jenama peranti
+     */
+    @PluginMethod
+    public void openAutostartSettings(PluginCall call) {
+        Context context = getContext();
+        String manufacturer = Build.MANUFACTURER != null ? Build.MANUFACTURER.toLowerCase() : "";
+        Log.i(TAG, "Membuka tetapan autostart untuk jenama: " + manufacturer);
+
+        boolean success = false;
+        try {
+            // 1. Xiaomi / Redmi / POCO (MIUI / HyperOS)
+            if (manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco")) {
+                success = tryStartActivity(context, new ComponentName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                ));
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.miui.securitycenter",
+                        "com.miui.powercenter.PowerSettings"
+                    ));
+                }
+            }
+            // 2. OPPO / Realme / OnePlus (ColorOS / Realme UI / OxygenOS)
+            else if (manufacturer.contains("oppo") || manufacturer.contains("realme") || manufacturer.contains("oneplus")) {
+                success = tryStartActivity(context, new ComponentName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.permission.startup.StartupAppListActivity"
+                ));
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.coloros.safecenter",
+                        "com.coloros.safecenter.startupapp.StartupAppListActivity"
+                    ));
+                }
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.oplus.safecenter",
+                        "com.oplus.safecenter.startupapp.StartupAppListActivity"
+                    ));
+                }
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.oppo.safe",
+                        "com.oppo.safe.permission.startup.StartupAppListActivity"
+                    ));
+                }
+            }
+            // 3. Vivo / iQOO (Funtouch OS / Origin OS)
+            else if (manufacturer.contains("vivo") || manufacturer.contains("iqoo")) {
+                success = tryStartActivity(context, new ComponentName(
+                    "com.vivo.permissionmanager",
+                    "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"
+                ));
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.iqoo.secure",
+                        "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"
+                    ));
+                }
+            }
+            // 4. Huawei / Honor (EMUI / Magic UI)
+            else if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
+                success = tryStartActivity(context, new ComponentName(
+                    "com.huawei.systemmanager",
+                    "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                ));
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.huawei.systemmanager",
+                        "com.huawei.systemmanager.optimize.process.ProtectActivity"
+                    ));
+                }
+            }
+            // 5. Samsung (One UI)
+            else if (manufacturer.contains("samsung")) {
+                success = tryStartActivity(context, new ComponentName(
+                    "com.samsung.android.lool",
+                    "com.samsung.android.sm.ui.battery.BatteryActivity"
+                ));
+                if (!success) {
+                    success = tryStartActivity(context, new ComponentName(
+                        "com.samsung.android.sm",
+                        "com.samsung.android.sm.ui.battery.BatteryActivity"
+                    ));
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Ralat melancarkan aktiviti OEM autostart: " + e.getMessage());
+        }
+
+        // Sandaran Terulung: Jika jenama lain atau aktiviti OEM tiada, buka terus info aplikasi
+        if (!success) {
+            openAppDetailsSettings(context);
+        }
+
+        JSObject ret = new JSObject();
+        ret.put("opened", true);
+        call.resolve(ret);
+    }
+
+    private void openGeneralBatterySettings(Context context) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception ex) {
+            openAppDetailsSettings(context);
+        }
+    }
+
+    private boolean tryStartActivity(Context context, ComponentName componentName) {
+        try {
+            Intent intent = new Intent();
+            intent.setComponent(componentName);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private void openAppDetailsSettings(Context context) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + context.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Gagal membuka tetapan info aplikasi: " + e.getMessage());
         }
     }
 
