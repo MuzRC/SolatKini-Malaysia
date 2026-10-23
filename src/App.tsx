@@ -330,31 +330,38 @@ export default function App() {
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 lg:gap-8">
           
           {/* Zone 1: Logo Geometri Rub el Hizb (۞) & Jenama SolatKini */}
+          {/* Zone 1: Logo Geometri Rub el Hizb (۞) & Jenama SolatKini */}
           <div
             onClick={() => setActiveTab('solat')}
             className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
           >
+            {/* Kotak Bintang 8 Bucu Islamik Dinamik (Padat & Jelas) */}
             <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center border border-white/20 shadow-md transition-all duration-300"
+              className="w-9 h-9 rounded-xl flex items-center justify-center border border-white/25 shadow-md transition-all duration-300"
               style={{
                 backgroundColor: currentThemeAccent,
                 boxShadow: `0 4px 14px ${currentThemeAccent}55`,
               }}
             >
+              {/* Saiz dibesarkan ke w-6 h-6 (24px) & strokeWidth ditebalkan ke 2.4 */}
               <svg
                 viewBox="0 0 24 24"
-                className="w-[18px] h-[18px] text-white"
+                className="w-6 h-6 text-white"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="2.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <rect x="4.5" y="4.5" width="15" height="15" rx="1.2" />
-                <rect x="4.5" y="4.5" width="15" height="15" rx="1.2" transform="rotate(45 12 12)" />
-                <circle cx="12" cy="12" r="2.2" className="fill-white stroke-none" />
+                {/* Segi empat pertama */}
+                <rect x="4.5" y="4.5" width="15" height="15" rx="1.5" />
+                {/* Segi empat kedua berputar 45° */}
+                <rect x="4.5" y="4.5" width="15" height="15" rx="1.5" transform="rotate(45 12 12)" />
+                {/* Titik pusat dibesarkan sedikit supaya padu */}
+                <circle cx="12" cy="12" r="2.6" className="fill-white stroke-none" />
               </svg>
             </div>
+
             <span className="text-base sm:text-lg font-extrabold tracking-tight text-white whitespace-nowrap">
               SolatKini{' '}
               <span
