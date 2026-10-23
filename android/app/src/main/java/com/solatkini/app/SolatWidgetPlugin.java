@@ -22,6 +22,8 @@ public class SolatWidgetPlugin extends Plugin {
             Context context = getContext();
             Intent intent = new Intent(context, SolatWidgetProvider.class);
             intent.setAction(SolatWidgetProvider.ACTION_UPDATE_PRAYER_TIMES);
+            // Kunci pakej untuk elak sekatan siaran latar belakang Android moden
+            intent.setPackage(context.getPackageName());
 
             if (call.hasOption("zone")) {
                 intent.putExtra("zone", call.getString("zone"));
@@ -83,9 +85,9 @@ public class SolatWidgetPlugin extends Plugin {
             // Sorotan solat seterusnya
             String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")" + (countdown.isEmpty() ? "" : " · " + countdown);
 
-            // Baris padat kesemua 5 waktu solat
+            // Baris padat 5 waktu solat harian
             String formatted5Times = String.format(
-                "Subuh %s  |  Zohor %s  |  Asar %s  |  Maghrib %s  |  Isyak %s",
+                "Subuh %s   Zohor %s   Asar %s   Maghrib %s   Isyak %s",
                 subuh, zohor, asar, maghrib, isyak
             );
 
@@ -110,9 +112,10 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
+            // Format BigText: Memaparkan solat seterusnya & baris jadual solat secara kemas tanpa terpotong
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
                 .setBigContentTitle("SolatKini · Zon " + zone)
-                .setSummaryText(hijri.isEmpty() ? "Waktu Solat Hari Ini" : hijri)
+                .setSummaryText(hijri.isEmpty() ? "Waktu Solat JAKIM" : hijri)
                 .bigText(nextKicker + "\n\n" + formatted5Times);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(
@@ -122,16 +125,14 @@ public class SolatWidgetPlugin extends Plugin {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("SolatKini · Zon " + zone)
                 .setContentText(nextKicker)
-                .setSubText(formatted5Times)
+                .setSubText(hijri.isEmpty() ? zone : hijri) // Kemas pada baris tajuk status bar
                 .setStyle(bigStyle)
                 .setContentIntent(openPending)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setSilent(true) // Senyapkan sepenuhnya tanpa getaran kecil
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setSound(null)
-                .setVibrate(new long[]{0})
-                .setDefaults(0)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);
