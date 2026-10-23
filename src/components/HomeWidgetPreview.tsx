@@ -7,7 +7,6 @@ import {
   Layers,
   Maximize2,
   Minimize2,
-  Tv,
   Smartphone
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
@@ -29,7 +28,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
   const [isStandbyMode, setIsStandbyMode] = useState<boolean>(false);
   const [wakeLockSentinel, setWakeLockSentinel] = useState<any>(null);
 
-  // Live timer for widget clock
+  // Jam masa nyata untuk paparan widget
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -37,7 +36,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Screen Wake Lock for Standby / Desk Clock Mode
+  // Screen Wake Lock untuk mod Jam Meja (AOD)
   useEffect(() => {
     let sentinel: any = null;
     const requestWakeLock = async () => {
@@ -65,17 +64,28 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
 
   const nextPrayer = determineNextPrayer(prayerTimes, currentTime);
   const hijri = getHijriDate(currentTime);
-  const isUserFastingToday = typeof window !== 'undefined' && localStorage.getItem('solatkini_fasting_active') === 'true';
+
+  // Semakan mod puasa yang segerak dengan tarikh semasa
+  const isUserFastingToday = (() => {
+    if (typeof window !== 'undefined') {
+      const savedDate = localStorage.getItem('solatkini_fasting_date');
+      const savedActive = localStorage.getItem('solatkini_fasting_active');
+      const today = new Date().toISOString().split('T')[0];
+      return savedDate === today && savedActive === 'true';
+    }
+    return false;
+  })();
+
   const fasting = getFastingCountdown(prayerTimes, currentTime, {
     isRamadan: hijri.isRamadan,
     isUserFasting: isUserFastingToday,
   });
 
-  // FULL SCREEN STANDBY / DESK CLOCK MODE
+  // MOD JAM MEJA / SKRIN PENUH (STANDBY MODE)
   if (isStandbyMode) {
     return (
       <div className="fixed inset-0 z-50 bg-[#050b08] text-white flex flex-col justify-between p-6 sm:p-10 select-none">
-        {/* Top bar with zone and exit */}
+        {/* Bar atas dengan zon dan butang keluar */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
@@ -91,14 +101,14 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
 
           <button
             onClick={() => setIsStandbyMode(false)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition active:scale-95"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition active:scale-95 cursor-pointer"
           >
             <Minimize2 className="w-4 h-4 text-emerald-400" />
             <span>Keluar Mod Skrin Penuh</span>
           </button>
         </div>
 
-        {/* Center Clock & Next Prayer */}
+        {/* Jam Digital Utama & Solat Seterusnya */}
         <div className="text-center my-auto space-y-4">
           <div className="text-6xl sm:text-8xl md:text-9xl font-black font-mono tracking-tight text-emerald-400 drop-shadow-[0_0_35px_rgba(16,185,129,0.3)]">
             {currentTime.toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
@@ -115,7 +125,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
           </p>
         </div>
 
-        {/* Bottom 5 Prayers Strip */}
+        {/* Jalur 5 Waktu Solat di Bahagian Bawah */}
         <div className="grid grid-cols-5 gap-2 sm:gap-4 max-w-4xl mx-auto w-full">
           {(['subuh', 'zohor', 'asar', 'maghrib', 'isyak'] as const).map((k) => {
             const isNext = nextPrayer.nextKey === k;
@@ -129,7 +139,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
                 }`}
               >
                 <div className="text-[11px] sm:text-xs text-slate-400 font-medium">
-                  {PRAYER_LABELS[k].split(' ')[0]}
+                  {PRAYER_LABELS[k]?.split(' ')[0] || k}
                 </div>
                 <div className="text-base sm:text-xl font-bold font-mono text-white mt-1">
                   {prayerTimes.times[k]}
@@ -162,7 +172,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
 
           <button
             onClick={() => setIsStandbyMode(true)}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition active:scale-95 shrink-0"
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-xs sm:text-sm shadow-xl shadow-emerald-950/50 transition active:scale-95 shrink-0 cursor-pointer"
           >
             <Maximize2 className="w-4 h-4 text-amber-300" />
             <span>Aktifkan Mod Jam Meja (AOD)</span>
@@ -170,11 +180,11 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </div>
       </div>
 
-      {/* Widget Size Selector Tabs */}
-      <div className="flex items-center justify-center gap-2">
+      {/* Pilihan Saiz Widget */}
+      <div className="flex items-center justify-center gap-2 flex-wrap">
         <button
           onClick={() => setActiveWidgetSize('mini')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
             activeWidgetSize === 'mini'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-white'
@@ -184,7 +194,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </button>
         <button
           onClick={() => setActiveWidgetSize('medium')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
             activeWidgetSize === 'medium'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-white'
@@ -194,7 +204,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </button>
         <button
           onClick={() => setActiveWidgetSize('fasting')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
             activeWidgetSize === 'fasting'
               ? 'bg-emerald-600 text-white shadow-md'
               : 'bg-slate-900 text-slate-400 hover:text-white'
@@ -204,14 +214,14 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </button>
       </div>
 
-      {/* Smartphone Mockup Container */}
+      {/* Bekas Simulasi Telefon Pintar */}
       <div className="relative mx-auto max-w-sm sm:max-w-md rounded-[42px] p-4 bg-slate-950 border-4 border-slate-800 shadow-2xl">
-        {/* Phone Speaker Notch */}
+        {/* Takuk Pembesar Suara Telefon */}
         <div className="w-24 h-4 bg-slate-900 rounded-full mx-auto mb-4" />
 
-        {/* Home Screen Simulated Background */}
+        {/* Latar Belakang Skrin Utama Simulasi */}
         <div className="rounded-[32px] p-5 bg-gradient-to-b from-[#0c1c16] via-[#091510] to-[#040806] border border-white/5 min-h-[480px] flex flex-col justify-between">
-          {/* Top Status Clock */}
+          {/* Jam Status Bar Atas */}
           <div className="flex items-center justify-between text-xs text-slate-400 px-1 font-mono">
             <span>
               {currentTime.getHours().toString().padStart(2, '0')}:
@@ -223,10 +233,10 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
             </div>
           </div>
 
-          {/* ACTIVE SIMULATED WIDGET */}
+          {/* SIMULASI WIDGET AKTIF */}
           <div className="my-auto py-2">
             {activeWidgetSize === 'mini' && (
-              /* Mini 2x2 Widget */
+              /* Widget Mini 2x2 */
               <div className="mx-auto w-48 h-48 rounded-3xl bg-gradient-to-br from-[#12281e] to-[#0a1711] border border-emerald-500/30 p-4 shadow-xl flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between">
@@ -253,7 +263,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
             )}
 
             {activeWidgetSize === 'medium' && (
-              /* Medium 4x2 Widget (All Prayers) */
+              /* Widget Penuh 4x2 */
               <div className="w-full rounded-3xl bg-gradient-to-br from-[#12281e] via-[#0d1c15] to-[#07110d] border border-emerald-500/30 p-4 shadow-2xl space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -265,7 +275,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
                   </span>
                 </div>
 
-                {/* 5 Prayers Row */}
+                {/* 5 Waktu Solat Sebaris */}
                 <div className="grid grid-cols-5 gap-1.5 text-center">
                   {(['subuh', 'zohor', 'asar', 'maghrib', 'isyak'] as const).map((k) => {
                     const isNext = nextPrayer.nextKey === k;
@@ -278,7 +288,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
                             : 'bg-slate-900/40'
                         }`}
                       >
-                        <div className="text-[10px] text-slate-400 font-medium">{PRAYER_LABELS[k].split(' ')[0]}</div>
+                        <div className="text-[10px] text-slate-400 font-medium">{PRAYER_LABELS[k]?.split(' ')[0] || k}</div>
                         <div className="text-[11px] font-bold text-white font-mono mt-0.5">
                           {prayerTimes.times[k]}
                         </div>
@@ -297,7 +307,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
             )}
 
             {activeWidgetSize === 'fasting' && (
-              /* Fasting Lockscreen Widget */
+              /* Widget Khas Berbuka Puasa */
               <div className="w-full rounded-3xl bg-gradient-to-br from-[#1b1c12] to-[#0a110d] border border-amber-500/30 p-5 shadow-2xl space-y-3 text-center">
                 <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
                   <Moon className="w-3 h-3" />
@@ -319,7 +329,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
             )}
           </div>
 
-          {/* Simulated App Grid Icons */}
+          {/* Ikon Aplikasi Simulasi */}
           <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-800/60">
             {['Solat', 'Kiblat', 'Puasa', 'Wirid'].map((app, i) => (
               <div key={i} className="flex flex-col items-center">
@@ -333,7 +343,7 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
         </div>
       </div>
 
-      {/* Android Widget Installation Guide Card */}
+      {/* Kad Panduan Pemasangan Widget Android */}
       <div className="rounded-3xl bg-gradient-to-br from-[#0c1a14] via-slate-900 to-[#0c1a14] border border-emerald-500/30 p-6 sm:p-7 shadow-xl space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
