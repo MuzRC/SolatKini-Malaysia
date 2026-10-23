@@ -21,7 +21,8 @@ import {
   HardDrive,
   Trash2,
   Check,
-  RefreshCw
+  RefreshCw,
+  WifiOff
 } from 'lucide-react';
 import {
   DayPrayerTimes,
@@ -83,19 +84,56 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [notificationsGranted, setNotificationsGranted] = useState<boolean>(true);
 
-  // Semak status kebenaran notifikasi dan kemas kini apabila tetingkap aktif semula
+  // Status sambungan internet langsung peranti
+  const [isOnline, setIsOnline] = useState<boolean>(() => {
+    if (typeof navigator !== 'undefined') {
+      return navigator.onLine ?? true;
+    }
+    return true;
+  });
+
   useEffect(() => {
-    const checkPerms = () => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Semak status kebenaran notifikasi dan pantau apabila aplikasi dibuka semula (fokus)
+  useEffect(() => {
+    const checkPermsAndState = () => {
       nativeAlarmService.checkPermissions().then((res) => {
         setNotificationsGranted(res.notificationsGranted);
       });
-    };
-    checkPerms();
-    window.addEventListener('focus', checkPerms);
-    return () => window.removeEventListener('focus', checkPerms);
-  }, []);
+      if (typeof navigator !== 'undefined') {
+        setIsOnline(navigator.onLine ?? true);
+      }
+      const now = new Date();
+      setCurrentTime(now);
+      setNextPrayerInfo(determineNextPrayer(prayerTimes, now));
 
-  // Azan and notification preferences
+      // Jika tarikh jam telefon dianjak berbanding tarikh data sedia ada, segerakkan semula
+      const todayStr = now.toISOString().split('T')[0];
+      if (prayerTimes && prayerTimes.date !== todayStr && onLiveSync) {
+        onLiveSync();
+      }
+    };
+
+    checkPermsAndState();
+    window.addEventListener('focus', checkPermsAndState);
+    document.addEventListener('visibilitychange', checkPermsAndState);
+    return () => {
+      window.removeEventListener('focus', checkPermsAndState);
+      document.removeEventListener('visibilitychange', checkPermsAndState);
+    };
+  }, [prayerTimes, onLiveSync]);
+
+  // Pilihan suara azan dan tetapan notifikasi
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('solatkini_azan_voice') as AzanVoice) || 'jakim';
@@ -159,7 +197,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     audioNotificationService.stopAudio();
     setIsPlayingPreview(false);
 
-    // 1. Tetapkan suara pilihan untuk solat harian
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
     setSelectedVoice(opt.id);
@@ -169,7 +206,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
     nativeAlarmService.setActiveVoice(opt.id);
 
-    // Kemas kini tetapan notifikasi: Subuh kekal 'subuh_special', solat lain ikut opt.id
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
@@ -188,7 +224,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       return updated;
     });
 
-    // Segerakkan jadual penggera AlarmManager Android dengan pemisahan suara Subuh
     if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
         key: k,
@@ -212,7 +247,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     setAudioToast(`Berjaya! ${opt.title} ditetapkan untuk solat harian (Subuh kekal Azan Subuh khas).`);
     setTimeout(() => setAudioToast(null), 4000);
 
-    // 2. Simpan ke memori luar talian di latar belakang jika belum disimpan
     if (!cachedVoiceIds.includes(opt.id)) {
       setDownloadingVoiceId(opt.id);
       setDownloadProgress(0);
@@ -319,7 +353,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone]);
 
-  // Segerak ke AlarmManager Android (Subuh guna 'subuh_special', yang lain guna 'selectedVoice')
+  // Segerak ke AlarmManager Android
   useEffect(() => {
     if (prayerTimes && prayerTimes.times) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
@@ -364,7 +398,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone, notificationSettings.persistentNotification, hijri.formatted, nextPrayerInfo.nextKey]);
 
-  // Dengar arahan segerak waktu solat daripada notifikasi
   useEffect(() => {
     const handleRemoteSync = () => {
       console.info('Menerima arahan segerak daripada butang pintasan notifikasi Android.');
@@ -509,7 +542,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
     nativeAlarmService.setActiveVoice(voice);
 
-    // Kemas kini preferences: Subuh kekal 'subuh_special', solat lain guna suara pilihan
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
@@ -528,7 +560,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       return updated;
     });
 
-    // Segerak semula penggera waktu solat
     if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
         key: k,
@@ -631,18 +662,27 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap text-xs font-semibold uppercase tracking-wider mb-1">
-              <span className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-[10px]">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                e-Solat JAKIM Online
-              </span>
+              {/* Lencana Pintar: Memaparkan status sebenar talian dan sumber data */}
+              {!isOnline ? (
+                <span className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 border border-amber-500/40 px-2.5 py-0.5 rounded-full text-[10px]">
+                  <WifiOff className="w-3 h-3 text-amber-400" />
+                  {isOfflineCalculated ? 'Falak Luar Talian' : 'Luar Talian (Data Tersimpan)'}
+                </span>
+              ) : isOfflineCalculated ? (
+                <span className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 border border-amber-500/40 px-2.5 py-0.5 rounded-full text-[10px]">
+                  <span className="flex h-2 w-2 rounded-full bg-amber-400" />
+                  Kiraan Falak Tempatan
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-[10px]">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  e-Solat JAKIM Online
+                </span>
+              )}
+
               {lastSyncTime && (
                 <span className="text-[11px] text-slate-400 font-mono lowercase">
                   dikemas kini {lastSyncTime}
-                </span>
-              )}
-              {isOfflineCalculated && (
-                <span className="text-[11px] text-amber-300 font-normal ml-1">
-                  (Mod Falak Luar Talian)
                 </span>
               )}
             </div>
@@ -826,7 +866,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
           {/* Quick Action Controls */}
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
-            {/* Uji azan automatik memilih 'subuh_special' jika solat seterusnya Subuh */}
             <button
               onClick={() => {
                 const testVoice = (nextPrayerInfo.nextKey === 'subuh' ? 'subuh_special' : selectedVoice) as AzanVoice;
@@ -935,7 +974,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           })}
         </div>
 
-        {/* Celebratory message upon completing 5/5 prayers */}
         {completedFardCount === 5 && (
           <div className="p-3.5 rounded-2xl bg-emerald-900/40 border border-emerald-400/40 flex items-center gap-3 text-xs text-emerald-200 animate-in fade-in-50 duration-300">
             <Sparkles className="w-5 h-5 text-amber-300 shrink-0" />
@@ -962,24 +1000,32 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             const displayTime = formatDisplayTime(time24);
             const label = PRAYER_LABELS[key];
             const isNext = nextPrayerInfo.nextKey === key;
+            const isCurrent = nextPrayerInfo.currentKey === key && !isNext && key !== 'imsak' && key !== 'syuruk';
             const isAlertEnabled = notificationSettings.preferences[key]?.enabled;
             const isSpecialFastingTime = key === 'imsak' || key === 'maghrib';
 
             return (
               <div
                 key={key}
-                className={`relative rounded-2xl p-4 transition-all duration-200 flex flex-col justify-between ${
+                className={`relative rounded-2xl p-4 transition-all duration-300 flex flex-col justify-between ${
                   isNext
-                    ? 'glass-card-active ring-1 ring-emerald-400/60'
+                    ? 'glass-card-active ring-1 ring-emerald-400/60 shadow-lg shadow-emerald-950/50'
+                    : isCurrent
+                    ? 'bg-gradient-to-br from-emerald-950/50 to-slate-900/80 border border-emerald-500/50 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/40'
                     : 'glass-card hover:border-emerald-500/30'
                 }`}
               >
                 <div>
-                  {isNext && (
+                  {isNext ? (
                     <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold tracking-wider uppercase border border-emerald-400/30">
                       Seterusnya
                     </div>
-                  )}
+                  ) : isCurrent ? (
+                    <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-bold tracking-wider uppercase border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Sedang Masuk
+                    </div>
+                  ) : null}
 
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
@@ -1065,7 +1111,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               </button>
             </div>
 
-            {/* Search and state filters */}
             <div className="pt-4 space-y-3">
               <input
                 type="text"
@@ -1075,7 +1120,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
               />
 
-              {/* State Filter pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs scrollbar-none">
                 {states.map((st) => (
                   <button
@@ -1093,7 +1137,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               </div>
             </div>
 
-            {/* Zones List */}
             <div className="flex-1 overflow-y-auto mt-2 space-y-2 pr-1">
               {filteredZones.map((z) => {
                 const isSelected = z.code === currentZone.code;
@@ -1153,7 +1196,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               </button>
             </div>
 
-            {/* Notification toast inside modal */}
             {audioToast && (
               <div className="mt-3 p-3 rounded-xl bg-emerald-900/80 border border-emerald-400 text-xs text-white flex items-center justify-between">
                 <span>{audioToast}</span>
@@ -1164,7 +1206,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             )}
 
             <div className="mt-4 space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
-
               <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
                 <span>Pilihan di bawah digunakan untuk Zohor, Asar, Maghrib & Isyak. Waktu Subuh kekal automatik menggunakan alunan Azan Subuh khas.</span>
@@ -1322,7 +1363,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                       </div>
                     )}
 
-                    {/* Action Toolbar for Phone Azan, Offline & Download */}
                     <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap text-xs">
                       {isDeviceActive ? (
                         <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
