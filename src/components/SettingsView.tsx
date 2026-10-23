@@ -89,15 +89,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       localStorage.setItem('solatkini_autostart_boot', String(nextVal));
     }
 
-    // Segerak ke storan native Android (CapacitorStorage) sekiranya plugin preferences tersedia
-    try {
-      import('@capacitor/preferences')
-        .then(({ Preferences }) => {
-          Preferences.set({ key: 'solatkini_autostart_boot', value: String(nextVal) });
-        })
-        .catch(() => {});
-    } catch {}
-
     showToast(
       nextVal
         ? 'Auto-start selepas restart telefon diaktifkan.'
