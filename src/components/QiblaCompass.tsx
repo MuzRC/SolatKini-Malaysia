@@ -1,47 +1,168 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Compass,
-  Sparkles,
-  Navigation,
-  Info,
-  RefreshCw,
+  RotateCw,
   CheckCircle2,
   AlertTriangle,
-  ShieldAlert,
-  X
+  Navigation,
+  Sparkles,
+  Info,
+  Maximize2
 } from 'lucide-react';
 import { JakimZone } from '../types/prayer';
-import { calculateQiblaDirection, calculateDistanceToKaaba } from '../utils/qibla';
 
 interface QiblaCompassProps {
   currentZone: JakimZone;
 }
 
-type CompassAccuracy = 'high' | 'medium' | 'low';
+// Koordinat Kaabah di Masjidil Haram, Makkah
+const MAKKAH_LAT = 21.422487;
+const MAKKAH_LNG = 39.826206;
+
+/**
+ * Formula Great Circle untuk mengira sudut bearing Kiblat tepat dari koordinat semasa
+ */
+function calculateQiblaBearing(lat: number, lng: number): number {
+  const phiK = (MAKKAH_LAT * Math.PI) / 180;
+  const lambdaK = (MAKKAH_LNG * Math.PI) / 180;
+  const phi = (lat * Math.PI) / 180;
+  const lambda = (lng * Math.PI) / 180;
+
+  const deltaLambda = lambdaK - lambda;
+  const y = Math.sin(deltaLambda);
+  const x = Math.cos(phi) * Math.tan(phiK) - Math.sin(phi) * Math.cos(deltaLambda);
+
+  let qibla = (Math.atan2(y, x) * 180) / Math.PI;
+  return (qibla + 360) % 360;
+}
 
 export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
+  // Sudut arah kompas peranti (0° = Utara Sebenar)
   const [deviceHeading, setDeviceHeading] = useState<number>(0);
-  const [hasSensor, setHasSensor] = useState<boolean>(false);
-  const [accuracy, setAccuracy] = useState<CompassAccuracy>('high');
-  const [showCalibrateModal, setShowCalibrateModal] = useState<boolean>(false);
-  const [manualHeading, setManualHeading] = useState<number>(0);
-  const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
-  
+  // Sudut bearing Kiblat dari lokasi semasa (cth: ~292° di Sabah)
+  const [qiblaAngle, setQiblaAngle] = useState<number>(292.5);
+
+  // Status sensor & kebenaran
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [sensorAccuracy, setSensorAccuracy] = useState<'high' | 'medium' | 'unreliable'>('medium');
+  const [isSupported, setIsSupported] = useState<boolean>(true);
+  const [needsCalibration, setNeedsCalibration] = useState<boolean>(false);
+
+  // Nilai sasaran dan penapis getaran (Smoothing Filter Refs)
+  const targetHeadingRef = useRef<number>(0);
+  const currentHeadingRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
   const lastVibrateRef = useRef<number>(0);
-  const prevHeadingRef = useRef<number>(0);
-  const continuousHeadingRef = useRef<number>(0);
+  const sampleCountRef = useRef<number>(0);
 
-  const qiblaAngle = calculateQiblaDirection(currentZone?.lat || 5.34, currentZone?.lng || 115.74);
-  const distanceKm = calculateDistanceToKaaba(currentZone?.lat || 5.34, currentZone?.lng || 115.74);
+  // 1. Kira sudut Kiblat mengikut zon JAKIM semasa atau koordinat GPS
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const angle = calculateQiblaBearing(pos.coords.latitude, pos.coords.longitude);
+          setQiblaAngle(Math.round(angle * 10) / 10);
+        },
+        () => {
+          // Sandaran: Jika GPS dimatikan, anggap koordinat purata zon (~292.5° di Sabah)
+          const fallbackLat = (currentZone as any)?.lat || 5.347;
+          const fallbackLng = (currentZone as any)?.lng || 115.743;
+          setQiblaAngle(Math.round(calculateQiblaBearing(fallbackLat, fallbackLng) * 10) / 10);
+        },
+        { enableHighAccuracy: true, timeout: 6000 }
+      );
+    }
+  }, [currentZone]);
 
-  // Active heading: sensor sebenar atau peluncur ujian manual
-  const activeHeading = hasSensor ? deviceHeading : manualHeading;
-  
-  // Beza sudut antara arah telefon dengan Kaabah (0° - 359°)
-  const angleDiff = (qiblaAngle - activeHeading + 360) % 360;
-  const isAligned = angleDiff <= 4 || angleDiff >= 356;
+  // 2. Enjin Penapis Getaran Sudut Bulatan (Circular Exponential Smoothing Filter @ 60fps)
+  useEffect(() => {
+    const SMOOTHING_FACTOR = 0.12; // Penapis getaran: ayunan lembut macam kompas minyak fizikal
 
-  // Maklum balas getaran haptik apabila tepat menghadap kiblat
+    const updateSmoothHeading = () => {
+      const current = currentHeadingRef.current;
+      const target = targetHeadingRef.current;
+
+      // Kira beza sudut terpendek dalam bulatan 360 darjah (mengelakkan sentakan di 0°/360°)
+      let diff = ((target - current + 180) % 360) - 180;
+      if (diff < -180) diff += 360;
+
+      if (Math.abs(diff) < 0.05) {
+        currentHeadingRef.current = target;
+      } else {
+        currentHeadingRef.current = (current + diff * SMOOTHING_FACTOR + 360) % 360;
+      }
+
+      setDeviceHeading(currentHeadingRef.current);
+      animationFrameRef.current = requestAnimationFrame(updateSmoothHeading);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(updateSmoothHeading);
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  // 3. Pendengar Sensor Orientasi Asli Android (deviceorientationabsolute & webkitCompassHeading)
+  useEffect(() => {
+    let orientationEventName = 'deviceorientation';
+
+    const handleOrientation = (e: any) => {
+      let heading: number | null = null;
+
+      // A. Sokongan iOS / Safari
+      if (typeof e.webkitCompassHeading === 'number') {
+        heading = e.webkitCompassHeading;
+        if (typeof e.webkitCompassAccuracy === 'number') {
+          if (e.webkitCompassAccuracy > 0 && e.webkitCompassAccuracy <= 15) {
+            setSensorAccuracy('high');
+            setNeedsCalibration(false);
+          } else if (e.webkitCompassAccuracy > 15) {
+            setSensorAccuracy('medium');
+          }
+        }
+      }
+      // B. Sokongan Android Native (deviceorientationabsolute / alpha)
+      else if (e.alpha !== null && e.alpha !== undefined) {
+        heading = 360 - e.alpha;
+
+        sampleCountRef.current += 1;
+        if (sampleCountRef.current > 20) {
+          if (e.absolute === true) {
+            setSensorAccuracy('high');
+            setNeedsCalibration(false);
+          } else {
+            setSensorAccuracy('medium');
+          }
+        }
+      }
+
+      if (heading !== null) {
+        targetHeadingRef.current = (heading + 360) % 360;
+        setHasPermission(true);
+      }
+    };
+
+    if ('ondeviceorientationabsolute' in window) {
+      orientationEventName = 'deviceorientationabsolute';
+    } else if (!('ondeviceorientation' in window)) {
+      setIsSupported(false);
+    }
+
+    window.addEventListener(orientationEventName, handleOrientation, true);
+
+    return () => {
+      window.removeEventListener(orientationEventName, handleOrientation, true);
+    };
+  }, []);
+
+  // Sudut relatif dari kepala telefon ke arah Kiblat
+  const qiblaRelativeAngle = ((qiblaAngle - deviceHeading + 540) % 360) - 180;
+  const isAligned = Math.abs(qiblaRelativeAngle) <= 3; // Toleransi tepat +-3 darjah
+
+  // 4. Sentuhan Haptik bila sudut tepat menghadap Kaabah
   useEffect(() => {
     if (isAligned) {
       const now = Date.now();
@@ -49,393 +170,187 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         lastVibrateRef.current = now;
         if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
           try {
-            navigator.vibrate([100, 50, 150]);
+            navigator.vibrate([40, 60, 40]);
           } catch {}
         }
       }
     }
   }, [isAligned]);
 
-  const setupSensorListener = () => {
-    const handleOrientation = (e: DeviceOrientationEvent) => {
-      let heading = 0;
-      
-      // 1. iOS Safari / WebKit True North
-      if ('webkitCompassHeading' in e && typeof (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading === 'number') {
-        heading = (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading;
-        setHasSensor(true);
-      } else if (e.alpha !== null) {
-        // 2. Android (Absolute orientation)
-        heading = (360 - e.alpha) % 360;
-        setHasSensor(true);
-      }
-
-      const roundedHeading = Math.round(heading);
-
-      // Logik Anti-Spin: Elak putaran 360° liar semasa melintasi 0°/360°
-      let diff = roundedHeading - prevHeadingRef.current;
-      if (diff > 180) diff -= 360;
-      if (diff < -180) diff += 360;
-      continuousHeadingRef.current += diff;
-      prevHeadingRef.current = roundedHeading;
-
-      setDeviceHeading(roundedHeading);
-
-      // Semakan kualiti penentukuran sensor
-      const acc = (e as unknown as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
-      if (typeof acc === 'number') {
-        if (acc > 0 && acc <= 15) {
-          setAccuracy('high');
-        } else if (acc > 15 && acc <= 30) {
-          setAccuracy('medium');
-        } else {
-          setAccuracy('low');
-        }
-      } else {
-        if (e.absolute === false) {
-          setAccuracy('medium');
-        } else {
-          setAccuracy('high');
-        }
-      }
-    };
-
-    // Gunakan 'deviceorientationabsolute' untuk Android jika disokong bagi ketepatan kompas mutlak
-    const eventName = 'ondeviceorientationabsolute' in window ? 'deviceorientationabsolute' : 'deviceorientation';
-    window.addEventListener(eventName, handleOrientation as EventListener, true);
-
-    return () => {
-      window.removeEventListener(eventName, handleOrientation as EventListener, true);
-    };
-  };
-
-  const requestCompassPermission = async () => {
-    if (
-      typeof window !== 'undefined' &&
-      'DeviceOrientationEvent' in window &&
-      typeof (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function'
-    ) {
-      try {
-        const response = await (DeviceOrientationEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
-        if (response === 'granted') {
-          setPermissionState('granted');
-          setupSensorListener();
-        } else {
-          setPermissionState('denied');
-        }
-      } catch {
-        setPermissionState('denied');
-      }
-    } else {
-      setupSensorListener();
-    }
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
-      if (typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission !== 'function') {
-        const cleanup = setupSensorListener();
-        return () => {
-          if (cleanup) cleanup();
-        };
-      }
-    }
-  }, []);
-
   return (
-    <div className="space-y-6 max-w-xl mx-auto pb-10 select-none">
-      {/* Header Info */}
-      <div className="glass-panel rounded-3xl p-6 text-center shadow-xl border border-white/5">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold uppercase mb-2">
-          <Compass className="w-3.5 h-3.5 text-amber-300" />
-          Penentuan Arah Kiblat
+    <div className="flex flex-col items-center justify-between min-h-[75vh] w-full max-w-md mx-auto px-4 py-2 select-none animate-in fade-in duration-300">
+      
+      {/* 1. Header & Status Sensor Ketepatan */}
+      <div className="w-full text-center space-y-2">
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 shadow-inner">
+          <div
+            className={`w-2.5 h-2.5 rounded-full ${
+              sensorAccuracy === 'high'
+                ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]'
+                : sensorAccuracy === 'medium'
+                ? 'bg-amber-400 shadow-[0_0_8px_#fbbf24]'
+                : 'bg-rose-500 animate-ping'
+            }`}
+          />
+          <span className="text-[11px] font-bold text-slate-300">
+            {sensorAccuracy === 'high'
+              ? 'Sensor Stabil & Tepat'
+              : sensorAccuracy === 'medium'
+              ? 'Sensor Sedang Menyelaras'
+              : 'Perlu Kalibrasi Angka 8'}
+          </span>
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-          Arah Kaabah di Makkah
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-300 mt-1">
-          Zon: <strong className="text-emerald-300">{currentZone?.daerah} ({currentZone?.code})</strong>
-        </p>
 
-        {/* Big Degrees & Distance Metrics */}
-        <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-800">
-          <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
-            <div className="text-xs text-slate-400">Sudut Azimuth Kiblat</div>
-            <div className="text-2xl font-black text-amber-300 font-mono mt-0.5">
-              {qiblaAngle}° <span className="text-xs text-slate-400 font-sans">Barat-Barat Laut</span>
-            </div>
-          </div>
-          <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
-            <div className="text-xs text-slate-400">Jarak ke Makkah</div>
-            <div className="text-2xl font-black text-emerald-300 font-mono mt-0.5">
-              {distanceKm.toLocaleString('ms-MY')}{' '}
-              <span className="text-xs text-slate-400 font-sans">km</span>
-            </div>
-          </div>
-        </div>
+        <h2 className="text-xl font-extrabold text-white flex items-center justify-center gap-2">
+          <span>Kompas Arah Kiblat</span>
+          {isAligned && <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />}
+        </h2>
+
+        <p className="text-xs text-slate-400">
+          Zon <span className="text-emerald-400 font-bold">{currentZone.daerah.split(',')[0]}</span> ({currentZone.code}) • Kiblat: <strong className="text-white font-mono">{qiblaAngle.toFixed(1)}°</strong>
+        </p>
       </div>
 
-      {/* COMPASS DIAL CONTAINER */}
-      <div className="relative rounded-3xl glass-panel p-6 sm:p-8 flex flex-col items-center justify-center overflow-hidden border border-emerald-500/20 shadow-2xl">
-        {/* Alignment banner */}
+      {/* 2. DAIL KOMPAS ISLAMIK (Fluid-damped smooth rotation) */}
+      <div className="relative w-72 h-72 sm:w-80 sm:h-80 my-6 flex items-center justify-center">
+        {/* Glow Lingkaran Luar bila Kiblat Tepat */}
         <div
-          className={`mb-3 w-full max-w-sm px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300 text-center ${
+          className={`absolute inset-0 rounded-full transition-all duration-500 pointer-events-none ${
             isAligned
-              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-[1.02]'
-              : 'bg-slate-800/80 text-slate-300'
+              ? 'bg-emerald-500/15 shadow-[0_0_50px_rgba(16,185,129,0.35)] ring-2 ring-emerald-400/60 scale-105'
+              : 'bg-slate-900/40 shadow-xl border border-slate-800/80'
           }`}
+        />
+
+        {/* Piring Dail Berpusing mengikut arah hadap telefon (-deviceHeading) */}
+        <div
+          className="absolute inset-2 rounded-full border border-slate-800/80 flex items-center justify-center bg-gradient-to-b from-[#0a1410] to-[#040806] transition-transform duration-75 will-change-transform shadow-2xl"
+          style={{
+            transform: `rotate(${-deviceHeading}deg)`,
+          }}
         >
-          {isAligned ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 fill-slate-950 text-emerald-500 shrink-0" />
-              <span>Tepat Menghadap Kiblat! (Solat Bersedia)</span>
-            </>
-          ) : (
-            <>
-              <Navigation className="w-4 h-4 text-emerald-400 animate-pulse shrink-0" />
-              <span>Pusingkan peranti anda sehingga jarum bertindih dengan Kaabah</span>
-            </>
-          )}
-        </div>
-
-        {/* Lencana Status Kalibrasi Sensor Semasa */}
-        <div className="w-full max-w-sm flex items-center justify-between gap-2 px-3.5 py-2 mb-6 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
-          <div className="flex items-center gap-2">
-            {accuracy === 'high' && (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1 text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Ditentukur (Tinggi)
-                </span>
-              </>
-            )}
-
-            {accuracy === 'medium' && (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
-                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
-                <span className="text-amber-400 font-bold flex items-center gap-1 text-[11px]">
-                  <AlertTriangle className="w-3.5 h-3.5" /> Sederhana
-                </span>
-              </>
-            )}
-
-            {accuracy === 'low' && (
-              <>
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
-                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
-                <span className="text-rose-400 font-bold flex items-center gap-1 text-[11px]">
-                  <ShieldAlert className="w-3.5 h-3.5" /> Perlu Kalibrasi
-                </span>
-              </>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowCalibrateModal(true)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold border border-slate-700 transition active:scale-95 cursor-pointer"
-            title="Buka panduan kalibrasi sensor kompas"
-          >
-            <RefreshCw className="w-3 h-3" />
-            <span>Kalibrasi</span>
-          </button>
-        </div>
-
-        {/* Outer Compass Housing */}
-        <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full border-4 border-emerald-950/80 bg-gradient-to-b from-[#0c1813] to-[#060c09] shadow-inner flex items-center justify-center">
-          {/* Compass Rose Markings (U, T, S, B) */}
-          <div
-            className="absolute inset-2 rounded-full transition-transform duration-200 ease-out pointer-events-none"
-            style={{ transform: `rotate(${-activeHeading}deg)` }}
-          >
-            {/* North Indicator */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center">
-              <span className="text-xs font-black text-red-500 font-mono">U</span>
-              <div className="w-1 h-2 bg-red-500 rounded-full mt-0.5" />
-            </div>
-
-            {/* East Indicator */}
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
-              <div className="w-2 h-1 bg-slate-600 rounded-full mr-0.5" />
-              <span className="text-xs font-bold text-slate-400 font-mono">T</span>
-            </div>
-
-            {/* South Indicator */}
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center">
-              <div className="w-1 h-2 bg-slate-600 rounded-full mb-0.5" />
-              <span className="text-xs font-bold text-slate-400 font-mono">S</span>
-            </div>
-
-            {/* West Indicator */}
-            <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center">
-              <span className="text-xs font-bold text-slate-400 font-mono">B</span>
-              <div className="w-2 h-1 bg-slate-600 rounded-full ml-0.5" />
-            </div>
-
-            {/* 360 Degree Ticks */}
-            {Array.from({ length: 36 }).map((_, i) => (
+          {/* Senggatan & Titik Kompas 360 Darjah */}
+          <div className="absolute inset-0 rounded-full flex items-center justify-center pointer-events-none">
+            {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
               <div
-                key={i}
-                className="absolute inset-0 flex justify-center"
-                style={{ transform: `rotate(${i * 10}deg)` }}
+                key={deg}
+                className="absolute w-full h-full flex justify-center items-start pt-2"
+                style={{ transform: `rotate(${deg}deg)` }}
               >
                 <div
-                  className={`w-0.5 ${
-                    i % 9 === 0 ? 'h-3 bg-slate-400' : 'h-1.5 bg-slate-700'
+                  className={`rounded-full ${
+                    deg % 90 === 0
+                      ? 'w-1 h-3 bg-slate-300'
+                      : 'w-0.5 h-1.5 bg-slate-600'
                   }`}
                 />
               </div>
             ))}
 
-            {/* Kaaba Target Emblem Positioned at Qibla Degrees */}
-            <div
-              className="absolute inset-0 flex justify-center pointer-events-none"
-              style={{ transform: `rotate(${qiblaAngle}deg)` }}
-            >
-              <div className="absolute -top-3 flex flex-col items-center">
-                <div className="w-7 h-7 rounded-lg bg-black border-2 border-amber-400 shadow-md shadow-amber-500/50 flex items-center justify-center">
-                  <div className="w-4 h-1 bg-amber-400 mb-1 rounded-sm" />
-                </div>
-                <span className="text-[10px] font-black text-amber-300 font-mono mt-1 bg-black/80 px-1 rounded">
-                  KAABAH
-                </span>
-              </div>
-            </div>
+            {/* Huruf Arah Utama: U, T, S, B */}
+            <span className="absolute top-4 text-xs font-black text-rose-500">U</span>
+            <span className="absolute right-4 text-xs font-bold text-slate-400">T</span>
+            <span className="absolute bottom-4 text-xs font-bold text-slate-400">S</span>
+            <span className="absolute left-4 text-xs font-bold text-slate-400">B</span>
           </div>
 
-          {/* Central Qibla Pointer Needle */}
+          {/* JARUM PENUNJUK KAABAH KIBLAT */}
           <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform duration-200 ease-out"
-            style={{ transform: `rotate(${angleDiff}deg)` }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+            style={{ transform: `rotate(${qiblaAngle}deg)` }}
           >
-            <div className="relative w-3 h-32 flex flex-col items-center justify-start -mt-20">
+            <div className="flex flex-col items-center -translate-y-20 sm:-translate-y-24">
               <div
-                className={`w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[45px] ${
-                  isAligned ? 'border-b-emerald-400 filter drop-shadow(0 0 8px #34d399)' : 'border-b-amber-400'
+                className={`p-1.5 rounded-xl border transition-all duration-300 shadow-lg ${
+                  isAligned
+                    ? 'bg-emerald-500 text-white border-emerald-300 scale-110 shadow-emerald-500/50'
+                    : 'bg-emerald-950/80 text-emerald-400 border-emerald-500/50 shadow-emerald-950/80'
                 }`}
-              />
-              <div
-                className={`w-2 h-16 ${
-                  isAligned ? 'bg-emerald-400' : 'bg-amber-400'
-                } rounded-b-full`}
-              />
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 fill-current"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M4 6.5L12 2L20 6.5V17.5L12 22L4 17.5V6.5Z" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M12 2V22" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M4 6.5L20 17.5" stroke="currentColor" strokeWidth="1.2" opacity="0.3" />
+                  <path d="M4 11.5L20 11.5" stroke="#f59e0b" strokeWidth="2" />
+                </svg>
+              </div>
+
+              <div className="w-0.5 h-14 bg-gradient-to-t from-transparent via-amber-400 to-emerald-400 shadow-[0_0_8px_#f59e0b]" />
             </div>
           </div>
 
-          {/* Central Pivot Hub */}
-          <div className="relative z-10 w-12 h-12 rounded-full bg-gradient-to-tr from-slate-900 to-slate-800 border-2 border-emerald-400/60 shadow-xl flex items-center justify-center">
-            <div className="w-4 h-4 rounded-full bg-emerald-400" />
+          {/* Pusat Kompas */}
+          <div
+            className={`w-12 h-12 rounded-full border flex items-center justify-center shadow-lg transition-all duration-300 ${
+              isAligned
+                ? 'bg-emerald-500 border-emerald-300 shadow-[0_0_15px_#10b981]'
+                : 'bg-slate-800 border-slate-700'
+            }`}
+          >
+            <div className="w-4 h-4 rounded-full bg-slate-950/80 border border-white/20" />
           </div>
         </div>
 
-        {/* Sensor Status / Permission Button */}
-        <div className="mt-6 flex flex-col items-center gap-3">
-          {permissionState === 'prompt' && !hasSensor && (
-            <button
-              type="button"
-              onClick={requestCompassPermission}
-              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-lg shadow-emerald-950/40 transition active:scale-95 cursor-pointer"
-            >
-              Aktifkan Penderia Kompas Telefon
-            </button>
-          )}
+        {/* Tanda Kepala Telefon (Top Reticle) */}
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none z-10">
+          <div
+            className={`w-3 h-3 rotate-45 border-t-2 border-l-2 transition-colors duration-200 ${
+              isAligned ? 'border-emerald-400 shadow-[0_0_8px_#34d399]' : 'border-rose-500'
+            }`}
+          />
+        </div>
+      </div>
 
-          {hasSensor ? (
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Penderia Magnetometer Berfungsi · Haluan Semasa: {deviceHeading}°
+      {/* 3. Panel Status & Bimbingan Pengguna */}
+      <div className="w-full space-y-3">
+        <div
+          className={`p-4 rounded-2xl border text-center transition-all duration-300 ${
+            isAligned
+              ? 'bg-emerald-950/40 border-emerald-500/50 shadow-lg shadow-emerald-950/50'
+              : 'bg-slate-900/70 border-slate-800'
+          }`}
+        >
+          {isAligned ? (
+            <div className="space-y-1 animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-center gap-1.5 text-emerald-400 font-bold text-sm">
+                <CheckCircle2 className="w-5 h-5 fill-emerald-500/20" />
+                <span>Kiblat Tepat!</span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Peranti anda kini tepat menghadap ke arah Baitullah Al-Haram, Makkah.
+              </p>
             </div>
           ) : (
-            <div className="w-full max-w-sm mt-2 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
-              <p className="text-xs text-slate-300 mb-2">
-                Simulasi Manual Haluan Peranti (Untuk Laptop / Ujian):
-              </p>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 font-mono">0°</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="359"
-                  value={manualHeading}
-                  onChange={(e) => setManualHeading(Number(e.target.value))}
-                  className="w-full accent-emerald-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
-                />
-                <span className="text-xs text-slate-400 font-mono">360°</span>
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-slate-400">
+                Pusing telefon anda{' '}
+                <span className="text-amber-400 font-bold">
+                  {qiblaRelativeAngle > 0
+                    ? `${Math.abs(Math.round(qiblaRelativeAngle))}° ke Kanan`
+                    : `${Math.abs(Math.round(qiblaRelativeAngle))}° ke Kiri`}
+                </span>
               </div>
-              <div className="text-xs text-amber-300 font-mono mt-1">
-                Haluan Diuji: {manualHeading}°
+              <div className="flex items-center justify-center gap-3 text-xs font-mono text-slate-400">
+                <span>Hadap: <strong className="text-white">{Math.round(deviceHeading)}°</strong></span>
+                <span>•</span>
+                <span>Kiblat: <strong className="text-emerald-400">{Math.round(qiblaAngle)}°</strong></span>
               </div>
             </div>
           )}
         </div>
-      </div>
 
-      {/* Petua Penentukuran Kompas */}
-      <div className="glass-panel rounded-3xl p-5 border border-white/5 space-y-3 text-xs text-slate-300">
-        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-          <Info className="w-4 h-4 text-emerald-400" />
-          Petua Penentukuran Kompas
-        </h4>
-        <ul className="space-y-1.5 list-disc list-inside text-slate-400 leading-relaxed">
-          <li>
-            Gerakkan telefon anda dalam corak bentuk <strong>angka 8</strong> di udara beberapa kali untuk menentukur semula sensor magnetik jika arah lari.
-          </li>
-          <li>
-            Pastikan peranti diletakkan di atas permukaan rata dan jauh daripada sebarang objek magnet atau besi (seperti komputer riba atau pembesar suara).
-          </li>
-          <li>
-            Arah kiblat bagi Malaysia secara astronomi menghala ke arah <strong>Barat-Barat Laut (antara 291° ke 294°)</strong>.
-          </li>
-        </ul>
-      </div>
-
-      {/* MODAL PANDUAN KALIBRASI HAYUNAN BENTUK 8 */}
-      {showCalibrateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-sm rounded-3xl bg-[#0d1713] border border-emerald-500/30 p-6 text-center space-y-4 shadow-2xl">
-            <button
-              type="button"
-              onClick={() => setShowCalibrateModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
-              <RefreshCw className="w-7 h-7 animate-spin" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h4 className="text-base font-extrabold text-white">Kalibrasi Kompas Telefon</h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Pegang telefon anda dan hayunkan peranti membentuk <strong>angka 8 (∞)</strong> di udara secara perlahan-lahan selama 3 hingga 5 saat.
-              </p>
-            </div>
-
-            <div className="p-3.5 rounded-2xl bg-black/40 border border-slate-800 text-[11px] text-amber-300 space-y-1 text-left">
-              <p className="font-semibold flex items-center gap-1.5 text-amber-300">
-                <Sparkles className="w-3.5 h-3.5" /> Tip Ketepatan Sensor:
-              </p>
-              <p className="text-slate-400 leading-relaxed">
-                Tanggalkan sarung telefon jika ia mempunyai magnet atau logam, dan jauhkan telefon daripada perkakas elektronik lain.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAccuracy('high');
-                setShowCalibrateModal(false);
-              }}
-              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition active:scale-95 shadow-md shadow-emerald-950/50 cursor-pointer"
-            >
-              Selesai Kalibrasi
-            </button>
-          </div>
+        <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-start gap-2.5 text-[11px] text-slate-400 leading-relaxed">
+          <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+          <p>
+            Jauhkan telefon daripada bahan magnet atau logam. Jika kompas tersangkut, hayunkan peranti membentuk <strong>angka 8 di udara</strong> untuk kalibrasi sensor kompas.
+          </p>
         </div>
-      )}
+      </div>
+
     </div>
   );
 };
