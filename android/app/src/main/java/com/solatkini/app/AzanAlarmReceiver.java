@@ -13,28 +13,45 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i(TAG, "Penggera azan diterima! Tindakan: " + intent.getAction());
+        if (intent == null) {
+            Log.w(TAG, "Intent azan bernilai null diterima. Mengabaikan cetusan.");
+            return;
+        }
+
+        String action = intent.getAction();
+        Log.i(TAG, "Penggera azan diterima! Tindakan: " + action);
 
         String prayerName = intent.getStringExtra("prayer_name");
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
-        if (prayerName == null) prayerName = "Solat";
-        if (prayerKey == null) prayerKey = "solat";
-        if (voice == null) voice = "jakim";
 
-        // 1. Dapatkan WakeLock untuk membangunkan perkakasan CPU telefon
-        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        PowerManager.WakeLock wakeLock = null;
-        if (powerManager != null) {
-            wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "SolatKini::AlarmReceiverWakeLock"
-            );
-            wakeLock.acquire(3 * 60 * 1000L); // 3 minutes
+        if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
+        if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
+
+        // Kunci Azan Subuh Khas sebagai perlindungan tambahan
+        if ("subuh".equalsIgnoreCase(prayerKey)) {
+            voice = "subuh_special";
+        } else if (voice == null || voice.isEmpty()) {
+            voice = "jakim";
+        }
+
+        // 1. Dapatkan WakeLock selamat dengan auto-timeout 15 saat
+        // Ini memastikan CPU kekal bangun sehingga AzanAudioService mengambil alih
+        try {
+            PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null) {
+                PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                    "SolatKini::AlarmReceiverWakeLock"
+                );
+                wakeLock.acquire(15 * 1000L); // 15 saat auto-release, elak CPU tidur sebelum servis hidup
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal mendapatkan WakeLock sementara", e);
         }
 
         try {
-            // 2. Mulakan perkhidmatan audio latar depan (AzanAudioService) pada saluran penggera
+            // 2. Mulakan perkhidmatan audio latar depan (AzanAudioService) pada aras STREAM_ALARM
             Intent serviceIntent = new Intent(context, AzanAudioService.class);
             serviceIntent.setAction(AzanAudioService.ACTION_PLAY_AZAN);
             serviceIntent.putExtra("prayer_name", prayerName);
@@ -46,8 +63,9 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             } else {
                 context.startService(serviceIntent);
             }
+            Log.i(TAG, "Servis audio azan berjaya dihantar ke AzanAudioService (" + prayerName + " - " + voice + ").");
 
-            // 3. Bangunkan dan lancarkan MainActivity untuk memaparkan skrin visual azan penuh automatik
+            // 3. Lancarkan paparan visual jika skrin/peranti membenarkan (sandaran kepada FullScreenIntent)
             Intent activityIntent = new Intent(context, MainActivity.class);
             activityIntent.setFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK |
@@ -62,13 +80,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             context.startActivity(activityIntent);
 
         } catch (Exception e) {
-            Log.e(TAG, "Ralat mengaktifkan servis azan / aktiviti skrin penuh", e);
-        } finally {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                try {
-                    wakeLock.release();
-                } catch (Exception ignored) {}
-            }
+            Log.e(TAG, "Ralat semasa mengaktifkan servis azan / aktiviti skrin", e);
         }
     }
 }
