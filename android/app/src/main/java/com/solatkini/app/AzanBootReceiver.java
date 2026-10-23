@@ -29,13 +29,18 @@ public class AzanBootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent != null ? intent.getAction() : "";
-        Log.i(TAG, "Menerima siaran sistem boot: " + action);
+        Log.i(TAG, "Menerima siaran sistem boot/masa: " + action);
 
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
+        boolean isBootAction = Intent.ACTION_BOOT_COMPLETED.equals(action) ||
             Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action) ||
             Intent.ACTION_MY_PACKAGE_REPLACED.equals(action) ||
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
-            "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
+            "com.htc.intent.action.QUICKBOOT_POWERON".equals(action);
+
+        boolean isTimeChangeAction = Intent.ACTION_TIME_CHANGED.equals(action) ||
+            Intent.ACTION_TIMEZONE_CHANGED.equals(action);
+
+        if (isBootAction || isTimeChangeAction) {
 
             // Gunakan Device Protected Storage secara selamat jika peranti masih di skrin kunci Direct Boot
             Context safeContext = context;
@@ -65,7 +70,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
             }
 
             // 2. Jadualkan semula semua penggera azan di latar belakang secara SENYAP
-            Log.i(TAG, "Auto-start AKTIF. Menjadualkan semula penggera waktu solat...");
+            Log.i(TAG, "Menjadualkan semula penggera waktu solat (Tindakan: " + action + ")...");
             rescheduleStoredAlarms(safeContext);
 
             // 3. Kemas kini Widget Skrin Utama
@@ -77,12 +82,14 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 Log.w(TAG, "Gagal mengemas kini widget: " + e.getMessage());
             }
 
-            // 4. Paparkan notifikasi permulaan yang boleh padam sendiri bila ditekan
-            try {
-                showInitialBootNotification(safeContext);
-                Log.i(TAG, "Notifikasi boot berjaya dipaparkan.");
-            } catch (Exception e) {
-                Log.e(TAG, "Gagal memaparkan notifikasi boot: " + e.getMessage());
+            // 4. Paparkan notifikasi permulaan (hanya semasa boot telefon, bukan setiap kali tukar jam manual)
+            if (isBootAction) {
+                try {
+                    showInitialBootNotification(safeContext);
+                    Log.i(TAG, "Notifikasi boot berjaya dipaparkan.");
+                } catch (Exception e) {
+                    Log.e(TAG, "Gagal memaparkan notifikasi boot: " + e.getMessage());
+                }
             }
         }
     }
@@ -127,6 +134,13 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     JSONObject obj = array.getJSONObject(i);
                     long ts = obj.optLong("timestamp", 0);
                     String name = obj.optString("prayerName", "");
+                    String key = obj.optString("prayerKey", "");
+
+                    // Abaikan Imsak dan Syuruk daripada paparan solat seterusnya
+                    if ("imsak".equalsIgnoreCase(key) || "syuruk".equalsIgnoreCase(key)) {
+                        continue;
+                    }
+
                     if (ts > now && ts < closestTime) {
                         closestTime = ts;
                         closestPrayerName = name;
@@ -204,6 +218,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
 
                     if (timestamp <= 0) continue;
 
+                    // Kunci azan Subuh khas
                     if ("subuh".equalsIgnoreCase(prayerKey)) {
                         voice = "subuh_special";
                     }
@@ -217,6 +232,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     targetCal.set(Calendar.SECOND, 0);
                     targetCal.set(Calendar.MILLISECOND, 0);
 
+                    // Jika waktu hari ini sudah berlalu berbanding masa semasa, jadualkan keesokan harinya
                     if (targetCal.getTimeInMillis() <= now) {
                         targetCal.add(Calendar.DAY_OF_YEAR, 1);
                     }
@@ -234,6 +250,8 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     alarmIntent.putExtra("prayer_key", prayerKey);
                     alarmIntent.putExtra("prayer_name", prayerName);
                     alarmIntent.putExtra("voice", voice);
+                    // Bekalkan scheduled_timestamp untuk semakan had masa
+                    alarmIntent.putExtra("scheduled_timestamp", triggerTimestamp);
 
                     PendingIntent pendingIntent = PendingIntent.getBroadcast(
                         context,
@@ -245,6 +263,8 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerTimestamp, pendingIntent);
                         alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
                     }
