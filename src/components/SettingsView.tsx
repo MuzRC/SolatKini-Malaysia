@@ -14,7 +14,6 @@ import {
   Power,
   ShieldAlert,
 } from 'lucide-react';
-import { Preferences } from '@capacitor/preferences';
 import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
 import { ThemeId, THEME_OPTIONS, applyTheme } from '../utils/theme';
@@ -74,40 +73,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const devVoice = audioStorageService.getActiveDeviceVoice();
     if (devVoice) setActiveDeviceVoice(devVoice);
 
-    // Pastikan nilai lalai (true) disimpan ke dalam storan Capacitor untuk dibaca oleh Java
-    const initAutoStart = async () => {
-      try {
-        const { value } = await Preferences.get({ key: 'solatkini_autostart_boot' });
-        if (value !== null) {
-          setAutoStartBoot(value === 'true');
-        } else {
-          await Preferences.set({ key: 'solatkini_autostart_boot', value: 'true' });
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('solatkini_autostart_boot', 'true');
-          }
-        }
-      } catch {
-        // Fallback jika dijalankan di pelayar web biasa
-      }
-    };
-    initAutoStart();
+    // Tetapkan nilai lalai ke dalam localStorage jika pemasangan baru
+    if (typeof window !== 'undefined' && localStorage.getItem('solatkini_autostart_boot') === null) {
+      localStorage.setItem('solatkini_autostart_boot', 'true');
+    }
   }, []);
 
-  const handleToggleAutoStart = async () => {
+  const handleToggleAutoStart = () => {
     const nextVal = !autoStartBoot;
     setAutoStartBoot(nextVal);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_autostart_boot', String(nextVal));
-    }
-
-    try {
-      await Preferences.set({
-        key: 'solatkini_autostart_boot',
-        value: String(nextVal),
-      });
-    } catch (e) {
-      console.error('Gagal simpan ke Preferences', e);
     }
 
     showToast(
