@@ -18,6 +18,11 @@ export interface BatteryStatusResult {
   isIgnoringBatteryOptimizations: boolean;
 }
 
+export interface AutoTimeStatusResult {
+  isAutoTimeEnabled: boolean;
+  isAutoTimeZoneEnabled: boolean;
+}
+
 export interface AzanAlarmPluginInterface {
   checkNotificationPermission(): Promise<PermissionStatusResult>;
   requestNotificationPermission(): Promise<{ granted: boolean; status: string }>;
@@ -32,6 +37,9 @@ export interface AzanAlarmPluginInterface {
   isBatteryOptimized(): Promise<BatteryStatusResult>;
   requestIgnoreBatteryOptimization(): Promise<{ opened: boolean }>;
   openAutostartSettings(): Promise<{ opened: boolean }>;
+  // Kaedah natif semakan masa automatik & tetapan jam
+  checkAutoTime(): Promise<AutoTimeStatusResult>;
+  openDateSettings(): Promise<{ opened: boolean }>;
 }
 
 const AzanAlarm = registerPlugin<AzanAlarmPluginInterface>('AzanAlarm');
@@ -161,6 +169,34 @@ class NativeAlarmService {
       return !!res.opened;
     } catch (err) {
       console.warn('Gagal membuka tetapan autostart jenama peranti:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Semak sama ada tetapan 'Set time automatically' dihidupkan pada telefon.
+   */
+  public async checkAutoTime(): Promise<boolean> {
+    if (!this.isNative) return true;
+    try {
+      const res = await AzanAlarm.checkAutoTime();
+      return res.isAutoTimeEnabled;
+    } catch (err) {
+      console.warn('Gagal menyemak status masa automatik:', err);
+      return true;
+    }
+  }
+
+  /**
+   * Buka menu Tetapan Tarikh & Masa Sistem Telefon (Settings -> Date & Time).
+   */
+  public async openDateSettings(): Promise<boolean> {
+    if (!this.isNative) return false;
+    try {
+      const res = await AzanAlarm.openDateSettings();
+      return !!res.opened;
+    } catch (err) {
+      console.warn('Gagal membuka tetapan tarikh & masa:', err);
       return false;
     }
   }
