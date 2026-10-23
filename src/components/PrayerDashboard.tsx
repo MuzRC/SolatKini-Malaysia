@@ -175,11 +175,11 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         ...prev,
         preferences: {
           ...prev.preferences,
-          subuh: { ...prev.preferences.subuh, voice: 'subuh_special' },
-          zohor: { ...prev.preferences.zohor, voice: opt.id as AzanVoice },
-          asar: { ...prev.preferences.asar, voice: opt.id as AzanVoice },
-          maghrib: { ...prev.preferences.maghrib, voice: opt.id as AzanVoice },
-          isyak: { ...prev.preferences.isyak, voice: opt.id as AzanVoice },
+          subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          zohor: { ...(prev.preferences?.zohor || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          asar: { ...(prev.preferences?.asar || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          maghrib: { ...(prev.preferences?.maghrib || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          isyak: { ...(prev.preferences?.isyak || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
         },
       };
       if (typeof window !== 'undefined') {
@@ -515,11 +515,11 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         ...prev,
         preferences: {
           ...prev.preferences,
-          subuh: { ...prev.preferences.subuh, voice: 'subuh_special' },
-          zohor: { ...prev.preferences.zohor, voice },
-          asar: { ...prev.preferences.asar, voice },
-          maghrib: { ...prev.preferences.maghrib, voice },
-          isyak: { ...prev.preferences.isyak, voice },
+          subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          zohor: { ...(prev.preferences?.zohor || {}), voice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          asar: { ...(prev.preferences?.asar || {}), voice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          maghrib: { ...(prev.preferences?.maghrib || {}), voice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          isyak: { ...(prev.preferences?.isyak || {}), voice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
         },
       };
       if (typeof window !== 'undefined') {
@@ -551,7 +551,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   };
 
   const handleTogglePrayerNotif = async (key: PrayerKey) => {
-    const isCurrentlyEnabled = notificationSettings.preferences[key]?.enabled;
+    const isCurrentlyEnabled = notificationSettings.preferences?.[key]?.enabled;
     if (!isCurrentlyEnabled) {
       const perms = await nativeAlarmService.checkPermissions();
       if (!perms.notificationsGranted) {
@@ -560,13 +560,14 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
 
     setNotificationSettings((prev) => {
+      const currentPref = prev.preferences?.[key] || { enabled: true, voice: 'jakim', beforeMinutes: 0, bypassSilentTone: true };
       const updated = {
         ...prev,
         preferences: {
           ...prev.preferences,
           [key]: {
-            ...prev.preferences[key],
-            enabled: !prev.preferences[key].enabled,
+            ...currentPref,
+            enabled: !currentPref.enabled,
           },
         },
       };
@@ -670,7 +671,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 onClick={onLiveSync}
                 disabled={isLiveSyncing}
                 title="Segerak waktu solat terkini daripada e-Solat JAKIM"
-                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-emerald-300 transition active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-xs font-semibold text-emerald-300 transition active:scale-95 cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLiveSyncing ? 'animate-spin text-emerald-400' : ''}`} />
                 <span className="hidden sm:inline">{isLiveSyncing ? 'Menyegerak...' : 'Segerak'}</span>
@@ -678,7 +679,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             )}
             <button
               onClick={() => setIsZoneModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-200 text-xs sm:text-sm font-semibold transition active:scale-95 shadow-lg shadow-emerald-950/40"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-200 text-xs sm:text-sm font-semibold transition active:scale-95 shadow-lg shadow-emerald-950/40 cursor-pointer"
             >
               <MapPin className="w-4 h-4 text-emerald-400 shrink-0" />
               <div className="text-left">
@@ -694,7 +695,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               onClick={handleDetectGPS}
               title="Kesan Lokasi GPS"
               disabled={isLocating}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-slate-200 transition active:scale-95"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-2xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/60 text-slate-200 transition active:scale-95 cursor-pointer"
             >
               <Navigation className={`w-4 h-4 text-emerald-400 ${isLocating ? 'animate-spin' : ''}`} />
             </button>
@@ -734,7 +735,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                   setNotificationsGranted(perms.notificationsGranted);
                 }, 1000);
               }}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/40"
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/40 cursor-pointer"
             >
               <Bell className="w-3.5 h-3.5 fill-slate-950" />
               Minta Kebenaran Notifikasi Sekarang
@@ -743,7 +744,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               onClick={async () => {
                 await nativeAlarmService.openNotificationSettings();
               }}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition"
+              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition cursor-pointer"
             >
               Buka Tetapan Telefon (App Info)
             </button>
@@ -798,7 +799,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 {!hijri.isRamadan && (
                   <button
                     onClick={toggleUserFastingToday}
-                    className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-900/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/20 transition shrink-0"
+                    className="text-[11px] px-2 py-0.5 rounded-md bg-emerald-900/80 hover:bg-emerald-800 text-emerald-300 border border-emerald-500/20 transition shrink-0 cursor-pointer"
                     title="Nyahaktifkan mod berpuasa untuk hari ini"
                   >
                     Batal Puasa
@@ -815,7 +816,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 </div>
                 <button
                   onClick={toggleUserFastingToday}
-                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold border border-amber-400/30 transition shrink-0 active:scale-95"
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[11px] font-semibold border border-amber-400/30 transition shrink-0 active:scale-95 cursor-pointer"
                 >
                   Saya Berpuasa
                 </button>
@@ -842,7 +843,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700/80 text-slate-200 font-medium text-xs sm:text-sm transition active:scale-95 cursor-pointer"
             >
               <Sliders className="w-4 h-4 text-emerald-400" />
-              Pilihan Muadzin ({AZAN_OPTIONS.find((v) => v.id === selectedVoice)?.reciter.split(' ')[0]})
+              Pilihan Muadzin ({(AZAN_OPTIONS.find((v) => v.id === selectedVoice)?.reciter || 'JAKIM').split(' ')[0]})
             </button>
 
             <button
@@ -984,7 +985,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                     <span className="text-sm font-semibold text-slate-200 flex items-center gap-1.5">
                       {label}
                       {isSpecialFastingTime && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-normal">
                           {key === 'imsak' ? 'Imsak' : 'Berbuka'}
                         </span>
                       )}
@@ -1180,7 +1181,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                       Azan Harian Semasa
                     </span>
                     <h4 className="text-sm font-extrabold text-white">
-                      {AZAN_OPTIONS.find((v) => v.id === (activeDeviceVoice || selectedVoice))?.title}
+                      {AZAN_OPTIONS.find((v) => v.id === (activeDeviceVoice || selectedVoice))?.title || 'Azan Rasmi JAKIM'}
                     </h4>
                     <p className="text-[11px] text-slate-300">
                       Digunakan pada waktu Zohor, Asar, Maghrib & Isyak
@@ -1213,7 +1214,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Dikuasakan oleh perkakasan <code className="text-emerald-300 font-mono">AlarmManager.setExactAndAllowWhileIdle</code> dan saluran audio <code className="text-emerald-300 font-mono">STREAM_ALARM</code> bagi menjamin laungan azan berkumandang tepat pada waktunya dan berupaya melepasi mod senyap serta skrin kunci.
+                  Dikuasakan oleh perkakasan <code className="text-emerald-300 font-mono">AlarmManager.setAlarmClock</code> dan saluran audio <code className="text-emerald-300 font-mono">STREAM_ALARM</code> bagi menjamin laungan azan berkumandang tepat pada waktunya dan berupaya melepasi mod senyap serta skrin kunci.
                 </p>
                 <div className="pt-1 flex flex-wrap items-center gap-2">
                   <button
