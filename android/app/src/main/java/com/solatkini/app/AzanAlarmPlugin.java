@@ -417,6 +417,7 @@ public class AzanAlarmPlugin extends Plugin {
                     intent.putExtra("prayer_key", prayerKey);
                     intent.putExtra("prayer_name", prayerName);
                     intent.putExtra("voice", voice);
+                    intent.putExtra("scheduled_timestamp", timestamp); // Kunci: Elak azan memekak masa jam dianjak!
 
                     PendingIntent pendingIntent = PendingIntent.getBroadcast(
                         context,
@@ -495,12 +496,15 @@ public class AzanAlarmPlugin extends Plugin {
             String voice = call.getString("voice", "jakim");
             int delaySeconds = call.getInt("delaySeconds", 2);
 
+            long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
+
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             Intent intent = new Intent(context, AzanAlarmReceiver.class);
             intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
             intent.putExtra("prayer_key", prayerKey);
             intent.putExtra("prayer_name", prayerName);
             intent.putExtra("voice", voice);
+            intent.putExtra("scheduled_timestamp", triggerAtMillis);
 
             PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -509,7 +513,6 @@ public class AzanAlarmPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
             if (alarmManager != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent);
