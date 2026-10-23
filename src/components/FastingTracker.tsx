@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Moon, Sun, Check, Plus, Minus, Calendar, Sparkles, Volume2, Copy } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Moon, Check, Plus, Minus, Calendar, Sparkles, Copy } from 'lucide-react';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
 import { getFastingCountdown } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
@@ -12,10 +12,18 @@ interface FastingTrackerProps {
 }
 
 export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, currentZone }) => {
-  const [currentTime] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Fasting ganti storage
+  // Jam masa nyata berdetik setiap saat untuk kiraan waktu berbuka puasa
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Simpanan data puasa ganti
   const [completedGantiCount, setCompletedGantiCount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
       return Number(localStorage.getItem('solatkini_ganti_completed') || '0');
@@ -76,7 +84,9 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
       localStorage.setItem('solatkini_ganti_completed', String(newVal));
     }
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate(100);
+      try {
+        navigator.vibrate(100);
+      } catch {}
     }
   };
 
@@ -90,15 +100,17 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   };
 
   const handleCopyText = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
-  const doaBerbuka = DUA_COLLECTION.filter((d) => d.category === 'puasa');
+  const doaBerbuka = (DUA_COLLECTION || []).filter((d) => d.category === 'puasa');
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
       {/* Top Banner Waktu Berbuka / Imsak */}
       <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -166,7 +178,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             </div>
             <button
               onClick={toggleUserFastingToday}
-              className={`px-4 py-2 rounded-xl text-xs font-semibold transition active:scale-95 shrink-0 ${
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition active:scale-95 shrink-0 cursor-pointer ${
                 isUserFastingToday
                   ? 'bg-amber-600/30 hover:bg-amber-600/40 text-amber-200 border border-amber-500/40'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-950/40'
@@ -216,7 +228,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             <div className="flex items-center bg-slate-900 rounded-xl border border-slate-800 p-1">
               <button
                 onClick={() => handleUpdateTarget(-1)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
@@ -225,7 +237,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
               </span>
               <button
                 onClick={() => handleUpdateTarget(1)}
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -252,7 +264,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
           <div className="flex items-center gap-3">
             <button
               onClick={handleToggleCompletedDay}
-              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 transition active:scale-95 shadow-lg shadow-emerald-950/40"
+              className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm flex items-center gap-2 transition active:scale-95 shadow-lg shadow-emerald-950/40 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               Tanda 1 Hari Selesai
@@ -260,7 +272,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             {completedGantiCount > 0 && (
               <button
                 onClick={handleResetGanti}
-                className="px-3 py-2.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-red-400 text-xs transition"
+                className="px-3 py-2.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-red-400 text-xs transition cursor-pointer"
               >
                 Reset
               </button>
@@ -291,7 +303,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                     </span>
                     <button
                       onClick={() => handleCopyText(item.id, `${item.arabic}\n\n${item.translation}`)}
-                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition"
+                      className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
                       title="Salin Teks"
                     >
                       {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
