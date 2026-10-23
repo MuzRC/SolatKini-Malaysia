@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Compass, Sparkles, Navigation, Info, RefreshCw, CheckCircle2 } from 'lucide-react';
+import {
+  Compass,
+  Sparkles,
+  Navigation,
+  Info,
+  RefreshCw,
+  CheckCircle2,
+  AlertTriangle,
+  ShieldAlert,
+  X
+} from 'lucide-react';
 import { JakimZone } from '../types/prayer';
 import { calculateQiblaDirection, calculateDistanceToKaaba } from '../utils/qibla';
 
@@ -7,10 +17,13 @@ interface QiblaCompassProps {
   currentZone: JakimZone;
 }
 
+type CompassAccuracy = 'high' | 'medium' | 'low';
+
 export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
   const [deviceHeading, setDeviceHeading] = useState<number>(0);
   const [hasSensor, setHasSensor] = useState<boolean>(false);
-  const [isCalibrating, setIsCalibrating] = useState<boolean>(false);
+  const [accuracy, setAccuracy] = useState<CompassAccuracy>('high');
+  const [showCalibrateModal, setShowCalibrateModal] = useState<boolean>(false);
   const [manualHeading, setManualHeading] = useState<number>(0);
   const [permissionState, setPermissionState] = useState<'prompt' | 'granted' | 'denied'>('prompt');
   const lastVibrateRef = useRef<number>(0);
@@ -18,15 +31,14 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
   const qiblaAngle = calculateQiblaDirection(currentZone.lat, currentZone.lng);
   const distanceKm = calculateDistanceToKaaba(currentZone.lat, currentZone.lng);
 
-  // Active heading: real sensor or manual test slider
+  // Active heading: sensor sebenar atau peluncur ujian manual
   const activeHeading = hasSensor ? deviceHeading : manualHeading;
   
-  // Angle difference between device heading and Kaaba
-  // 0 means device is pointing directly at Kaaba
+  // Beza sudut antara arah telefon dengan Kaabah
   const angleDiff = (qiblaAngle - activeHeading + 360) % 360;
   const isAligned = angleDiff <= 4 || angleDiff >= 356;
 
-  // Haptic feedback when aligned
+  // Maklum balas getaran haptik apabila tepat menghadap kiblat
   useEffect(() => {
     if (isAligned) {
       const now = Date.now();
@@ -43,7 +55,6 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
     if (
       typeof window !== 'undefined' &&
       'DeviceOrientationEvent' in window &&
-      // iOS 13+ permission API
       typeof (DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function'
     ) {
       try {
@@ -54,7 +65,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         } else {
           setPermissionState('denied');
         }
-      } catch (e) {
+      } catch {
         setPermissionState('denied');
       }
     } else {
@@ -65,16 +76,35 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
   const setupSensorListener = () => {
     const handleOrientation = (e: DeviceOrientationEvent) => {
       let heading = 0;
-      // iOS webkitCompassHeading is True North
+      // iOS webkitCompassHeading (True North)
       if ('webkitCompassHeading' in e && typeof (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading === 'number') {
         heading = (e as unknown as { webkitCompassHeading: number }).webkitCompassHeading;
         setHasSensor(true);
       } else if (e.alpha !== null) {
-        // Android fallback (alpha 0 is North if absolute)
+        // Android absolute orientation
         heading = 360 - e.alpha;
         setHasSensor(true);
       }
       setDeviceHeading(Math.round(heading));
+
+      // Semak status ketepatan penentukuran sensor
+      const acc = (e as unknown as { webkitCompassAccuracy?: number }).webkitCompassAccuracy;
+      if (typeof acc === 'number') {
+        if (acc > 0 && acc <= 15) {
+          setAccuracy('high');
+        } else if (acc > 15 && acc <= 30) {
+          setAccuracy('medium');
+        } else {
+          setAccuracy('low');
+        }
+      } else {
+        // Pada Android WebView, semak jika orientasi mutlak (absolute)
+        if (e.absolute === false) {
+          setAccuracy('medium');
+        } else {
+          setAccuracy('high');
+        }
+      }
     };
 
     window.addEventListener('deviceorientation', handleOrientation, true);
@@ -85,7 +115,6 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'DeviceOrientationEvent' in window) {
-      // Check if permission required (iOS)
       if (typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission !== 'function') {
         setupSensorListener();
       }
@@ -126,31 +155,76 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
       </div>
 
       {/* COMPASS DIAL CONTAINER */}
-      <div className="relative rounded-3xl glass-panel p-8 flex flex-col items-center justify-center overflow-hidden border border-emerald-500/20 shadow-2xl">
+      <div className="relative rounded-3xl glass-panel p-6 sm:p-8 flex flex-col items-center justify-center overflow-hidden border border-emerald-500/20 shadow-2xl">
         {/* Alignment banner */}
         <div
-          className={`mb-6 px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all duration-300 ${
+          className={`mb-3 w-full max-w-sm px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all duration-300 text-center ${
             isAligned
-              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-105'
+              ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30 scale-102'
               : 'bg-slate-800/80 text-slate-300'
           }`}
         >
           {isAligned ? (
             <>
-              <CheckCircle2 className="w-4 h-4 fill-slate-950 text-emerald-500" />
-              Tepat Menghadap Kiblat! (Solat Bersedia)
+              <CheckCircle2 className="w-4 h-4 fill-slate-950 text-emerald-500 shrink-0" />
+              <span>Tepat Menghadap Kiblat! (Solat Bersedia)</span>
             </>
           ) : (
             <>
-              <Navigation className="w-4 h-4 text-emerald-400 animate-pulse" />
-              Pusingkan peranti anda sehingga jarum bertindih dengan Kaabah
+              <Navigation className="w-4 h-4 text-emerald-400 animate-pulse shrink-0" />
+              <span>Pusingkan peranti anda sehingga jarum bertindih dengan Kaabah</span>
             </>
           )}
         </div>
 
+        {/* Lencana Status Kalibrasi Sensor Semasa */}
+        <div className="w-full max-w-sm flex items-center justify-between gap-2 px-3.5 py-2 mb-6 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs">
+          <div className="flex items-center gap-2">
+            {accuracy === 'high' && (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
+                <span className="text-emerald-400 font-bold flex items-center gap-1 text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Ditentukur (Tinggi)
+                </span>
+              </>
+            )}
+
+            {accuracy === 'medium' && (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" />
+                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
+                <span className="text-amber-400 font-bold flex items-center gap-1 text-[11px]">
+                  <AlertTriangle className="w-3.5 h-3.5" /> Sederhana
+                </span>
+              </>
+            )}
+
+            {accuracy === 'low' && (
+              <>
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shrink-0" />
+                <span className="text-slate-400 text-[11px]">Status Kalibrasi:</span>
+                <span className="text-rose-400 font-bold flex items-center gap-1 text-[11px]">
+                  <ShieldAlert className="w-3.5 h-3.5" /> Perlu Kalibrasi
+                </span>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowCalibrateModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-[11px] font-semibold border border-slate-700 transition active:scale-95"
+            title="Buka panduan kalibrasi sensor kompas"
+          >
+            <RefreshCw className="w-3 h-3" />
+            <span>Kalibrasi</span>
+          </button>
+        </div>
+
         {/* Outer Compass Housing */}
         <div className="relative w-72 h-72 sm:w-80 sm:h-80 rounded-full border-4 border-emerald-950/80 bg-gradient-to-b from-[#0c1813] to-[#060c09] shadow-inner flex items-center justify-center">
-          {/* Compass Rose Markings (N, E, S, W) rotated by active device heading */}
+          {/* Compass Rose Markings (U, T, S, B) */}
           <div
             className="absolute inset-2 rounded-full transition-transform duration-200 ease-out pointer-events-none"
             style={{ transform: `rotate(${-activeHeading}deg)` }}
@@ -194,7 +268,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
               </div>
             ))}
 
-            {/* Kaaba Target Emblem Positioned at Qibla Degrees on the Compass Ring */}
+            {/* Kaaba Target Emblem Positioned at Qibla Degrees */}
             <div
               className="absolute inset-0 flex justify-center pointer-events-none"
               style={{ transform: `rotate(${qiblaAngle}deg)` }}
@@ -215,7 +289,6 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
             className="absolute inset-0 flex items-center justify-center pointer-events-none transition-transform duration-200 ease-out"
             style={{ transform: `rotate(${angleDiff}deg)` }}
           >
-            {/* Top Needle Pointing to Kaaba */}
             <div className="relative w-3 h-32 flex flex-col items-center justify-start -mt-20">
               <div
                 className={`w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[45px] ${
@@ -250,7 +323,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           {hasSensor ? (
             <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/50 px-3 py-1.5 rounded-xl border border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Penderia Giroskop Berfungsi · Haluan Semasa: {deviceHeading}°
+              Penderia Magnetometer Berfungsi · Haluan Semasa: {deviceHeading}°
             </div>
           ) : (
             <div className="w-full max-w-sm mt-2 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 text-center">
@@ -277,7 +350,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         </div>
       </div>
 
-      {/* Calibration & Usage Tips */}
+      {/* Petua Penentukuran Kompas */}
       <div className="glass-panel rounded-3xl p-5 border border-white/5 space-y-3 text-xs text-slate-300">
         <h4 className="text-sm font-bold text-white flex items-center gap-2">
           <Info className="w-4 h-4 text-emerald-400" />
@@ -285,7 +358,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         </h4>
         <ul className="space-y-1.5 list-disc list-inside text-slate-400 leading-relaxed">
           <li>
-            Gerakkan telefon anda dalam corak bentuk <strong>angka 8</strong> di udara selama 3 saat untuk menentukur semula sensor magnetik.
+            Gerakkan telefon anda dalam corak bentuk <strong>angka 8</strong> di udara beberapa kali untuk menentukur semula sensor magnetik jika arah lari.
           </li>
           <li>
             Pastikan peranti diletakkan di atas permukaan rata dan jauh daripada sebarang objek magnet atau besi (seperti komputer riba atau pembesar suara).
@@ -295,6 +368,51 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           </li>
         </ul>
       </div>
+
+      {/* MODAL PANDUAN KALIBRASI HAYUNAN BENTUK 8 */}
+      {showCalibrateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm rounded-3xl bg-[#0d1713] border border-emerald-500/30 p-6 text-center space-y-4 shadow-2xl">
+            <button
+              onClick={() => setShowCalibrateModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner">
+              <RefreshCw className="w-7 h-7 animate-spin" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h4 className="text-base font-extrabold text-white">Kalibrasi Kompas Telefon</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Pegang telefon anda dan hayunkan peranti membentuk <strong>angka 8 (∞)</strong> di udara secara perlahan-lahan selama 3 hingga 5 saat.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-black/40 border border-slate-800 text-[11px] text-amber-300 space-y-1 text-left">
+              <p className="font-semibold flex items-center gap-1.5 text-amber-300">
+                <Sparkles className="w-3.5 h-3.5" /> Tip Ketepatan Sensor:
+              </p>
+              <p className="text-slate-400 leading-relaxed">
+                Tanggalkan sarung telefon jika ia mempunyai magnet atau logam, dan jauhkan telefon daripada perkakas elektronik lain.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAccuracy('high');
+                setShowCalibrateModal(false);
+              }}
+              className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition active:scale-95 shadow-md shadow-emerald-950/50"
+            >
+              Selesai Kalibrasi
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
