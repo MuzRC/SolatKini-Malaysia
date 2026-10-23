@@ -6,6 +6,8 @@ import {
   Sparkles,
   ChevronRight,
   BatteryCharging,
+  Zap,
+  ExternalLink,
 } from 'lucide-react';
 import { nativeAlarmService } from '../services/nativeAlarmService';
 
@@ -16,6 +18,7 @@ interface OnboardingChecklistProps {
 export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComplete }) => {
   const [notifGranted, setNotifGranted] = useState<boolean>(false);
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
+  const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
 
   // Semak status kebenaran sedia ada secara berkala semasa skrin dibuka
   useEffect(() => {
@@ -74,6 +77,18 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         // Fallback untuk pelayar / Android WebView tertentu
       }
     }
+
+    // 3. Semak Status Pengecualian Sekatan Bateri
+    try {
+      if (nativeAlarmService && typeof nativeAlarmService.isBatteryOptimized === 'function') {
+        const isIgnored = await nativeAlarmService.isBatteryOptimized();
+        if (isIgnored) {
+          setBatteryIgnored(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Ralat semakan sekatan bateri:', e);
+    }
   };
 
   // Minta Kebenaran Notifikasi Asli
@@ -107,6 +122,31 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         },
         { enableHighAccuracy: true, timeout: 10000 }
       );
+    }
+  };
+
+  // Minta Pengecualian Sekatan Bateri Terus
+  const handleRequestBattery = async () => {
+    try {
+      if (nativeAlarmService && typeof nativeAlarmService.requestIgnoreBatteryOptimization === 'function') {
+        await nativeAlarmService.requestIgnoreBatteryOptimization();
+      }
+    } catch (err) {
+      console.warn('Gagal membuka dialog pengecualian bateri:', err);
+    }
+    setTimeout(() => {
+      checkPermissions();
+    }, 800);
+  };
+
+  // Buka Tetapan Autostart Mengikut Jenama Peranti
+  const handleOpenAutostart = async () => {
+    try {
+      if (nativeAlarmService && typeof nativeAlarmService.openAutostartSettings === 'function') {
+        await nativeAlarmService.openAutostartSettings();
+      }
+    } catch (err) {
+      console.warn('Gagal membuka tetapan autostart:', err);
     }
   };
 
@@ -238,15 +278,78 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
           </div>
 
-          {/* 3. TIPS PENGOPTIMUMAN BATERI */}
-          <div className="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 text-xs space-y-1.5">
-            <div className="flex items-center gap-2 text-amber-300 font-bold">
-              <BatteryCharging className="w-4 h-4 shrink-0" />
-              <span>Panduan Penjimatan Bateri Telefon:</span>
+          {/* 3. KAD PINTASAN PENGOPTIMUMAN BATERI & AUTOSTART (TUGASAN 1) */}
+          <div
+            className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
+              batteryIgnored
+                ? 'bg-emerald-950/30 border-emerald-500/40'
+                : 'bg-amber-950/25 border-amber-500/30'
+            }`}
+          >
+            <div className="space-y-2.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                      batteryIgnored
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}
+                  >
+                    <BatteryCharging className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-white">Sekatan Bateri & Autostart</h3>
+                      <span
+                        className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold ${
+                          batteryIgnored
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-amber-950 text-amber-300 border border-amber-500/30'
+                        }`}
+                      >
+                        {batteryIgnored ? 'Dikecualikan' : 'Penting'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {batteryIgnored && (
+                  <div className="flex items-center gap-1.5 text-emerald-400 shrink-0 text-xs font-bold pt-1">
+                    <CheckCircle2 className="w-5 h-5 fill-emerald-500/20" />
+                    <span className="text-xs">Bebas Sekatan</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Untuk telefon <strong>Xiaomi, Vivo, Oppo, Realme atau Samsung</strong>, sistem peranti kerap membekukan azan semasa skrin ditutup. Tekan butang di bawah untuk membuka kebenaran:
+              </p>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleRequestBattery}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm ${
+                    batteryIgnored
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                      : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{batteryIgnored ? 'Sekatan Bateri Dinyahaktif' : 'Nyahaktif Sekatan Bateri'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAutostart}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Buka Menu Autostart</span>
+                </button>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-300 leading-relaxed">
-              Untuk telefon Xiaomi, Vivo, Oppo, Realme atau Samsung, tetapkan aplikasi kepada <strong>&quot;Tiada Sekatan Bateri&quot;</strong> dan benarkan <strong>&quot;Autostart&quot;</strong> di tetapan peranti anda agar azan sentiasa berkumandang tepat pada waktunya.
-            </p>
           </div>
         </div>
       </div>
