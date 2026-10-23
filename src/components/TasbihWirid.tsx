@@ -2,131 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff } from 'lucide-react';
 import { WIRID_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
+import { ArabicQuranText } from './QuranAyahBadge';
 
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
-/* =========================================================================
-   KOMPONEN LENCANA AYAT AL-QURAN BERHIAS EMAS (MUSHAF AYAH ROSETTE)
-   ========================================================================= */
-const QuranAyahBadge: React.FC<{ number: string }> = ({ number }) => {
-  return (
-    <span
-      className="inline-flex items-center justify-center align-middle mx-1.5 my-0.5 select-none"
-      style={{ verticalAlign: 'middle', lineHeight: 1 }}
-      dir="ltr"
-      title={`Ayat ${number}`}
-    >
-      <svg
-        className="w-7 h-7 sm:w-8 sm:h-8 inline-block drop-shadow-[0_1px_3px_rgba(0,0,0,0.6)] shrink-0 transition-transform hover:scale-110"
-        viewBox="0 0 38 38"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-label={`Ayat ${number}`}
-      >
-        {/* Lingkaran luar putus-putus keemasan */}
-        <circle
-          cx="19"
-          cy="19"
-          r="17.2"
-          stroke="#d97706"
-          strokeWidth="0.8"
-          strokeDasharray="2 1.5"
-          opacity="0.85"
-        />
-
-        {/* Bingkai utama bertrim emas */}
-        <circle
-          cx="19"
-          cy="19"
-          r="15"
-          fill="#041f16"
-          stroke="#f59e0b"
-          strokeWidth="1.3"
-        />
-
-        {/* Cincin dalaman */}
-        <circle
-          cx="19"
-          cy="19"
-          r="12.5"
-          stroke="#fbbf24"
-          strokeWidth="0.75"
-          opacity="0.65"
-        />
-
-        {/* 4 Kelopak Bunga Kardinal */}
-        <path d="M19 1.5 L20.5 3.5 L19 5.5 L17.5 3.5 Z" fill="#fbbf24" />
-        <path d="M19 32.5 L20.5 34.5 L19 36.5 L17.5 34.5 Z" fill="#fbbf24" />
-        <path d="M1.5 19 L3.5 20.5 L5.5 19 L3.5 17.5 Z" fill="#fbbf24" />
-        <path d="M32.5 19 L34.5 20.5 L36.5 19 L34.5 17.5 Z" fill="#fbbf24" />
-
-        {/* 4 Titik hiasan pepenjuru */}
-        <circle cx="7" cy="7" r="0.9" fill="#fde047" opacity="0.85" />
-        <circle cx="31" cy="7" r="0.9" fill="#fde047" opacity="0.85" />
-        <circle cx="7" cy="31" r="0.9" fill="#fde047" opacity="0.85" />
-        <circle cx="31" cy="31" r="0.9" fill="#fde047" opacity="0.85" />
-
-        {/* Angka Nombor Ayat di Tengah */}
-        <text
-          x="19"
-          y="20.5"
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill="#fef08a"
-          fontWeight="bold"
-          fontFamily="'Amiri', 'Scheherazade New', serif"
-          fontSize={number.length >= 3 ? '10' : number.length === 2 ? '11.5' : '13.5'}
-          className="select-none"
-        >
-          {number}
-        </text>
-      </svg>
-    </span>
-  );
-};
-
-/* Komponen Pengesan Simbol Ayat dan Penukar Lencana Automatik */
-const ArabicQuranText: React.FC<{ text: string; className?: string }> = ({
-  text,
-  className = 'font-arabic text-xl sm:text-2xl text-right text-emerald-200 leading-loose mb-3',
-}) => {
-  const regex = /(۝[\u0660-\u0669\d]+|(?<=\s)[\u0660-\u0669]{1,4}(?=\s|$)|۝)/g;
-  const parts = text.split(regex);
-
-  if (parts.length === 1) {
-    return (
-      <p className={className} dir="rtl">
-        {text}
-      </p>
-    );
-  }
-
-  return (
-    <p className={className} dir="rtl">
-      {parts.map((part, index) => {
-        if (!part) return null;
-
-        if (part.startsWith('۝') || /^[\u0660-\u0669\d]+$/.test(part.trim())) {
-          const num = part.replace(/^۝/, '').trim();
-          if (num) {
-            return <QuranAyahBadge key={index} number={num} />;
-          }
-          return (
-            <span key={index} className="text-amber-400 font-arabic mx-1">
-              ۝
-            </span>
-          );
-        }
-
-        return <span key={index}>{part}</span>;
-      })}
-    </p>
-  );
-};
-
-/* =========================================================================
-   KOMPONEN UTAMA TASBIH & WIRID
-   ========================================================================= */
 export const TasbihWirid: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'tasbih' | 'wirid'>('wirid');
   const [count, setCount] = useState<number>(0);
@@ -261,11 +140,13 @@ export const TasbihWirid: React.FC = () => {
     }
 
     if (vibrateEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      if (targetCount > 0 && nextCount % targetCount === 0) {
-        navigator.vibrate([80, 40, 120]);
-      } else {
-        navigator.vibrate(35);
-      }
+      try {
+        if (targetCount > 0 && nextCount % targetCount === 0) {
+          navigator.vibrate([80, 40, 120]);
+        } else {
+          navigator.vibrate(35);
+        }
+      } catch {}
     }
 
     if (targetCount > 0 && nextCount >= targetCount) {
@@ -307,14 +188,14 @@ export const TasbihWirid: React.FC = () => {
   }[fontSize];
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
       {/* Switcher Tab: Tasbih Digital vs Panduan Wirid */}
       <div className="flex items-center justify-center">
         <div className="p-1 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-1">
           <button
             type="button"
             onClick={() => setActiveSection('tasbih')}
-            className={`min-h-[44px] px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+            className={`min-h-[44px] px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
               activeSection === 'tasbih'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
                 : 'text-slate-400 hover:text-white'
@@ -325,7 +206,7 @@ export const TasbihWirid: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveSection('wirid')}
-            className={`min-h-[44px] px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition ${
+            className={`min-h-[44px] px-6 py-2 rounded-xl text-xs sm:text-sm font-semibold transition cursor-pointer ${
               activeSection === 'wirid'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
                 : 'text-slate-400 hover:text-white'
@@ -350,7 +231,7 @@ export const TasbihWirid: React.FC = () => {
                       setTargetCount(t);
                       setCount(0);
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
                       targetCount === t
                         ? 'bg-emerald-600 text-white'
                         : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
@@ -365,7 +246,7 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setSoundEnabled(!soundEnabled)}
-                  className={`p-2 rounded-xl border transition ${
+                  className={`p-2 rounded-xl border transition cursor-pointer ${
                     soundEnabled
                       ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-400'
                       : 'bg-slate-900 border-slate-800 text-slate-500'
@@ -378,7 +259,7 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleResetAll}
-                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 transition"
+                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 transition cursor-pointer"
                   title="Reset Pusingan"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -400,7 +281,7 @@ export const TasbihWirid: React.FC = () => {
               <button
                 type="button"
                 onClick={handleTap}
-                className="relative group w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-gradient-to-br from-[#12241d] to-[#07110d] border-4 border-emerald-500/30 hover:border-emerald-400/60 shadow-2xl shadow-emerald-950/70 flex flex-col items-center justify-center transition-all duration-150 active:scale-95 focus:outline-none select-none"
+                className="relative group w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-gradient-to-br from-[#12241d] to-[#07110d] border-4 border-emerald-500/30 hover:border-emerald-400/60 shadow-2xl shadow-emerald-950/70 flex flex-col items-center justify-center transition-all duration-150 active:scale-95 focus:outline-none select-none cursor-pointer"
               >
                 <div className="absolute inset-3 rounded-full border border-emerald-500/10 pointer-events-none" />
                 <div className="absolute inset-7 rounded-full border border-dashed border-emerald-500/20 pointer-events-none" />
@@ -420,7 +301,7 @@ export const TasbihWirid: React.FC = () => {
             <button
               type="button"
               onClick={handleReset}
-              className="text-xs text-slate-400 hover:text-white px-4 py-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 transition"
+              className="text-xs text-slate-400 hover:text-white px-4 py-2 rounded-xl bg-slate-900/60 hover:bg-slate-800 transition cursor-pointer"
             >
               Reset Kiraan Semasa ke 0
             </button>
@@ -455,7 +336,7 @@ export const TasbihWirid: React.FC = () => {
                     type="button"
                     onClick={() => handleSetFontSize(s)}
                     title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
-                    className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 ${
+                    className={`px-2 py-1 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer ${
                       fontSize === s
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : 'text-slate-400 hover:text-white'
@@ -470,7 +351,7 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={toggleArabic}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                     showArabic
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -484,7 +365,7 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={toggleRumi}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                     showRumi
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -498,7 +379,7 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={toggleTranslation}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer ${
                     showTranslation
                       ? 'bg-emerald-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-300 bg-slate-800/40'
@@ -535,7 +416,7 @@ export const TasbihWirid: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText (Menggantikan <p> biasa) */}
+                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText */}
                   {showArabic && (
                     <ArabicQuranText
                       text={item.arabic}
