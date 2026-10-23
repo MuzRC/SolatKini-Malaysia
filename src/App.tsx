@@ -6,21 +6,16 @@ import {
   MoonStar,
   Radio,
   BookOpen,
-  Download,
   Volume2,
   MapPin,
-  CheckCircle2,
-  AlertCircle,
   X,
   Award,
-  Heart,
   Settings
 } from 'lucide-react';
 import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './types/prayer';
 import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
 import { fetchDayPrayerTimes } from './services/prayerService';
 import { audioNotificationService } from './services/audioNotificationService';
-import { audioStorageService } from './services/audioStorageService';
 import { nativeAlarmService } from './services/nativeAlarmService';
 import { widgetService } from './services/widgetService';
 import { PrayerDashboard } from './components/PrayerDashboard';
@@ -66,12 +61,12 @@ export default function App() {
 
   const [isDndGuideOpen, setIsDndGuideOpen] = useState(false);
 
-  // Apply initial theme globally
+  // Guna tema aktif secara global
   useEffect(() => {
     applyTheme(currentTheme);
   }, [currentTheme]);
 
-  // Active JAKIM zone (defaults to WLY01 Kuala Lumpur & Putrajaya or saved in localStorage)
+  // Zon JAKIM aktif (Lalai: WLY01 Kuala Lumpur & Putrajaya atau zon tersimpan)
   const [currentZone, setCurrentZone] = useState<JakimZone>(() => {
     if (typeof window !== 'undefined') {
       const savedCode = localStorage.getItem('solatkini_active_zone');
@@ -91,7 +86,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLiveSyncing, setIsLiveSyncing] = useState(false);
 
-  // Automatic Geolocation state
+  // Status Geolocation Automatik
   const [geoStatus, setGeoStatus] = useState<{
     type: 'detected' | 'error' | null;
     message: string;
@@ -100,7 +95,7 @@ export default function App() {
 
   const hasAutoLocatedRef = useRef(false);
 
-  // Full-screen Azan Alarm Modal State
+  // Modal Notifikasi Penuh Penggera Azan
   const [alarmModalState, setAlarmModalState] = useState<{
     isOpen: boolean;
     prayerKey: PrayerKey;
@@ -113,7 +108,7 @@ export default function App() {
     voice: 'jakim',
   });
 
-  // 1. AUTOMATIC GEOLOCATION DETECTION ON APP LAUNCH
+  // 1. Pengesanan GPS automatik ketika aplikasi mula dibuka
   useEffect(() => {
     if (hasAutoLocatedRef.current) return;
     hasAutoLocatedRef.current = true;
@@ -133,13 +128,12 @@ export default function App() {
             zoneName: `${nearest.daerah.split(',')[0]} (${nearest.code})`,
           });
 
-          // Auto-hide toast after 5 seconds
           setTimeout(() => {
             setGeoStatus(null);
           }, 5000);
         },
         (error) => {
-          console.info('Geolocation notice:', error.message);
+          console.info('Makluman geolokasi:', error.message);
         },
         {
           enableHighAccuracy: true,
@@ -150,7 +144,7 @@ export default function App() {
     }
   }, []);
 
-  // 2. Fetch prayer data on launch & whenever currentZone changes
+  // 2. Muat data waktu solat semasa pelancaran & bila zon bertukar
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -171,7 +165,7 @@ export default function App() {
     };
   }, [currentZone]);
 
-  // 3. Automatic Day Transition Check (Midnight 00:00 AM Auto-Refresh)
+  // 3. Semakan anjakan hari tengah malam (00:00 Auto-Refresh)
   useEffect(() => {
     let lastDate = new Date().getDate();
     const interval = setInterval(() => {
@@ -196,7 +190,7 @@ export default function App() {
     }
   };
 
-  // 4. Request Android 13+ Notification Permission on App Startup & Listen for Native Azan Trigger
+  // 4. Minta kebenaran notifikasi Android 13+ & dengar acara azan asli
   useEffect(() => {
     nativeAlarmService.checkPermissions().then((status) => {
       if (!status.notificationsGranted) {
@@ -216,7 +210,7 @@ export default function App() {
 
         setAlarmModalState({
           isOpen: true,
-          prayerKey: (data.prayerKey as PrayerKey) || 'solat' as PrayerKey,
+          prayerKey: (data.prayerKey as PrayerKey) || ('solat' as PrayerKey),
           prayerName: data.prayerName || 'Solat',
           voice: data.voice || 'jakim',
         });
@@ -229,7 +223,7 @@ export default function App() {
     return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
   }, []);
 
-  // 5. Setup Azan trigger listener from audio service (untuk pelayar web)
+  // 5. Pendengar picu azan untuk pelayar web
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
@@ -318,7 +312,7 @@ export default function App() {
             </div>
             <button
               onClick={() => setGeoStatus(null)}
-              className="text-slate-400 hover:text-white p-1 rounded-lg"
+              className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -367,7 +361,7 @@ export default function App() {
                   onClick={() => setActiveTab(item.id)}
                   title={item.label}
                   aria-label={item.label}
-                  className={`relative p-2.5 rounded-xl transition-all duration-200 group flex items-center justify-center ${
+                  className={`relative p-2.5 rounded-xl transition-all duration-200 group flex items-center justify-center cursor-pointer ${
                     isActive
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
                       : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
@@ -382,11 +376,11 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: Primary Action (Butang Uji Azan turut mengikut warna tema) */}
+          {/* Zone 3: Primary Action (Menguji alunan azan harian pilihan pengguna) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
-              onClick={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
-              className="px-3.5 py-1.5 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition active:scale-95"
+              onClick={() => handleTriggerTestAlarm('zohor', 'Zohor', selectedVoice)}
+              className="px-3.5 py-1.5 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 shadow-md transition active:scale-95 cursor-pointer"
               style={{
                 backgroundColor: currentThemeAccent,
                 boxShadow: `0 4px 12px ${currentThemeAccent}40`,
@@ -452,7 +446,7 @@ export default function App() {
                 persistentNotification={persistentNotification}
                 onTogglePersistentNotification={handleTogglePersistentNotification}
                 onOpenDndGuide={() => setIsDndGuideOpen(true)}
-                onTriggerTestAlarm={() => handleTriggerTestAlarm('subuh', 'Subuh', selectedVoice)}
+                onTriggerTestAlarm={() => handleTriggerTestAlarm('zohor', 'Zohor', selectedVoice)}
               />
             )}
 
@@ -482,7 +476,7 @@ export default function App() {
           <div className="flex items-center gap-3 text-xs">
             <button
               onClick={() => setActiveTab('kredit')}
-              className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl border transition flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'kredit'
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                   : 'bg-slate-900/80 text-slate-300 border-slate-800 hover:text-white hover:border-slate-700'
@@ -493,14 +487,14 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('solat')}
-              className="text-slate-400 hover:text-emerald-300 transition"
+              className="text-slate-400 hover:text-emerald-300 transition cursor-pointer"
             >
               Waktu Solat
             </button>
             <span className="text-slate-700">•</span>
             <button
               onClick={() => setActiveTab('kiblat')}
-              className="text-slate-400 hover:text-emerald-300 transition"
+              className="text-slate-400 hover:text-emerald-300 transition cursor-pointer"
             >
               Kiblat
             </button>
@@ -520,7 +514,7 @@ export default function App() {
                 onClick={() => setActiveTab(item.id)}
                 title={item.label}
                 aria-label={item.label}
-                className={`relative h-12 flex items-center justify-center rounded-2xl transition-all duration-200 active:scale-90 ${
+                className={`relative h-12 flex items-center justify-center rounded-2xl transition-all duration-200 active:scale-90 cursor-pointer ${
                   isActive
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm shadow-emerald-950/50'
                     : 'text-slate-400 hover:text-slate-200'
