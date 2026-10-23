@@ -13,6 +13,14 @@ interface AzanAlarmModalProps {
   onClose: () => void;
 }
 
+// Sandaran kebal sekiranya fail data doa terlewat dimuatkan
+const DEFAULT_DOA_AZAN = {
+  arabic: 'اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ، وَالصَّلَاةِ الْقَائِمَةِ، آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ، وَابْعَثْهُ مَقَامًا مَحْمُودًا الَّذِي وَعَدْتَهُ',
+  transliteration: "Allahumma Rabba hazihid-da'watit-tammah, was-salatil-qa'imah, ati Muhammadanil-wasilata wal-fadilah, wab'athhu maqamam-mahmudanil-lazi wa'adtah.",
+  translation: 'Ya Allah, Tuhan yang menguasai seruan yang sempurna ini dan solat yang didirikan. Berikanlah kepada Nabi Muhammad kedudukan yang tinggi dan keutamaan, dan bangkitkanlah baginda pada kedudukan terpuji yang telah Engkau janjikan.',
+  reference: 'Sahih al-Bukhari (No. 614)',
+};
+
 export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   isOpen,
   prayerKey,
@@ -25,26 +33,42 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   const [volume, setVolume] = useState(1.0);
   const [showDoa, setShowDoa] = useState(false);
 
-  // Subuh sentiasa menggunakan 'subuh_special', manakala solat lain mengikut prop 'voice'
+  const isNative = nativeAlarmService.getIsNative();
+
+  // Kunci kebal Subuh Khas
   const effectiveVoice: AzanVoice = prayerKey === 'subuh' ? 'subuh_special' : voice;
 
+  // Padanan suara pintar: Mengelakkan fallback ke JAKIM jika ID Subuh didaftarkan sebagai 'subuh'
   const selectedVoice =
-    AZAN_OPTIONS.find((v) => v.id === effectiveVoice) || AZAN_OPTIONS[0];
-  const doaAzan = DUA_COLLECTION?.find((d) => d.id === 'dua-selepas-azan');
+    AZAN_OPTIONS.find(
+      (v) =>
+        v.id === effectiveVoice ||
+        (effectiveVoice === 'subuh_special' && (v.id === 'subuh' || v.id === 'subuh_special'))
+    ) || {
+      id: effectiveVoice,
+      title: effectiveVoice === 'subuh_special' ? 'Azan Subuh (Khas)' : 'Azan Rasmi SolatKini',
+      reciter: effectiveVoice === 'subuh_special' ? 'As-Salatu Khayrum Minan-Naum' : 'Muazzin Rasmi',
+    };
+
+  const doaAzan = DUA_COLLECTION?.find((d) => d.id === 'dua-selepas-azan') || DEFAULT_DOA_AZAN;
 
   useEffect(() => {
     if (isOpen) {
       setIsPlaying(true);
       setShowDoa(false);
-      const unsubscribe = audioNotificationService.addAudioStateListener(
-        (playing, cur, dur) => {
-          setIsPlaying(playing);
-          setProgress({ current: cur, total: dur });
-        }
-      );
-      return () => unsubscribe();
+
+      // Hanya dengar servis audio web sekiranya BUKAN di peranti Android asli
+      if (!isNative) {
+        const unsubscribe = audioNotificationService.addAudioStateListener(
+          (playing, cur, dur) => {
+            setIsPlaying(playing);
+            setProgress({ current: cur, total: dur });
+          }
+        );
+        return () => unsubscribe();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isNative]);
 
   if (!isOpen) return null;
 
@@ -55,9 +79,15 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   };
 
   const handlePlayAudio = () => {
-    audioNotificationService.unlockAudio();
-    audioNotificationService.playAzan(effectiveVoice, () => setIsPlaying(false));
-    setIsPlaying(true);
+    if (isNative) {
+      // Di Android Native, laungkan semula melalui perkhidmatan penggera STREAM_ALARM
+      nativeAlarmService.testAlarm(prayerName, effectiveVoice, 1);
+      setIsPlaying(true);
+    } else {
+      audioNotificationService.unlockAudio();
+      audioNotificationService.playAzan(effectiveVoice, () => setIsPlaying(false));
+      setIsPlaying(true);
+    }
   };
 
   const handleCloseAll = () => {
@@ -81,17 +111,17 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300 select-none">
       <div className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-[#13221c] to-[#0a120f] border border-emerald-500/30 p-6 sm:p-8 shadow-2xl shadow-emerald-950/60 text-center overflow-hidden">
-        {/* Subtle decorative glow */}
+        {/* Hiasan Kilauan Lembut */}
         <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Pulse ring icon */}
+        {/* Ikon Loceng Berdenyut */}
         <div className="relative mx-auto mb-5 w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-400/40 flex items-center justify-center">
           <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping opacity-75" />
           <BellRing className="w-10 h-10 text-emerald-400 animate-bounce" />
         </div>
 
-        {/* Header and prayer alert */}
+        {/* Lencana Makluman Rasmi */}
         <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-900/50 border border-emerald-500/30 text-emerald-300 text-xs font-semibold tracking-wide uppercase">
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
           Pemberitahuan Waktu Solat Rasmi JAKIM
@@ -109,7 +139,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           </span>
         </p>
 
-        {/* Visual equalizer wave */}
+        {/* Visual Gelombang Penyama Audio (Equalizer) */}
         <div className="my-5 flex items-center justify-center gap-1.5 h-10">
           {[40, 75, 55, 90, 65, 80, 50, 95, 60, 45, 85, 65, 90, 50, 70].map((h, i) => (
             <span
@@ -126,7 +156,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           ))}
         </div>
 
-        {/* Real Audio Progress Bar */}
+        {/* Bar Kemajuan Audio Sebenar (Mod Pelayar Web) */}
         {progress.total > 0 && (
           <div className="mb-5 px-4">
             <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono mb-1">
@@ -142,28 +172,35 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           </div>
         )}
 
-        {/* Volume Slider */}
-        <div className="mb-5 flex items-center justify-center gap-3 px-6">
-          <button
-            type="button"
-            onClick={() => handleVolumeChange(volume === 0 ? 1 : 0)}
-            className="text-slate-400 hover:text-white transition cursor-pointer"
-          >
-            {volume === 0 ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
-          </button>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            value={volume}
-            onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
-            className="w-32 accent-emerald-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
-          />
-          <span className="text-[11px] text-slate-400 font-mono w-8">{Math.round(volume * 100)}%</span>
-        </div>
+        {/* Kawalan Aras Suara Pintar (Slider di Web / Info di Android Native) */}
+        {!isNative ? (
+          <div className="mb-5 flex items-center justify-center gap-3 px-6">
+            <button
+              type="button"
+              onClick={() => handleVolumeChange(volume === 0 ? 1 : 0)}
+              className="text-slate-400 hover:text-white transition cursor-pointer"
+            >
+              {volume === 0 ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="w-32 accent-emerald-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+            />
+            <span className="text-[11px] text-slate-400 font-mono w-8">{Math.round(volume * 100)}%</span>
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-400 mb-5 flex items-center justify-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
+            Audio azan dilaungkan pada aras penggera sistem maksima (STREAM_ALARM)
+          </p>
+        )}
 
-        {/* Action buttons */}
+        {/* Butang Tindakan */}
         <div className="flex flex-col sm:flex-row items-center gap-3 justify-center mb-6">
           {isPlaying ? (
             <button
@@ -194,8 +231,8 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           </button>
         </div>
 
-        {/* Collapsible Doa Selepas Azan */}
-        {showDoa && doaAzan && (
+        {/* Paparan Doa Selepas Azan */}
+        {showDoa && (
           <div className="mt-4 p-5 rounded-2xl bg-slate-900/80 border border-emerald-500/20 text-left animate-in slide-in-from-bottom-2 duration-200">
             <h4 className="text-xs uppercase font-bold text-amber-300 tracking-wider mb-2">
               Doa Selepas Azan (Sunnah)
@@ -215,7 +252,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           </div>
         )}
 
-        {/* Dismiss modal footer */}
+        {/* Bahagian Bawah Penutup Modal */}
         <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
           <span>Mod Penggera Prioriti Tinggi</span>
           <button
