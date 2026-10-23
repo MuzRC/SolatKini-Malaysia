@@ -23,7 +23,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
     private static final String PREFS_NAME = "SolatKiniAlarms";
     private static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
 
-    // Gunakan ID channel baru agar Android mereset prioritas dari Silent ke Atas
     public static final String CHANNEL_ID_PERSISTENT = "solatkini_persistent_channel_v2";
     public static final int NOTIFICATION_ID_PERSISTENT = 1001;
 
@@ -38,13 +37,13 @@ public class AzanBootReceiver extends BroadcastReceiver {
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
             "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 
-            // Gunakan Device Protected Storage jika perangkat masih dalam status kunci Direct Boot
+            // Gunakan Device Protected Storage secara selamat jika peranti masih di skrin kunci Direct Boot
             Context safeContext = context;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 safeContext = context.isDeviceProtectedStorage() ? context : context.createDeviceProtectedStorageContext();
             }
 
-            // 1. Periksa pengaturan auto-start pengguna (Default: TRUE)
+            // 1. Semak tetapan auto-start pengguna (Lalai: TRUE)
             boolean isAutoStartEnabled = true;
             try {
                 SharedPreferences appPrefs = safeContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -57,7 +56,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     isAutoStartEnabled = "true".equalsIgnoreCase(val);
                 }
             } catch (Exception e) {
-                Log.w(TAG, "Gagal membaca pengaturan auto-start: " + e.getMessage());
+                Log.w(TAG, "Gagal membaca tetapan auto-start: " + e.getMessage());
             }
 
             if (!isAutoStartEnabled) {
@@ -65,39 +64,38 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // 2. Jadwalkan ulang alarm azan secara senyap tanpa audio
-            Log.i(TAG, "Auto-start AKTIF. Menjadwalkan ulang alarm waktu salat...");
+            // 2. Jadualkan semula semua penggera azan di latar belakang secara SENYAP
+            Log.i(TAG, "Auto-start AKTIF. Menjadualkan semula penggera waktu solat...");
             rescheduleStoredAlarms(safeContext);
 
-            // 3. Perbarui widget layar utama
+            // 3. Kemas kini Widget Skrin Utama
             try {
                 Intent widgetIntent = new Intent(safeContext, SolatWidgetProvider.class);
                 widgetIntent.setAction("com.solatkini.app.UPDATE_PRAYER_TIMES");
                 safeContext.sendBroadcast(widgetIntent);
             } catch (Exception e) {
-                Log.w(TAG, "Gagal memperbarui widget: " + e.getMessage());
+                Log.w(TAG, "Gagal mengemas kini widget: " + e.getMessage());
             }
 
-            // 4. Tampilkan notifikasi tetap di panel atas (di luar Silent Notifications)
+            // 4. Paparkan notifikasi permulaan yang boleh padam sendiri bila ditekan
             try {
-                showPersistentNotification(safeContext);
-                Log.i(TAG, "Notifikasi tetap berhasil dimunculkan di bar atas.");
+                showInitialBootNotification(safeContext);
+                Log.i(TAG, "Notifikasi boot berjaya dipaparkan.");
             } catch (Exception e) {
-                Log.e(TAG, "Gagal menampilkan notifikasi tetap: " + e.getMessage());
+                Log.e(TAG, "Gagal memaparkan notifikasi boot: " + e.getMessage());
             }
         }
     }
 
     /**
-     * Menampilkan notifikasi persisten di bagian atas (bukan Silent Notifications)
+     * Memaparkan notifikasi permulaan selepas reboot.
+     * Menggunakan setAutoCancel(true) supaya automatik padam apabila ditekan.
      */
-    public static void showPersistentNotification(Context context) {
+    public static void showInitialBootNotification(Context context) {
         try {
             NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (notificationManager == null) return;
 
-            // Gunakan IMPORTANCE_DEFAULT agar posisinya berada di atas (setara MacroDroid),
-            // tetapi suaranya dimatikan (setSound null) agar tidak berisik saat HP menyala.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID_PERSISTENT,
@@ -116,7 +114,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
             String alarmsJson = prefs.getString(KEY_STORED_ALARMS, null);
 
             String nextPrayerTitle = "SolatKini Malaysia";
-            String nextPrayerDetails = "Jadual waktu solat aktif";
+            String nextPrayerDetails = "Jadual waktu solat aktif · Tekan untuk buka";
             SimpleDateFormat timeFormat = new SimpleDateFormat("h:mm a", Locale.getDefault());
 
             if (alarmsJson != null && !alarmsJson.isEmpty()) {
@@ -138,7 +136,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 if (closestPrayerName != null && closestTime != Long.MAX_VALUE) {
                     String timeStr = timeFormat.format(new Date(closestTime));
                     nextPrayerTitle = "Solat Seterusnya: " + closestPrayerName + " (" + timeStr + ")";
-                    nextPrayerDetails = "Penggera azan aktif · Sentuh untuk buka SolatKini";
+                    nextPrayerDetails = "Penggera azan aktif · Tekan untuk buka SolatKini";
                 }
             }
 
@@ -155,15 +153,15 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(nextPrayerTitle)
                 .setContentText(nextPrayerDetails)
-                .setOngoing(true) // Menempel terus di bar notifikasi
-                .setAutoCancel(false)
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT) // Prioritas standar agar posisinya di atas
+                .setOngoing(false) // Boleh dileret (swipe) buang
+                .setAutoCancel(true) // Automatik padam bila ditekan
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(contentPendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
             notificationManager.notify(NOTIFICATION_ID_PERSISTENT, builder.build());
         } catch (Exception e) {
-            Log.e(TAG, "Ralat membina notifikasi berterusan", e);
+            Log.e(TAG, "Ralat membina notifikasi boot", e);
         }
     }
 
