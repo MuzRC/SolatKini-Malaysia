@@ -60,25 +60,30 @@ public class AzanAudioService extends Service {
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
 
+        if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
+        if (prayerKey == null) prayerKey = "solat";
+
         long now = System.currentTimeMillis();
-        // Halang pencetusan azan berulang bagi solat yang sama dalam tempoh 90 saat (anti-overlap lock)
-        if (prayerKey != null && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
-            Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu. Mengabaikan cetusan bertindih.");
+        boolean isTest = "test".equalsIgnoreCase(prayerKey);
+
+        // Halang pencetusan azan bertindih dalam tempoh 15 saat bagi solat sebenar
+        if (!isTest && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 15_000L)) {
+            Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 15 saat yang lalu. Mengabaikan cetusan bertindih.");
             return START_NOT_STICKY;
         }
 
         sLastAzanTimestamp = now;
-        sLastPrayerKey = prayerKey != null ? prayerKey : "";
+        sLastPrayerKey = prayerKey;
 
-        if (voice == null || voice.isEmpty()) {
+        // Kunci kebal Subuh: Jika solat Subuh, paksa guna suara khas 'subuh_special'
+        if ("subuh".equalsIgnoreCase(prayerKey)) {
+            voice = "subuh_special";
+        } else if (voice == null || voice.isEmpty()) {
             SharedPreferences prefs = getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
             voice = prefs.getString("selected_azan_voice", "jakim");
         }
 
-        if (prayerName == null) prayerName = "Solat";
-        if (voice == null || voice.isEmpty()) voice = "jakim";
-
-        Log.i(TAG, "Menerima permintaan azan untuk solat: " + prayerName + " dengan nada: " + voice);
+        Log.i(TAG, "Menerima permintaan azan untuk solat: " + prayerName + " (Kunci: " + prayerKey + ", Nada: " + voice + ")");
 
         acquireWakeLock();
         startForeground(NOTIFICATION_ID, buildForegroundNotification(prayerName, prayerKey, voice));
@@ -95,7 +100,7 @@ public class AzanAudioService extends Service {
                     PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
                     "SolatKini::AzanAudioServiceWakeLock"
                 );
-                wakeLock.acquire(7 * 60 * 1000L); // 7 minutes max
+                wakeLock.acquire(7 * 60 * 1000L); // Maksimum 7 minit
             }
         } catch (Exception e) {
             Log.e(TAG, "Gagal mendapatkan WakeLock", e);
@@ -127,8 +132,7 @@ public class AzanAudioService extends Service {
                 channel.enableVibration(true);
                 channel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000});
                 channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-                // Senyapkan audio notifikasi sistem secara eksplisit
-                channel.setSound(null, null);
+                channel.setSound(null, null); // Senyapkan bunyi sistem lalai kerana MediaPlayer mengendalikan audio
                 manager.createNotificationChannel(channel);
             }
         }
@@ -158,10 +162,12 @@ public class AzanAudioService extends Service {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        String displayVoice = "subuh_special".equalsIgnoreCase(voice) ? "SUBUH KHAS" : voice.toUpperCase();
+
         return new NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle("Masuk Waktu Solat " + prayerName)
-            .setContentText("Laungan azan berkumandang (" + voice.toUpperCase() + "). Klik untuk buka skrin.")
+            .setContentText("Laungan azan berkumandang (" + displayVoice + "). Klik untuk buka paparan.")
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -176,7 +182,7 @@ public class AzanAudioService extends Service {
     }
 
     private void playAzanAudio(String voice) {
-        stopAzan();
+        stopAzanPlaybackOnly();
 
         try {
             mediaPlayer = new MediaPlayer();
@@ -186,9 +192,8 @@ public class AzanAudioService extends Service {
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build();
             mediaPlayer.setAudioAttributes(audioAttributes);
-            mediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
 
-            // 1. Petakan ID suara azan kepada nama fail sebenar
+            // 1. Petakan ID suara azan kepada nama fail fizikal
             String mappedVoice = voice;
             if (voice == null || voice.isEmpty()) {
                 mappedVoice = "jakim";
@@ -202,47 +207,55 @@ public class AzanAudioService extends Service {
 
             boolean loaded = false;
 
-            // 2. Semak jika pengguna menggunakan fail tersuai (custom upload)
+            // 2. Semak jika pengguna memuat naik fail tersuai (custom upload)
             File customFile = new File(getFilesDir(), "custom_azan.mp3");
             if (("custom".equalsIgnoreCase(voice) || "custom".equalsIgnoreCase(mappedVoice)) && customFile.exists() && customFile.length() > 0) {
                 try {
+                    mediaPlayer.reset();
+                    mediaPlayer.setAudioAttributes(audioAttributes);
                     mediaPlayer.setDataSource(customFile.getAbsolutePath());
                     loaded = true;
-                    Log.i(TAG, "Berjaya memuatkan fail azan tersuai pengguna: " + customFile.getAbsolutePath());
+                    Log.i(TAG, "Berjaya memuatkan fail azan tersuai: " + customFile.getAbsolutePath());
                 } catch (Exception e) {
                     Log.w(TAG, "Gagal menetapkan fail azan tersuai", e);
                 }
             }
 
-            // 3. Muatkan fail audio azan pilihan daripada aset APK (public/audio/azan/<suara>.mp3)
+            // 3. Muatkan fail audio azan daripada aset APK
             if (!loaded) {
                 String[] candidatePaths = new String[]{
                     "public/audio/azan/" + mappedVoice + ".mp3",
                     "audio/azan/" + mappedVoice + ".mp3",
                     "public/audio/azan/" + voice + ".mp3",
                     "audio/azan/" + voice + ".mp3",
-                    "public/audio/azan/jakim.mp3"
+                    "public/audio/azan/jakim.mp3",
+                    "audio/azan/jakim.mp3"
                 };
 
                 for (String path : candidatePaths) {
-                    if (loadAudioFromAssets(path)) {
+                    if (loadAudioFromAssets(path, audioAttributes)) {
                         loaded = true;
-                        Log.i(TAG, "Berjaya memuatkan fail azan pilihan dari assets: " + path);
+                        Log.i(TAG, "Berjaya memuatkan fail azan dari assets: " + path);
                         break;
                     }
                 }
             }
 
-            // 4. Sandaran terakhir: jika tiada fail assets yang boleh dimuatkan, guna res/raw/azan_notification
+            // 4. Sandaran terakhir res/raw
             if (!loaded) {
-                Log.w(TAG, "Fail azan pilihan gagal dimuatkan, beralih ke res/raw/azan_notification sebagai sandaran.");
                 int rawId = getResources().getIdentifier("azan_notification", "raw", getPackageName());
                 if (rawId != 0) {
-                    AssetFileDescriptor rawFd = getResources().openRawResourceFd(rawId);
-                    if (rawFd != null) {
-                        mediaPlayer.setDataSource(rawFd.getFileDescriptor(), rawFd.getStartOffset(), rawFd.getLength());
-                        rawFd.close();
-                        loaded = true;
+                    try {
+                        AssetFileDescriptor rawFd = getResources().openRawResourceFd(rawId);
+                        if (rawFd != null) {
+                            mediaPlayer.reset();
+                            mediaPlayer.setAudioAttributes(audioAttributes);
+                            mediaPlayer.setDataSource(rawFd.getFileDescriptor(), rawFd.getStartOffset(), rawFd.getLength());
+                            rawFd.close();
+                            loaded = true;
+                        }
+                    } catch (Exception err) {
+                        Log.w(TAG, "Gagal memuatkan fail raw sandaran", err);
                     }
                 }
             }
@@ -280,18 +293,20 @@ public class AzanAudioService extends Service {
         }
     }
 
-    private boolean loadAudioFromAssets(String assetRelativePath) {
-        // Cuba buka secara terus menggunakan AssetFileDescriptor (cepat jika fail uncompressed)
+    private boolean loadAudioFromAssets(String assetRelativePath, AudioAttributes attributes) {
+        // Percubaan 1: Buka terus AssetFileDescriptor
         try {
+            mediaPlayer.reset();
+            mediaPlayer.setAudioAttributes(attributes);
             AssetFileDescriptor afd = getAssets().openFd(assetRelativePath);
             mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
             afd.close();
             return true;
         } catch (Exception e) {
-            Log.d(TAG, "openFd gagal untuk " + assetRelativePath + " (mungkin fail dimampatkan): " + e.getMessage());
+            Log.d(TAG, "openFd gagal untuk " + assetRelativePath + ": " + e.getMessage());
         }
 
-        // Salin fail melalui InputStream ke fail cache dalaman aplikasi (dijamin 100% berjaya walaupun fail dimampatkan)
+        // Percubaan 2: Salin melalui InputStream ke memori cache aplikasi
         try (InputStream is = getAssets().open(assetRelativePath)) {
             File cacheFile = new File(getCacheDir(), "active_azan_playback.mp3");
             try (FileOutputStream fos = new FileOutputStream(cacheFile)) {
@@ -303,6 +318,8 @@ public class AzanAudioService extends Service {
                 fos.flush();
             }
             if (cacheFile.exists() && cacheFile.length() > 0) {
+                mediaPlayer.reset();
+                mediaPlayer.setAudioAttributes(attributes);
                 mediaPlayer.setDataSource(cacheFile.getAbsolutePath());
                 return true;
             }
@@ -312,7 +329,7 @@ public class AzanAudioService extends Service {
         return false;
     }
 
-    private void stopAzan() {
+    private void stopAzanPlaybackOnly() {
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {
@@ -325,7 +342,26 @@ public class AzanAudioService extends Service {
             }
             mediaPlayer = null;
         }
+    }
+
+    private void stopAzan() {
+        stopAzanPlaybackOnly();
         releaseWakeLock();
+
+        // Buang notifikasi foreground secara bersih dari status bar
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+            } else {
+                stopForeground(true);
+            }
+            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager != null) {
+                manager.cancel(NOTIFICATION_ID);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Ralat mematikan notifikasi perkhidmatan", e);
+        }
     }
 
     @Override
