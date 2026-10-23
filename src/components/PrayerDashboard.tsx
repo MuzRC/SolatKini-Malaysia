@@ -106,7 +106,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     };
   }, []);
 
-  // Semak status kebenaran notifikasi, masa automatik dan pantau apabila aplikasi dibuka semula (fokus)
+  // Semak status kebenaran notifikasi, masa automatik dan pantau apabila aplikasi dibuka semula
   useEffect(() => {
     const checkPermsAndState = () => {
       nativeAlarmService.checkPermissions().then((res) => {
@@ -124,7 +124,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       setCurrentTime(now);
       setNextPrayerInfo(determineNextPrayer(prayerTimes, now));
 
-      // Jika tarikh jam telefon dianjak berbanding tarikh data sedia ada, segerakkan semula
       const todayStr = now.toISOString().split('T')[0];
       if (prayerTimes && prayerTimes.date !== todayStr && onLiveSync) {
         onLiveSync();
@@ -140,7 +139,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     };
   }, [prayerTimes, onLiveSync]);
 
-  // Pilihan suara azan dan tetapan notifikasi
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('solatkini_azan_voice') as AzanVoice) || 'jakim';
@@ -176,7 +174,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           };
         }
       } catch {
-        // use default
+        // default
       }
     }
     return defaultSettings;
@@ -191,7 +189,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return audioStorageService.getActiveDeviceVoice();
   });
 
-  // Muat senarai suara yang telah disimpan dalam memori luar talian
   useEffect(() => {
     audioStorageService.getAllCachedVoiceIds().then((ids) => {
       setCachedVoiceIds(ids);
@@ -343,7 +340,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   };
 
-  // Jam digital dikemas kini setiap saat
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -353,14 +349,12 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return () => clearInterval(timer);
   }, [prayerTimes]);
 
-  // Segerak ke Widget Skrin Utama Android
   useEffect(() => {
     if (prayerTimes && currentZone) {
       widgetService.syncWidget(prayerTimes, currentZone);
     }
   }, [prayerTimes, currentZone]);
 
-  // Segerak ke AlarmManager Android
   useEffect(() => {
     if (prayerTimes && prayerTimes.times) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
@@ -392,7 +386,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const hijri = getHijriDate(currentTime);
   const recommendation = getFastingRecommendation(currentTime, hijri);
 
-  // Segerakkan Notifikasi Tetap Waktu Solat ke kawasan notifikasi Android
   useEffect(() => {
     if (prayerTimes && currentZone) {
       const isPersistentEnabled = notificationSettings.persistentNotification ?? true;
@@ -407,7 +400,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
   useEffect(() => {
     const handleRemoteSync = () => {
-      console.info('Menerima arahan segerak daripada butang pintasan notifikasi Android.');
       if (onLiveSync) {
         onLiveSync();
       }
@@ -450,7 +442,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     isUserFasting: isUserFastingToday,
   });
 
-  // Senarai Semak 5 Waktu Solat Fardu Harian
   const [prayerChecklist, setPrayerChecklist] = useState<Record<FardPrayerKey, boolean>>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -669,7 +660,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 flex-wrap text-xs font-semibold uppercase tracking-wider mb-1">
-              {/* Lencana Pintar: Memaparkan status sebenar talian dan sumber data */}
               {!isOnline ? (
                 <span className="flex items-center gap-1.5 text-amber-300 bg-amber-950/60 border border-amber-500/40 px-2.5 py-0.5 rounded-full text-[10px]">
                   <WifiOff className="w-3 h-3 text-amber-400" />
@@ -756,7 +746,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         )}
       </div>
 
-      {/* WARNING BANNER: MASA AUTOMATIK DIMATIKAN (SET TIME AUTOMATICALLY OFF) */}
+      {/* WARNING BANNER: MASA AUTOMATIK DIMATIKAN */}
       {!isAutoTimeEnabled && (
         <div className="rounded-2xl p-4 bg-gradient-to-r from-rose-950/80 via-amber-950/70 to-[#1f0f0a] border border-rose-500/50 text-left space-y-2.5 shadow-xl animate-in fade-in duration-300">
           <div className="flex items-center justify-between gap-2">
@@ -771,7 +761,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            Pilihan <strong>&quot;Set time automatically&quot;</strong> dimatikan di tetapan telefon anda[span_4](start_span)[span_4](end_span). Sekiranya jam telefon dianjak secara manual, jadual waktu solat dan laungan azan mungkin tidak tepat.
+            Pilihan <strong>&quot;Set time automatically&quot;</strong> dimatikan di tetapan telefon anda. Sekiranya jam telefon dianjak secara manual, jadual waktu solat dan laungan azan mungkin tidak tepat.
           </p>
           <div className="pt-1 flex flex-wrap items-center gap-2">
             <button
