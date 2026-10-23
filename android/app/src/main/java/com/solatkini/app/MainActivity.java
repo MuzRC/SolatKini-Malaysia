@@ -2,6 +2,7 @@ package com.solatkini.app;
 
 import android.Manifest;
 import android.app.KeyguardManager;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -31,7 +32,10 @@ public class MainActivity extends BridgeActivity {
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
-        // 3. Tangani intent pelancaran (Cold Start) dengan kelewatan selamat
+        // 3. Padam serta-merta notifikasi boot sementara (ID 1001) bila aplikasi dibuka
+        clearInitialBootNotification();
+
+        // 4. Tangani intent pelancaran (Cold Start) dengan kelewatan selamat
         // Memberi ruang ~1.2 saat untuk Capacitor WebView & React App.tsx siap sedia mendengar acara
         final Intent launchIntent = getIntent();
         if (launchIntent != null) {
@@ -47,6 +51,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
+        // Padamkan juga semasa aplikasi kembali ke latar depan (foreground)
+        clearInitialBootNotification();
+
         if (!permissionRequested) {
             permissionRequested = true;
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -55,6 +62,21 @@ public class MainActivity extends BridgeActivity {
                     requestNotificationPermissionImmediate();
                 }
             }, 700);
+        }
+    }
+
+    /**
+     * Memadamkan notifikasi permulaan boot (ID 1001) supaya hanya notifikasi rasmi penuh yang kekal
+     */
+    private void clearInitialBootNotification() {
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                nm.cancel(1001);
+                Log.d(TAG, "Notifikasi boot sementara (ID 1001) berjaya dipadam.");
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal memadam notifikasi sementara: " + e.getMessage());
         }
     }
 
@@ -77,6 +99,7 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         configureWakeAndLockScreen();
+        clearInitialBootNotification();
         // Bila app memang sedia dibuka di latar belakang, cetuskan serta-merta
         handleAzanIntent(intent);
     }
