@@ -23,7 +23,8 @@ public class AzanBootReceiver extends BroadcastReceiver {
     private static final String PREFS_NAME = "SolatKiniAlarms";
     private static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
 
-    public static final String CHANNEL_ID_PERSISTENT = "solatkini_persistent_channel";
+    // Gunakan ID channel baru agar Android mereset prioritas dari Silent ke Atas
+    public static final String CHANNEL_ID_PERSISTENT = "solatkini_persistent_channel_v2";
     public static final int NOTIFICATION_ID_PERSISTENT = 1001;
 
     @Override
@@ -37,13 +38,13 @@ public class AzanBootReceiver extends BroadcastReceiver {
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
             "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 
-            // Gunakan Device Protected Storage secara selamat jika peranti masih di skrin kunci Direct Boot
+            // Gunakan Device Protected Storage jika perangkat masih dalam status kunci Direct Boot
             Context safeContext = context;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 safeContext = context.isDeviceProtectedStorage() ? context : context.createDeviceProtectedStorageContext();
             }
 
-            // 1. Semak tetapan auto-start pengguna (Lalai: TRUE)
+            // 1. Periksa pengaturan auto-start pengguna (Default: TRUE)
             boolean isAutoStartEnabled = true;
             try {
                 SharedPreferences appPrefs = safeContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -56,7 +57,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     isAutoStartEnabled = "true".equalsIgnoreCase(val);
                 }
             } catch (Exception e) {
-                Log.w(TAG, "Gagal membaca tetapan auto-start, menggunakan nilai lalai aktif: " + e.getMessage());
+                Log.w(TAG, "Gagal membaca pengaturan auto-start: " + e.getMessage());
             }
 
             if (!isAutoStartEnabled) {
@@ -64,44 +65,44 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // 2. Jadualkan semula semua penggera azan di latar belakang secara SENYAP (AlarmManager)
-            Log.i(TAG, "Auto-start AKTIF. Menjadualkan semula penggera waktu solat...");
+            // 2. Jadwalkan ulang alarm azan secara senyap tanpa audio
+            Log.i(TAG, "Auto-start AKTIF. Menjadwalkan ulang alarm waktu salat...");
             rescheduleStoredAlarms(safeContext);
 
-            // 3. Kemas kini Widget Skrin Utama secara senyap
+            // 3. Perbarui widget layar utama
             try {
                 Intent widgetIntent = new Intent(safeContext, SolatWidgetProvider.class);
                 widgetIntent.setAction("com.solatkini.app.UPDATE_PRAYER_TIMES");
                 safeContext.sendBroadcast(widgetIntent);
             } catch (Exception e) {
-                Log.w(TAG, "Gagal mengemas kini widget selepas reboot: " + e.getMessage());
+                Log.w(TAG, "Gagal memperbarui widget: " + e.getMessage());
             }
 
-            // 4. Paparkan notifikasi kekal waktu solat di bar notifikasi SAHAJA
-            // (Skrin UI MainActivity tidak dibuka dan AzanAudioService tidak dimainkan)
+            // 4. Tampilkan notifikasi tetap di panel atas (di luar Silent Notifications)
             try {
                 showPersistentNotification(safeContext);
-                Log.i(TAG, "Notifikasi kekal waktu solat berjaya dipaparkan pada bar notifikasi.");
+                Log.i(TAG, "Notifikasi tetap berhasil dimunculkan di bar atas.");
             } catch (Exception e) {
-                Log.e(TAG, "Gagal memaparkan notifikasi kekal waktu solat selepas reboot: " + e.getMessage());
+                Log.e(TAG, "Gagal menampilkan notifikasi tetap: " + e.getMessage());
             }
         }
     }
 
     /**
-     * Memaparkan notifikasi berterusan (ongoing) pada panel notifikasi telefon secara senyap
+     * Menampilkan notifikasi persisten di bagian atas (bukan Silent Notifications)
      */
     public static void showPersistentNotification(Context context) {
         try {
             NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (notificationManager == null) return;
 
-            // Pastikan saluran notifikasi (NotificationChannel) wujud bagi Android 8.0+ (Oreo)
+            // Gunakan IMPORTANCE_DEFAULT agar posisinya berada di atas (setara MacroDroid),
+            // tetapi suaranya dimatikan (setSound null) agar tidak berisik saat HP menyala.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID_PERSISTENT,
                     "Waktu Solat Berterusan",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_DEFAULT
                 );
                 channel.setDescription("Paparan waktu solat berterusan pada panel notifikasi");
                 channel.setShowBadge(false);
@@ -111,7 +112,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 notificationManager.createNotificationChannel(channel);
             }
 
-            // Cari waktu solat seterusnya daripada data penggera yang tersimpan
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String alarmsJson = prefs.getString(KEY_STORED_ALARMS, null);
 
@@ -142,7 +142,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 }
             }
 
-            // Intent apabila pengguna mengetik notifikasi (buka MainActivity secara manual)
             Intent openAppIntent = new Intent(context, MainActivity.class);
             openAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent contentPendingIntent = PendingIntent.getActivity(
@@ -156,9 +155,9 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(nextPrayerTitle)
                 .setContentText(nextPrayerDetails)
-                .setOngoing(true) // Kekal di bar notifikasi
+                .setOngoing(true) // Menempel terus di bar notifikasi
                 .setAutoCancel(false)
-                .setPriority(NotificationCompat.PRIORITY_LOW) // Senyap, tidak berbunyi/bergetar
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT) // Prioritas standar agar posisinya di atas
                 .setContentIntent(contentPendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
@@ -173,7 +172,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String alarmsJson = prefs.getString(KEY_STORED_ALARMS, null);
 
-            // Sandaran konteks Direct Boot
             if ((alarmsJson == null || alarmsJson.isEmpty()) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && context.isDeviceProtectedStorage()) {
                 Context credContext = context.getApplicationContext();
                 if (credContext != null) {
@@ -208,12 +206,10 @@ public class AzanBootReceiver extends BroadcastReceiver {
 
                     if (timestamp <= 0) continue;
 
-                    // Kunci kebal Subuh Khas
                     if ("subuh".equalsIgnoreCase(prayerKey)) {
                         voice = "subuh_special";
                     }
 
-                    // Ambil waktu solat
                     Calendar storedCal = Calendar.getInstance();
                     storedCal.setTimeInMillis(timestamp);
 
@@ -223,9 +219,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     targetCal.set(Calendar.SECOND, 0);
                     targetCal.set(Calendar.MILLISECOND, 0);
 
-                    // Tepat & Tiada Delay:
-                    // Jika waktu solat memang sudah lepas hari ini, anjak ke hari esok.
-                    // Jika belum lepas (walaupun tinggal beberapa saat lagi), kekal hari ini.
                     if (targetCal.getTimeInMillis() <= now) {
                         targetCal.add(Calendar.DAY_OF_YEAR, 1);
                     }
@@ -251,7 +244,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    // Guna setAlarmClock supaya kebal mod Doze dan tepat pada saatnya tanpa delay
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerTimestamp, pendingIntent);
                         alarmManager.setAlarmClock(clockInfo, pendingIntent);
