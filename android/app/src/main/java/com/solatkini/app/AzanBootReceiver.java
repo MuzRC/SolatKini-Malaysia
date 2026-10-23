@@ -34,7 +34,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 safeContext = context.isDeviceProtectedStorage() ? context : context.createDeviceProtectedStorageContext();
             }
 
-            // 1. Semak tetapan auto-start (Lalai: TRUE)
+            // 1. Semak tetapan auto-start pengguna (Lalai: TRUE)
             boolean isAutoStartEnabled = true;
             try {
                 SharedPreferences appPrefs = safeContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -55,11 +55,11 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // 2. Jadualkan semula semua penggera azan tepat di latar belakang
+            // 2. Jadualkan semula semua penggera azan tepat di latar belakang (SENYAP TANPA MAIN AUDIO)
             Log.i(TAG, "Auto-start AKTIF. Menjadualkan semula penggera waktu solat...");
             rescheduleStoredAlarms(safeContext);
 
-            // 3. Kemas kini Widget Skrin Utama secara langsung selepas boot
+            // 3. Kemas kini Widget Skrin Utama secara senyap
             try {
                 Intent widgetIntent = new Intent(safeContext, SolatWidgetProvider.class);
                 widgetIntent.setAction("com.solatkini.app.UPDATE_PRAYER_TIMES");
@@ -68,29 +68,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 Log.w(TAG, "Gagal mengemas kini widget selepas reboot: " + e.getMessage());
             }
 
-            // 4. Lancarkan Foreground Service untuk kemas kini notifikasi berterusan dan pastikan app aktif
-            try {
-                Intent serviceIntent = new Intent(safeContext, AzanAudioService.class);
-                serviceIntent.setAction("ACTION_RESCHEDULE_ALL");
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    safeContext.startForegroundService(serviceIntent);
-                } else {
-                    safeContext.startService(serviceIntent);
-                }
-                Log.i(TAG, "Servis latar depan AzanAudioService dimulakan selepas boot.");
-            } catch (Exception e) {
-                Log.w(TAG, "Servis latar depan dihadkan: " + e.getMessage());
-            }
-
-            // 5. Percubaan melancarkan MainActivity secara selamat
-            try {
-                Intent launchIntent = new Intent(context, MainActivity.class);
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                context.startActivity(launchIntent);
-                Log.i(TAG, "Aplikasi SolatKini dilancarkan ke latar depan.");
-            } catch (Exception e) {
-                Log.d(TAG, "Pelancaran skrin depan dihadkan oleh OS Android (Normal untuk background boot): " + e.getMessage());
-            }
+            // NOTA: AzanAudioService SENGAJA TIDAK DIPANGGIL di sini supaya azan TIDAK berbunyi semasa telefon baru hidup!
         }
     }
 
@@ -99,7 +77,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String alarmsJson = prefs.getString(KEY_STORED_ALARMS, null);
 
-            // Sandaran: Jika SharedPreferences biasa kosong dalam mod Direct Boot, semak konteks asal
+            // Sandaran konteks Direct Boot
             if ((alarmsJson == null || alarmsJson.isEmpty()) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && context.isDeviceProtectedStorage()) {
                 Context credContext = context.getApplicationContext();
                 if (credContext != null) {
@@ -139,7 +117,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         voice = "subuh_special";
                     }
 
-                    // Ambil jam & minit solat daripada cap masa tersimpan
+                    // Ambil waktu solat
                     Calendar storedCal = Calendar.getInstance();
                     storedCal.setTimeInMillis(timestamp);
 
@@ -149,14 +127,14 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     targetCal.set(Calendar.SECOND, 0);
                     targetCal.set(Calendar.MILLISECOND, 0);
 
-                    // Jika waktu solat berkenaan sudah berlalu hari ini, anjakkan terus ke hari esok
-                    if (targetCal.getTimeInMillis() <= now) {
+                    // Buffer Keselamatan: Jika waktu solat berkenaan sudah lepas atau kurang dari 10 saat dari sekarang,
+                    // anjakkan terus ke hari esok supaya sistem TIDAK 'tertembak' azan secara serta-merta!
+                    if (targetCal.getTimeInMillis() <= (now + 10000)) {
                         targetCal.add(Calendar.DAY_OF_YEAR, 1);
                     }
 
                     long triggerTimestamp = targetCal.getTimeInMillis();
 
-                    // Kemas kini timestamp terkini dalam array jika ada perubahan
                     if (triggerTimestamp != timestamp) {
                         obj.put("timestamp", triggerTimestamp);
                         obj.put("voice", voice);
@@ -184,18 +162,17 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     }
 
                     rescheduledCount++;
-                    Log.i(TAG, "Penggera solat " + prayerName + " [" + voice + "] berjaya dijadualkan pada: " + triggerTimestamp);
+                    Log.i(TAG, "Penggera solat " + prayerName + " [" + voice + "] didaftarkan untuk: " + targetCal.getTime().toString());
                 } catch (Exception individualEx) {
-                    Log.w(TAG, "Gagal menjadualkan satu slot solat pada indeks " + i, individualEx);
+                    Log.w(TAG, "Gagal menjadualkan slot solat pada indeks " + i, individualEx);
                 }
             }
 
-            // Simpan semula senarai penggera yang sudah dikemas kini tarikhnya
             if (hasUpdates) {
                 prefs.edit().putString(KEY_STORED_ALARMS, array.toString()).apply();
             }
 
-            Log.i(TAG, "Selesai menjadualkan semula " + rescheduledCount + " waktu solat selepas reboot.");
+            Log.i(TAG, "Berjaya menjadualkan semula " + rescheduledCount + " waktu solat dengan selamat.");
         } catch (Exception e) {
             Log.e(TAG, "Ralat menjadualkan semula penggera dari AzanBootReceiver", e);
         }
