@@ -21,8 +21,37 @@ public class AzanBootReceiver extends BroadcastReceiver {
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
             "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 
-            Log.i(TAG, "Peranti dihidupkan semula (Boot Completed). Menjadualkan semula penggera solat...");
+            Log.i(TAG, "Peranti dihidupkan semula (Boot Completed).");
+
+            // 1. Semak tetapan auto-start dari Capacitor/SharedPreferences
+            // Nilai LALAI (DEFAULT) adalah TRUE (aktif secara automatik bila mula pasang)
+            SharedPreferences capPrefs = context.getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
+            
+            // Baca sama ada dalam bentuk boolean atau string yang disimpan oleh @capacitor/preferences
+            boolean isAutoStartEnabled = true;
+            if (capPrefs.contains("solatkini_autostart_boot")) {
+                String val = capPrefs.getString("solatkini_autostart_boot", "true");
+                isAutoStartEnabled = "true".equalsIgnoreCase(val);
+            }
+
+            if (!isAutoStartEnabled) {
+                Log.d(TAG, "Pengguna telah mematikan fungsi auto-start SolatKini.");
+                return;
+            }
+
+            // 2. Jadualkan semula semua penggera azan tepat
+            Log.i(TAG, "Auto-start AKTIF. Menjadualkan semula penggera solat...");
             rescheduleStoredAlarms(context);
+
+            // 3. Lancarkan paparan aplikasi SolatKini ke skrin depan telefon
+            try {
+                Intent launchIntent = new Intent(context, MainActivity.class);
+                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                context.startActivity(launchIntent);
+                Log.i(TAG, "Aplikasi SolatKini berjaya dimulakan secara automatik.");
+            } catch (Exception e) {
+                Log.e(TAG, "Gagal melancarkan paparan aktiviti utama: " + e.getMessage());
+            }
         }
     }
 
@@ -72,11 +101,11 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
-                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula tepat melalui setAlarmClock pada: " + timestamp);
+                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula tepat pada: " + timestamp);
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ralat menjadualkan semula penggera dari BootReceiver", e);
+            Log.e(TAG, "Ralat menjadualkan semula penggera dari AzanBootReceiver", e);
         }
     }
 }
