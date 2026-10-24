@@ -7,7 +7,7 @@ import { ArabicQuranText } from './QuranAyahBadge';
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
 // 1. Senarai Zikir & Tasbih Pilihan
-interface TasbihPreset {
+export interface TasbihPreset {
   id: string;
   name: string;
   arabic: string;
@@ -16,7 +16,7 @@ interface TasbihPreset {
   defaultTarget: number;
 }
 
-const SENARAI_TASBIH: TasbihPreset[] = [
+export const SENARAI_TASBIH: TasbihPreset[] = [
   {
     id: 'subhanallah',
     name: 'Tasbih (Subhanallah)',
@@ -313,7 +313,7 @@ export const TasbihWirid: React.FC = () => {
         <div className="space-y-4">
           {/* PEMILIH TASBIH / ZIKIR */}
           <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-emerald-500/20 bg-slate-900/60 shadow-xl space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <label className="text-xs font-bold uppercase tracking-wider text-emerald-400">
                 Pilih Zikir / Amalan Tasbih:
               </label>
@@ -321,27 +321,28 @@ export const TasbihWirid: React.FC = () => {
                 <select
                   value={selectedTasbihId}
                   onChange={(e) => handleSelectTasbih(e.target.value)}
-                  className="w-full sm:w-64 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-8 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
+                  className="w-full sm:w-64 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
                 >
                   {SENARAI_TASBIH.map((item) => (
-                    <option key={item.id} value={item.id} className="bg-slate-900 text-white">
-                      {item.name}
+                    <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100 py-1">
+                      {item.name} {item.defaultTarget > 0 ? `(${item.defaultTarget}x)` : ''}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
-            {/* Kad Bacaan Zikir Semasa */}
-            <div className="pt-3 border-t border-slate-800 text-center space-y-1">
-              <p className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed">
-                {activeTasbih.arabic}
-              </p>
+            {/* Kad Bacaan Zikir Semasa Menggunakan ArabicQuranText */}
+            <div className="pt-3 border-t border-slate-800 text-center space-y-1.5">
+              <ArabicQuranText
+                text={activeTasbih.arabic}
+                className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed block text-center"
+              />
               <p className="text-xs sm:text-sm text-slate-300 italic font-medium">
                 &quot;{activeTasbih.transliteration}&quot;
               </p>
-              <p className="text-[11px] sm:text-xs text-slate-400">
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xl mx-auto">
                 {activeTasbih.translation}
               </p>
             </div>
@@ -349,8 +350,8 @@ export const TasbihWirid: React.FC = () => {
 
           {/* KAUNTER TASBIH INTERFACE */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/20 text-center shadow-2xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-6 border-b border-slate-800">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-800">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {[33, 99, 100, 0].map((t) => (
                   <button
                     key={t}
@@ -361,7 +362,7 @@ export const TasbihWirid: React.FC = () => {
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
                       targetCount === t
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-emerald-600 text-white shadow-sm'
                         : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
                     }`}
                   >
@@ -405,11 +406,12 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
+            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
                 onClick={handleTap}
-                className="relative group w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-gradient-to-br from-[#12241d] to-[#07110d] border-4 border-emerald-500/30 hover:border-emerald-400/60 shadow-2xl shadow-emerald-950/70 flex flex-col items-center justify-center transition-all duration-150 active:scale-95 focus:outline-none select-none cursor-pointer"
+                className="relative group w-64 h-64 sm:w-72 sm:h-72 rounded-full bg-gradient-to-br from-[#12241d] to-[#07110d] border-4 border-emerald-500/30 hover:border-emerald-400/60 shadow-2xl shadow-emerald-950/70 flex flex-col items-center justify-center transition-all duration-150 active:scale-95 focus:outline-none select-none cursor-pointer touch-manipulation"
               >
                 <div className="absolute inset-3 rounded-full border border-emerald-500/10 pointer-events-none" />
                 <div className="absolute inset-7 rounded-full border border-dashed border-emerald-500/20 pointer-events-none" />
