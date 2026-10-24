@@ -416,3 +416,84 @@ export const DUA_COLLECTION: DuaItem[] = [
     reference: 'HR Al-Bukhari (No. 6306)',
   },
 ];
+
+// ==========================================
+// SENARAI AMALAN KAUNTER TASBIH DIGITAL
+// ==========================================
+
+export interface TasbihPreset {
+  id: string;
+  name: string;
+  arabic: string;
+  transliteration: string;
+  translation: string;
+  defaultTarget: number;
+}
+
+export const TASBIH_LIST: TasbihPreset[] = [
+  {
+    id: 'subhanallah',
+    name: 'Tasbih (Subhanallah)',
+    arabic: 'سُبْحَانَ اللَّهِ',
+    transliteration: 'Subhanallah',
+    translation: 'Maha Suci Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'alhamdulillah',
+    name: 'Tahmid (Alhamdulillah)',
+    arabic: 'الْحَمْدُ لِلَّهِ',
+    transliteration: 'Alhamdulillah',
+    translation: 'Segala puji bagi Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'allahuakbar',
+    name: 'Takbir (Allahu Akbar)',
+    arabic: 'اللَّهُ أَكْبَرُ',
+    transliteration: 'Allahu Akbar',
+    translation: 'Allah Maha Besar',
+    defaultTarget: 33,
+  },
+  {
+    id: 'tahlil',
+    name: 'Tahlil (La ilaha illallah)',
+    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ',
+    transliteration: 'Laa ilaaha illallah',
+    translation: 'Tiada Tuhan selain Allah',
+    defaultTarget: 100,
+  },
+  {
+    id: 'istighfar',
+    name: 'Istighfar (Astaghfirullah)',
+    arabic: 'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ',
+    transliteration: 'Astaghfirullahalzim',
+    translation: 'Aku memohon ampun kepada Allah Yang Maha Agung',
+    defaultTarget: 100,
+  },
+  {
+    id: 'selawat',
+    name: 'Selawat Ke Atas Nabi',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَىٰ سَيِّدِنَا مُحَمَّدٍ',
+    transliteration: 'Allahumma salli ala sayyidina Muhammad',
+    translation: 'Ya Allah limpahkanlah rahmat ke atas junjungan kami Nabi Muhammad',
+    defaultTarget: 100,
+  },
+  {
+    id: 'hauqalah',
+    name: 'Hauqalah (La hawla wa la...)',
+    arabic: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ',
+    transliteration: 'La hawla wa la quwwata illa billahil aliyyil azim',
+    translation: 'Tiada daya dan kekuatan melainkan dengan pertolongan Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'bebas',
+    name: 'Zikir Bebas / Umum',
+    arabic: 'ذِكْرُ اللَّهِ',
+    transliteration: 'Zikrullah',
+    translation: 'Mengingati Allah secara umum tanpa ikatan lafaz khusus',
+    defaultTarget: 0,
+  },
+];
+
