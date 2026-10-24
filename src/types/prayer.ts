@@ -83,6 +83,17 @@ export interface WiridItem {
   targetCount: number;
   note?: string;
   audioUrl?: string;
+  fadilat?: string; // Fadilat & rujukan hadis sahih
+}
+
+export interface TasbihPreset {
+  id: string;
+  name: string;
+  arabic: string;
+  transliteration: string;
+  translation: string;
+  defaultTarget: number;
+  fadilat: string;
 }
 
 export interface FastingTrackerState {
