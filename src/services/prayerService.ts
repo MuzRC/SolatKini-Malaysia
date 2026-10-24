@@ -4,6 +4,16 @@ import { getHijriDate } from '../utils/hijriCalendar';
 
 const CACHE_KEY_PREFIX = 'solatkini_prayer_times_';
 
+/**
+ * Format tarikh tempatan 'YYYY-MM-DD' bagi mengelakkan ralat anjakan 8 jam UTC pada waktu Subuh/Sahur
+ */
+export const getLocalDateString = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function getSafeZoneCoordinates(zone: JakimZone): { lat: number; lng: number } {
   const lat = typeof (zone as any).lat === 'number' && !isNaN((zone as any).lat) ? (zone as any).lat : 5.347;
   const lng = typeof (zone as any).lng === 'number' && !isNaN((zone as any).lng) ? (zone as any).lng : 115.743;
@@ -29,7 +39,8 @@ export async function fetchDayPrayerTimes(
   date: Date = new Date(),
   forceLive: boolean = false
 ): Promise<{ times: DayPrayerTimes; isOfflineCalculated: boolean; lastSyncTime: string }> {
-  const dateStr = date.toISOString().split('T')[0];
+  // Guna tarikh zon tempatan Malaysia (UTC+8), bukan toISOString() yang tertinggal 8 jam
+  const dateStr = getLocalDateString(date);
   const cacheKey = `${CACHE_KEY_PREFIX}${zone.code}_${dateStr}`;
   const nowTimeStr = new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
 
@@ -197,7 +208,6 @@ export const PRAYER_LABELS: Record<PrayerKey, string> = {
   isyak: 'Isyak',
 };
 
-// WAJIB ADA: Eksport ini dicari oleh PrayerDashboard & SettingsView
 export const PRAYER_KEYS_ORDER: PrayerKey[] = [
   'imsak',
   'subuh',
@@ -208,7 +218,6 @@ export const PRAYER_KEYS_ORDER: PrayerKey[] = [
   'isyak',
 ];
 
-// 5 Waktu Fardhu Sahaja untuk kiraan Solat Seterusnya (Imsak & Syuruk dipotong)
 export const OBLIGATORY_PRAYERS_ORDER: PrayerKey[] = [
   'subuh',
   'zohor',
@@ -288,7 +297,6 @@ export interface FastingCountdownOptions {
   isUserFasting?: boolean;
 }
 
-// WAJIB ADA: Eksport ini dicari oleh PrayerDashboard & FastingTracker
 export function getFastingCountdown(
   prayerTimes: DayPrayerTimes,
   currentTime: Date = new Date(),
