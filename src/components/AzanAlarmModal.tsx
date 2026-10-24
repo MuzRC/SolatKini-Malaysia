@@ -15,9 +15,12 @@ interface AzanAlarmModalProps {
 
 // Sandaran kebal sekiranya fail data doa terlewat dimuatkan
 const DEFAULT_DOA_AZAN = {
-  arabic: 'اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ، وَالصَّلَاةِ الْقَائِمَةِ، آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ، وَابْعَثْهُ مَقَامًا مَحْمُودًا الَّذِي وَعَدْتَهُ',
-  transliteration: "Allahumma Rabba hazihid-da'watit-tammah, was-salatil-qa'imah, ati Muhammadanil-wasilata wal-fadilah, wab'athhu maqamam-mahmudanil-lazi wa'adtah.",
-  translation: 'Ya Allah, Tuhan yang menguasai seruan yang sempurna ini dan solat yang didirikan. Berikanlah kepada Nabi Muhammad kedudukan yang tinggi dan keutamaan, dan bangkitkanlah baginda pada kedudukan terpuji yang telah Engkau janjikan.',
+  arabic:
+    'اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ، وَالصَّلَاةِ الْقَائِمَةِ، آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ، وَابْعَثْهُ مَقَامًا مَحْمُودًا الَّذِي وَعَدْتَهُ',
+  transliteration:
+    "Allahumma Rabba hazihid-da'watit-tammah, was-salatil-qa'imah, ati Muhammadanil-wasilata wal-fadilah, wab'athhu maqamam-mahmudanil-lazi wa'adtah.",
+  translation:
+    'Ya Allah, Tuhan yang menguasai seruan yang sempurna ini dan solat yang didirikan. Berikanlah kepada Nabi Muhammad kedudukan yang tinggi dan keutamaan, dan bangkitkanlah baginda pada kedudukan terpuji yang telah Engkau janjikan.',
   reference: 'Sahih al-Bukhari (No. 614)',
 };
 
@@ -43,7 +46,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
     AZAN_OPTIONS.find(
       (v) =>
         v.id === effectiveVoice ||
-        (effectiveVoice === 'subuh_special' && (v.id === 'subuh' || v.id === 'subuh_special'))
+        (effectiveVoice === 'subuh_special' && (v.id === 'subuh' || (v.id as string) === 'subuh_special'))
     ) || {
       id: effectiveVoice,
       title: effectiveVoice === 'subuh_special' ? 'Azan Subuh (Khas)' : 'Azan Rasmi SolatKini',
