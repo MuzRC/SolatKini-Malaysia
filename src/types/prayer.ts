@@ -8,6 +8,7 @@ export interface PrayerTimeItem {
   isNext?: boolean;
   isPast?: boolean;
   isCurrent?: boolean;
+  voice?: AzanVoice;
 }
 
 export interface DayPrayerTimes {
@@ -25,7 +26,15 @@ export interface JakimZone {
   lng: number;
 }
 
-export type AzanVoice = 'makkah' | 'madinah' | 'jakim' | 'al_aqsa' | 'mishary' | 'subuh_special' | 'takbir_raya';
+export type AzanVoice =
+  | 'makkah'
+  | 'madinah'
+  | 'jakim'
+  | 'al_aqsa'
+  | 'mishary'
+  | 'subuh_special'
+  | 'takbir_raya'
+  | 'custom';
 
 export interface AzanAudioOption {
   id: AzanVoice;
@@ -33,6 +42,9 @@ export interface AzanAudioOption {
   reciter: string;
   description: string;
   durationSec: number;
+  audioUrl?: string;
+  filename?: string;
+  fallbackUrl?: string;
 }
 
 export interface PrayerAlertConfig {
@@ -80,7 +92,7 @@ export interface FastingTrackerState {
   gantiTargetDays: number;
 }
 
-export type ActiveTab = 'solat' | 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'tetapan' | 'widget' | 'kredit';
+export type ActiveTab = 'solat' | 'kiblat' | 'puasa' | 'wirid' | 'doa' | 'tasbih' | 'tetapan' | 'widget' | 'kredit';
 
 export type FardPrayerKey = 'subuh' | 'zohor' | 'asar' | 'maghrib' | 'isyak';
 
