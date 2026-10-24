@@ -59,6 +59,15 @@ const getLocalDateString = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * Tukar rentetan masa 'HH:mm' kepada jumlah minit dari jam 12:00 tengah malam
+ */
+const toMinutes = (timeStr?: string): number => {
+  if (!timeStr) return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
 interface PrayerDashboardProps {
   currentZone: JakimZone;
   onZoneChange: (zone: JakimZone) => void;
@@ -103,7 +112,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return true;
   });
 
-  // Deklarasi awal hijri & recommendation supaya sentiasa selamat diakses
   const hijri = getHijriDate(currentTime);
   const recommendation = getFastingRecommendation(currentTime, hijri);
 
@@ -235,7 +243,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       localStorage.setItem('solatkini_active_device_voice', opt.id);
     }
 
-    // Maklumkan native alarm pasal pertukaran suara
     try {
       if (typeof nativeAlarmService.setActiveVoice === 'function') {
         nativeAlarmService.setActiveVoice(opt.id);
@@ -244,7 +251,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       console.warn('Gagal tetapkan active voice native:', e);
     }
 
-    // 2. Kemas kini state notifikasi (useEffect di bawah akan uruskan penjadualan semula secara automatik)
+    // 2. Kemas kini state notifikasi
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
@@ -1050,7 +1057,30 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
             const displayTime = formatDisplayTime(time24);
             const label = PRAYER_LABELS[key];
             const isNext = nextPrayerInfo.nextKey === key;
-            const isCurrent = nextPrayerInfo.currentKey === key && !isNext && key !== 'imsak' && key !== 'syuruk';
+
+            // Pengiraan sempadan waktu falak sebenar (mengelakkan 'Sedang Masuk' palsu)
+            const currentMins = currentTime.getHours() * 60 + currentTime.getMinutes();
+            const subuhMins = toMinutes(prayerTimes.times.subuh);
+            const syurukMins = toMinutes(prayerTimes.times.syuruk);
+            const zohorMins = toMinutes(prayerTimes.times.zohor);
+            const asarMins = toMinutes(prayerTimes.times.asar);
+            const maghribMins = toMinutes(prayerTimes.times.maghrib);
+            const isyakMins = toMinutes(prayerTimes.times.isyak);
+
+            let isCurrent = false;
+            if (key === 'subuh') {
+              isCurrent = currentMins >= subuhMins && currentMins < syurukMins;
+            } else if (key === 'zohor') {
+              isCurrent = currentMins >= zohorMins && currentMins < asarMins;
+            } else if (key === 'asar') {
+              isCurrent = currentMins >= asarMins && currentMins < maghribMins;
+            } else if (key === 'maghrib') {
+              isCurrent = currentMins >= maghribMins && currentMins < isyakMins;
+            } else if (key === 'isyak') {
+              isCurrent = currentMins >= isyakMins || currentMins < subuhMins;
+            }
+            isCurrent = isCurrent && !isNext;
+
             const isAlertEnabled = notificationSettings.preferences[key]?.enabled;
             const isSpecialFastingTime = key === 'imsak' || key === 'maghrib';
 
