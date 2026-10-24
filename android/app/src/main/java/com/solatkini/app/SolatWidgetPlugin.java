@@ -74,7 +74,9 @@ public class SolatWidgetPlugin extends Plugin {
             String hijri = call.getString("hijri", "");
             String nextLabel = call.getString("next_label", "Solat");
             String nextTime = call.getString("next_time", "--:--");
-            String countdown = call.getString("countdown", "");
+
+            // Dapatkan target timestamp (milisaat) dari TypeScript
+            Long targetTimestamp = call.hasOption("target_timestamp") ? call.getLong("target_timestamp") : null;
 
             String subuh = call.getString("subuh", "--:--");
             String zohor = call.getString("zohor", "--:--");
@@ -82,8 +84,8 @@ public class SolatWidgetPlugin extends Plugin {
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            // Sorotan solat seterusnya
-            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")" + (countdown.isEmpty() ? "" : " · " + countdown);
+            // Format teks solat seterusnya (tanpa string statik countdown supaya tidak bertindih dengan chronometer)
+            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
 
             // Baris padat 5 waktu solat harian
             String formatted5Times = String.format(
@@ -112,7 +114,7 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Format BigText: Memaparkan solat seterusnya & baris jadual solat secara kemas tanpa terpotong
+            // Format BigText: Memaparkan solat seterusnya & baris jadual solat
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
                 .setBigContentTitle("SolatKini · Zon " + zone)
                 .setSummaryText(hijri.isEmpty() ? "Waktu Solat JAKIM" : hijri)
@@ -125,17 +127,24 @@ public class SolatWidgetPlugin extends Plugin {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle("SolatKini · Zon " + zone)
                 .setContentText(nextKicker)
-                .setSubText(hijri.isEmpty() ? zone : hijri) // Kemas pada baris tajuk status bar
+                .setSubText(hijri.isEmpty() ? zone : hijri)
                 .setStyle(bigStyle)
                 .setContentIntent(openPending)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setSilent(true) // Senyapkan sepenuhnya tanpa getaran kecil
+                .setSilent(true)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);
+
+            // Aktifkan jam undur natif Android jika timestamp sah dan berada pada masa hadapan
+            if (targetTimestamp != null && targetTimestamp > System.currentTimeMillis()) {
+                builder.setWhen(targetTimestamp)
+                       .setUsesChronometer(true)
+                       .setChronometerCountDown(true);
+            }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
 
