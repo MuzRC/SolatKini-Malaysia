@@ -39,7 +39,6 @@ export async function fetchDayPrayerTimes(
   date: Date = new Date(),
   forceLive: boolean = false
 ): Promise<{ times: DayPrayerTimes; isOfflineCalculated: boolean; lastSyncTime: string }> {
-  // Guna tarikh zon tempatan Malaysia (UTC+8), bukan toISOString() yang tertinggal 8 jam
   const dateStr = getLocalDateString(date);
   const cacheKey = `${CACHE_KEY_PREFIX}${zone.code}_${dateStr}`;
   const nowTimeStr = new Date().toLocaleTimeString('ms-MY', { hour: '2-digit', minute: '2-digit' });
@@ -191,6 +190,7 @@ export interface NextPrayerInfo {
   nextLabel: string;
   nextTimeStr: string;
   nextDisplayTime: string;
+  targetTimestamp: number; // <--- DITAMBAH: Epoch ms tepat untuk pemasa Android
   remainingSeconds: number;
   countdownFormatted: string;
   currentKey: PrayerKey;
@@ -262,6 +262,7 @@ export function determineNextPrayer(
         nextLabel: PRAYER_LABELS[key],
         nextTimeStr: timeStr,
         nextDisplayTime: formatDisplayTime(timeStr),
+        targetTimestamp: prayerDate.getTime(), // <--- DITAMBAH: ms tepat hari ini
         remainingSeconds: remainingSec,
         countdownFormatted: countdown,
         currentKey: prevKey,
@@ -284,6 +285,7 @@ export function determineNextPrayer(
     nextLabel: PRAYER_LABELS.subuh,
     nextTimeStr: tomorrowSubuhStr,
     nextDisplayTime: formatDisplayTime(tomorrowSubuhStr),
+    targetTimestamp: tomorrowSubuh.getTime(), // <--- DITAMBAH: ms tepat Subuh esok
     remainingSeconds: remainingSec,
     countdownFormatted: `${hours}j ${mins}m ${secs}s`,
     currentKey: 'isyak',
