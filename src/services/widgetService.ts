@@ -1,4 +1,8 @@
-// 1. Tambah target_timestamp dalam interface
+import { registerPlugin, Capacitor } from '@capacitor/core';
+import { DayPrayerTimes, JakimZone } from '../types/prayer';
+import { determineNextPrayer } from './prayerService';
+import { formatDisplayTime } from '../utils/prayerCalculator';
+
 interface SolatWidgetPluginInterface {
   updateWidget(options: {
     zone: string;
@@ -16,7 +20,7 @@ interface SolatWidgetPluginInterface {
     next_label: string;
     next_time: string;
     countdown?: string;
-    target_timestamp?: number; // <--- TAMBAH INI (Unix epoch ms)
+    target_timestamp?: number;
     subuh: string;
     zohor: string;
     asar: string;
@@ -26,7 +30,56 @@ interface SolatWidgetPluginInterface {
   cancelPersistentNotification(): Promise<{ success: boolean }>;
 }
 
-// ... kod lain kekal ...
+const SolatWidget = registerPlugin<SolatWidgetPluginInterface>('SolatWidget');
+
+export class WidgetService {
+  private lastSyncedWidgetPayload: string | null = null;
+  private lastSyncedNotifPayload: string | null = null;
+  private isUpdatingNotif: boolean = false;
+
+  private isAndroid(): boolean {
+    return Capacitor.getPlatform() === 'android';
+  }
+
+  public async syncWidget(prayerTimes: DayPrayerTimes, zone: JakimZone): Promise<void> {
+    try {
+      if (!prayerTimes?.times) return;
+
+      const now = new Date();
+      const nextPrayer = determineNextPrayer(prayerTimes, now);
+      const nextLabel = nextPrayer ? nextPrayer.nextLabel : 'Waktu Solat';
+      const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
+
+      const payload = {
+        zone: zone?.code || 'WLY01',
+        next_label: nextLabel,
+        next_time: nextTime,
+        subuh: formatDisplayTime(prayerTimes.times.subuh),
+        zohor: formatDisplayTime(prayerTimes.times.zohor),
+        asar: formatDisplayTime(prayerTimes.times.asar),
+        maghrib: formatDisplayTime(prayerTimes.times.maghrib),
+        isyak: formatDisplayTime(prayerTimes.times.isyak),
+      };
+
+      const payloadStr = JSON.stringify(payload);
+      if (payloadStr === this.lastSyncedWidgetPayload) {
+        return;
+      }
+
+      this.lastSyncedWidgetPayload = payloadStr;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_widget_latest', payloadStr);
+      }
+
+      if (this.isAndroid()) {
+        await SolatWidget.updateWidget(payload);
+        console.info('[WidgetService] Widget Android berjaya dikemaskini:', payload.zone);
+      }
+    } catch (err) {
+      console.warn('[WidgetService] Tidak dapat mengemaskini widget natif Android:', err);
+    }
+  }
 
   public async syncPersistentNotification(
     prayerTimes: DayPrayerTimes,
@@ -47,13 +100,24 @@ interface SolatWidgetPluginInterface {
       const nextLabel = nextPrayer ? nextPrayer.nextLabel : 'Waktu Solat';
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
-      
-      // Dapatkan timestamp waktu solat seterusnya dalam ms
-      // (Pastikan nextPrayer ada pegang objek Date / timestamp sasaran)
-      const targetTimestamp = nextPrayer?.targetDate 
-        ? new Date(nextPrayer.targetDate).getTime() 
-        : 0;
 
+      // Tentukan target timestamp (milisaat) secara defensif
+      let targetTimestamp = 0;
+      if (nextPrayer && (nextPrayer as any).targetDate) {
+        targetTimestamp = new Date((nextPrayer as any).targetDate).getTime();
+      } else if (nextPrayer && (nextPrayer as any).nextTime) {
+        const parts = (nextPrayer as any).nextTime.split(':');
+        if (parts.length >= 2) {
+          const target = new Date();
+          target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+          if (target.getTime() <= now.getTime()) {
+            target.setDate(target.getDate() + 1);
+          }
+          targetTimestamp = target.getTime();
+        }
+      }
+
+      // Ekstrak nama daerah secara defensif mengelakkan TypeError
       const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
       const zoneLabel = daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
 
@@ -63,7 +127,7 @@ interface SolatWidgetPluginInterface {
         next_label: nextLabel,
         next_time: nextTime,
         countdown: countdown,
-        target_timestamp: targetTimestamp, // <--- HANTAR KE ANDROID
+        target_timestamp: targetTimestamp,
         subuh: formatDisplayTime(prayerTimes.times.subuh),
         zohor: formatDisplayTime(prayerTimes.times.zohor),
         asar: formatDisplayTime(prayerTimes.times.asar),
@@ -73,6 +137,7 @@ interface SolatWidgetPluginInterface {
 
       const payloadStr = JSON.stringify(payload);
 
+      // Sekat jika payload sama atau masih dalam proses penghantaran
       if (payloadStr === this.lastSyncedNotifPayload || this.isUpdatingNotif) {
         return;
       }
@@ -94,3 +159,21 @@ interface SolatWidgetPluginInterface {
       this.isUpdatingNotif = false;
     }
   }
+
+  public async cancelPersistentNotification(): Promise<void> {
+    try {
+      this.lastSyncedNotifPayload = null;
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('solatkini_persistent_notif_payload');
+      }
+      if (this.isAndroid()) {
+        await SolatWidget.cancelPersistentNotification();
+        console.info('[WidgetService] Notifikasi tetap dibatalkan.');
+      }
+    } catch (err) {
+      console.warn('[WidgetService] Ralat membatalkan notifikasi tetap:', err);
+    }
+  }
+}
+
+export const widgetService = new WidgetService();
