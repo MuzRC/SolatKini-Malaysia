@@ -32,11 +32,17 @@ interface SolatWidgetPluginInterface {
 const SolatWidget = registerPlugin<SolatWidgetPluginInterface>('SolatWidget');
 
 export class WidgetService {
-  private lastSyncedPayload: string | null = null;
+  private lastSyncedWidgetPayload: string | null = null;
+  private lastSyncedNotifPayload: string | null = null;
+  private isUpdatingNotif: boolean = false;
+
+  private isAndroid(): boolean {
+    return Capacitor.getPlatform() === 'android';
+  }
 
   public async syncWidget(prayerTimes: DayPrayerTimes, zone: JakimZone): Promise<void> {
     try {
-      if (!prayerTimes || !prayerTimes.times) return;
+      if (!prayerTimes?.times) return;
 
       const now = new Date();
       const nextPrayer = determineNextPrayer(prayerTimes, now);
@@ -44,7 +50,7 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
 
       const payload = {
-        zone: zone.code || 'WLY01',
+        zone: zone?.code || 'WLY01',
         next_label: nextLabel,
         next_time: nextTime,
         subuh: formatDisplayTime(prayerTimes.times.subuh),
@@ -55,21 +61,19 @@ export class WidgetService {
       };
 
       const payloadStr = JSON.stringify(payload);
-      if (payloadStr === this.lastSyncedPayload) {
-        return; // Avoid unnecessary IPC broadcasts if values haven't changed
+      if (payloadStr === this.lastSyncedWidgetPayload) {
+        return;
       }
 
-      this.lastSyncedPayload = payloadStr;
+      this.lastSyncedWidgetPayload = payloadStr;
 
-      // Always save to localStorage so web preview or fallback reflects it
       if (typeof window !== 'undefined') {
         localStorage.setItem('solatkini_widget_latest', payloadStr);
       }
 
-      // If running on native Android APK, dispatch to native SolatWidgetProvider
-      if (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'android') {
+      if (this.isAndroid()) {
         await SolatWidget.updateWidget(payload);
-        console.info('[WidgetService] Widget Android berjaya dikemaskini dengan waktu solat terkini:', payload.zone);
+        console.info('[WidgetService] Widget Android berjaya dikemaskini:', payload.zone);
       }
     } catch (err) {
       console.warn('[WidgetService] Tidak dapat mengemaskini widget natif Android:', err);
@@ -84,10 +88,11 @@ export class WidgetService {
   ): Promise<void> {
     try {
       if (!enabled) {
+        this.lastSyncedNotifPayload = null;
         await this.cancelPersistentNotification();
         return;
       }
-      if (!prayerTimes || !prayerTimes.times) return;
+      if (!prayerTimes?.times) return;
 
       const now = new Date();
       const nextPrayer = determineNextPrayer(prayerTimes, now);
@@ -95,8 +100,12 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
 
+      // Ekstrak nama daerah secara defensif mengelakkan TypeError
+      const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
+      const zoneLabel = daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
+
       const payload = {
-        zone: `${zone.code} (${zone.daerah.split(',')[0].trim()})`,
+        zone: zoneLabel,
         hijri: hijriFormatted || '',
         next_label: nextLabel,
         next_time: nextTime,
@@ -108,27 +117,40 @@ export class WidgetService {
         isyak: formatDisplayTime(prayerTimes.times.isyak),
       };
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('solatkini_persistent_notif_payload', JSON.stringify(payload));
+      const payloadStr = JSON.stringify(payload);
+
+      // Sekat jika payload sama atau masih dalam proses penghantaran
+      if (payloadStr === this.lastSyncedNotifPayload || this.isUpdatingNotif) {
+        return;
       }
 
-      if (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'android') {
+      this.isUpdatingNotif = true;
+      this.lastSyncedNotifPayload = payloadStr;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_persistent_notif_payload', payloadStr);
+      }
+
+      if (this.isAndroid()) {
         await SolatWidget.updatePersistentNotification(payload);
-        console.info('[WidgetService] Notifikasi tetap 5 waktu solat berjaya dihantar ke sistem:', payload.zone);
+        console.info('[WidgetService] Notifikasi tetap dihantar:', payload.zone);
       }
     } catch (err) {
       console.warn('[WidgetService] Ralat mengemaskini notifikasi tetap:', err);
+    } finally {
+      this.isUpdatingNotif = false;
     }
   }
 
   public async cancelPersistentNotification(): Promise<void> {
     try {
+      this.lastSyncedNotifPayload = null;
       if (typeof window !== 'undefined') {
         localStorage.removeItem('solatkini_persistent_notif_payload');
       }
-      if (Capacitor.isNativePlatform() || Capacitor.getPlatform() === 'android') {
+      if (this.isAndroid()) {
         await SolatWidget.cancelPersistentNotification();
-        console.info('[WidgetService] Notifikasi tetap 5 waktu solat dibatalkan.');
+        console.info('[WidgetService] Notifikasi tetap dibatalkan.');
       }
     } catch (err) {
       console.warn('[WidgetService] Ralat membatalkan notifikasi tetap:', err);
