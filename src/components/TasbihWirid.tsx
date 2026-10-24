@@ -58,7 +58,7 @@ export const TasbihWirid: React.FC = () => {
     }
   };
 
-  // Saiz Tulisan
+  // Saiz Tulisan (Dikongsi untuk kedua-dua tab Tasbih & Wirid)
   const [fontSize, setFontSize] = useState<FontSize>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('solatkini_wirid_font_size') as FontSize;
@@ -269,7 +269,7 @@ export const TasbihWirid: React.FC = () => {
       {activeSection === 'tasbih' ? (
         /* DIGITAL TASBIH INTERFACE */
         <div className="space-y-4">
-          {/* KAD ATAS: PEMILIH TASBIH + ZON SENTUHAN BEBAS (FREE TOUCH) */}
+          {/* KAD ATAS: PEMILIH TASBIH + KAWALAN SAIZ TEKS & SENTUHAN BEBAS */}
           <div
             onClick={() => {
               if (freeTouchEnabled) {
@@ -282,44 +282,73 @@ export const TasbihWirid: React.FC = () => {
                 : 'border-emerald-500/20 bg-slate-900/60'
             } shadow-xl space-y-3 relative`}
           >
-            {/* Header: Label Pilihan & Suis Togol Free Touch */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-800/80">
+            {/* Header: Label Pilihan, Kawalan Saiz Teks & Suis Togol Free Touch */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-2 border-b border-slate-800/80">
               <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 Pilih Zikir / Amalan Tasbih:
               </label>
 
-              {/* Butang Togol Sentuhan Bebas (Hentikan Event Propagation agar tidak ter-kira semasa klik butang) */}
+              {/* Kawalan Toolbar: Butang Saiz Teks & Butang Free Touch */}
               <div
+                className="flex items-center gap-2 flex-wrap self-end md:self-auto"
                 onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-2 self-end sm:self-auto bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800"
               >
-                <Fingerprint
-                  className={`w-3.5 h-3.5 transition-colors ${
-                    freeTouchEnabled ? 'text-emerald-400' : 'text-slate-500'
-                  }`}
-                />
-                <span className="text-[11px] font-medium text-slate-300">
-                  Sentuhan Bebas
-                </span>
-                <button
-                  type="button"
-                  onClick={toggleFreeTouch}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    freeTouchEnabled ? 'bg-emerald-500' : 'bg-slate-700'
-                  }`}
-                  title={freeTouchEnabled ? 'Nyahaktifkan Sentuhan Bebas' : 'Aktifkan Sentuhan Bebas'}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                      freeTouchEnabled ? 'translate-x-4' : 'translate-x-0'
+                {/* 1. Pelaras Saiz Teks (Macam di bahagian wirid) */}
+                <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400 px-1 font-medium">Saiz:</span>
+                  {(['normal', 'large', 'xlarge', '4xl'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSetFontSize(s);
+                      }}
+                      title={s === '4xl' ? 'Saiz Ekstra 4XL' : undefined}
+                      className={`px-2 py-0.5 rounded-lg text-xs font-bold transition active:scale-95 cursor-pointer ${
+                        fontSize === s
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {s === 'normal' ? 'A' : s === 'large' ? 'A+' : s === 'xlarge' ? 'A++' : 'A+++'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 2. Butang Togol Sentuhan Bebas */}
+                <div className="flex items-center gap-2 bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800">
+                  <Fingerprint
+                    className={`w-3.5 h-3.5 transition-colors ${
+                      freeTouchEnabled ? 'text-emerald-400' : 'text-slate-500'
                     }`}
                   />
-                </button>
+                  <span className="text-[11px] font-medium text-slate-300">
+                    Sentuhan Bebas
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFreeTouch();
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      freeTouchEnabled ? 'bg-emerald-500' : 'bg-slate-700'
+                    }`}
+                    title={freeTouchEnabled ? 'Nyahaktifkan Sentuhan Bebas' : 'Aktifkan Sentuhan Bebas'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        freeTouchEnabled ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Dropdown Pemilih (Hentikan Event Propagation agar tidak ter-kira semasa memilih zikir) */}
+            {/* Dropdown Pemilih Zikir */}
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <select
                 value={selectedTasbihId}
@@ -335,16 +364,16 @@ export const TasbihWirid: React.FC = () => {
               <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            {/* Kad Bacaan Zikir Semasa (Bila Free Touch ON, kawasan ini boleh diketik terus) */}
+            {/* Kad Bacaan Zikir Semasa (Menggunakan fontStyles Dinamik) */}
             <div className="pt-2 text-center space-y-2">
               <ArabicQuranText
                 text={activeTasbih.arabic}
-                className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed block text-center"
+                className={`font-arabic text-emerald-300 font-bold block text-center transition-all duration-150 ${fontStyles.arabic}`}
               />
-              <p className="text-xs sm:text-sm text-slate-300 italic font-medium">
+              <p className={`text-slate-300 italic font-medium transition-all duration-150 ${fontStyles.rumi}`}>
                 &quot;{activeTasbih.transliteration}&quot;
               </p>
-              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
+              <p className={`text-slate-400 max-w-xl mx-auto leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
                 {activeTasbih.translation}
               </p>
 
@@ -361,7 +390,7 @@ export const TasbihWirid: React.FC = () => {
                 </div>
               )}
 
-              {/* Lencana Kiraan Semasa Bila Sentuhan Bebas Aktif (Pengguna tak perlu scroll bawah untuk pantau kiraan) */}
+              {/* Lencana Kiraan Semasa Bila Sentuhan Bebas Aktif */}
               {freeTouchEnabled && (
                 <div className="mt-3 pt-2.5 border-t border-emerald-500/20 flex items-center justify-between text-xs px-3 py-2 rounded-2xl bg-emerald-900/30 border text-emerald-300 animate-in fade-in duration-200">
                   <span className="flex items-center gap-1.5 font-semibold">
@@ -435,7 +464,7 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
-            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
+            {/* Bulatan Ketik Bawah */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
@@ -485,7 +514,7 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
-            {/* Toolbar Kawalan Saiz & Togol Paparan */}
+            {/* Toolbar Kawalan Saiz & Togol Paparan Wirid */}
             <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5">
               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                 <span className="text-[11px] text-slate-400 px-1.5 font-medium">Saiz:</span>
