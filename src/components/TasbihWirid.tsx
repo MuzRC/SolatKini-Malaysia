@@ -1,10 +1,87 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { WIRID_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
 import { ArabicQuranText } from './QuranAyahBadge';
 
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
+
+// 1. Senarai Zikir & Tasbih Pilihan
+interface TasbihPreset {
+  id: string;
+  name: string;
+  arabic: string;
+  transliteration: string;
+  translation: string;
+  defaultTarget: number;
+}
+
+const SENARAI_TASBIH: TasbihPreset[] = [
+  {
+    id: 'subhanallah',
+    name: 'Tasbih (Subhanallah)',
+    arabic: 'سُبْحَانَ اللَّهِ',
+    transliteration: 'Subhanallah',
+    translation: 'Maha Suci Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'alhamdulillah',
+    name: 'Tahmid (Alhamdulillah)',
+    arabic: 'الْحَمْدُ لِلَّهِ',
+    transliteration: 'Alhamdulillah',
+    translation: 'Segala puji bagi Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'allahuakbar',
+    name: 'Takbir (Allahu Akbar)',
+    arabic: 'اللَّهُ أَكْبَرُ',
+    transliteration: 'Allahu Akbar',
+    translation: 'Allah Maha Besar',
+    defaultTarget: 33,
+  },
+  {
+    id: 'tahlil',
+    name: 'Tahlil (La ilaha illallah)',
+    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ',
+    transliteration: 'Laa ilaaha illallah',
+    translation: 'Tiada Tuhan selain Allah',
+    defaultTarget: 100,
+  },
+  {
+    id: 'istighfar',
+    name: 'Istighfar (Astaghfirullah)',
+    arabic: 'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ',
+    transliteration: 'Astaghfirullahalzim',
+    translation: 'Aku memohon ampun kepada Allah Yang Maha Agung',
+    defaultTarget: 100,
+  },
+  {
+    id: 'selawat',
+    name: 'Selawat Ke Atas Nabi',
+    arabic: 'اللَّهُمَّ صَلِّ عَلَىٰ سَيِّدِنَا مُحَمَّدٍ',
+    transliteration: 'Allahumma salli ala sayyidina Muhammad',
+    translation: 'Ya Allah limpahkanlah rahmat ke atas junjungan kami Nabi Muhammad',
+    defaultTarget: 100,
+  },
+  {
+    id: 'hauqalah',
+    name: 'Hauqalah (La hawla wa la...)',
+    arabic: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ',
+    transliteration: 'La hawla wa la quwwata illa billahil aliyyil azim',
+    translation: 'Tiada daya dan kekuatan melainkan dengan pertolongan Allah',
+    defaultTarget: 33,
+  },
+  {
+    id: 'bebas',
+    name: 'Zikir Bebas / Umum',
+    arabic: 'ذِكْرُ اللَّهِ',
+    transliteration: 'Zikrullah',
+    translation: 'Mengingati Allah secara umum tanpa ikatan lafaz khusus',
+    defaultTarget: 0,
+  },
+];
 
 export const TasbihWirid: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'tasbih' | 'wirid'>('wirid');
@@ -13,6 +90,20 @@ export const TasbihWirid: React.FC = () => {
   const [lapCount, setLapCount] = useState<number>(0);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
+
+  // State zikir yang dipilih oleh pengguna
+  const [selectedTasbihId, setSelectedTasbihId] = useState<string>('subhanallah');
+  const activeTasbih = SENARAI_TASBIH.find((t) => t.id === selectedTasbihId) || SENARAI_TASBIH[0];
+
+  const handleSelectTasbih = (id: string) => {
+    setSelectedTasbihId(id);
+    setCount(0);
+    setLapCount(0);
+    const item = SENARAI_TASBIH.find((t) => t.id === id);
+    if (item) {
+      setTargetCount(item.defaultTarget);
+    }
+  };
 
   // Saiz Tulisan
   const [fontSize, setFontSize] = useState<FontSize>(() => {
@@ -219,11 +310,48 @@ export const TasbihWirid: React.FC = () => {
 
       {activeSection === 'tasbih' ? (
         /* DIGITAL TASBIH INTERFACE */
-        <div className="space-y-6">
+        <div className="space-y-4">
+          {/* PEMILIH TASBIH / ZIKIR */}
+          <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-emerald-500/20 bg-slate-900/60 shadow-xl space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                Pilih Zikir / Amalan Tasbih:
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedTasbihId}
+                  onChange={(e) => handleSelectTasbih(e.target.value)}
+                  className="w-full sm:w-64 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-8 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
+                >
+                  {SENARAI_TASBIH.map((item) => (
+                    <option key={item.id} value={item.id} className="bg-slate-900 text-white">
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Kad Bacaan Zikir Semasa */}
+            <div className="pt-3 border-t border-slate-800 text-center space-y-1">
+              <p className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed">
+                {activeTasbih.arabic}
+              </p>
+              <p className="text-xs sm:text-sm text-slate-300 italic font-medium">
+                &quot;{activeTasbih.transliteration}&quot;
+              </p>
+              <p className="text-[11px] sm:text-xs text-slate-400">
+                {activeTasbih.translation}
+              </p>
+            </div>
+          </div>
+
+          {/* KAUNTER TASBIH INTERFACE */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/20 text-center shadow-2xl relative overflow-hidden">
             <div className="flex items-center justify-between pb-6 border-b border-slate-800">
               <div className="flex items-center gap-1.5">
-                {[33, 99, 0].map((t) => (
+                {[33, 99, 100, 0].map((t) => (
                   <button
                     key={t}
                     type="button"
