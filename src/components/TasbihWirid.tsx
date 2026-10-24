@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  RotateCcw,
+  BookOpen,
+  Play,
+  Pause,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Sparkles
+} from 'lucide-react';
 import { WIRID_LIST, TASBIH_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
 import { ArabicQuranText } from './QuranAyahBadge';
@@ -201,6 +212,11 @@ export const TasbihWirid: React.FC = () => {
     },
   }[fontSize];
 
+  // Senarai butang target pantas (termasuk sasaran khas zikir jika ada)
+  const availableTargets = Array.from(
+    new Set([33, 99, 100, activeTasbih?.defaultTarget || 0, 0])
+  ).sort((a, b) => (a === 0 ? 1 : b === 0 ? -1 : a - b));
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
       {/* Switcher Tab: Tasbih Digital vs Panduan Wirid */}
@@ -237,14 +253,15 @@ export const TasbihWirid: React.FC = () => {
           {/* PEMILIH TASBIH / ZIKIR */}
           <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-emerald-500/20 bg-slate-900/60 shadow-xl space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
                 Pilih Zikir / Amalan Tasbih:
               </label>
               <div className="relative">
                 <select
                   value={selectedTasbihId}
                   onChange={(e) => handleSelectTasbih(e.target.value)}
-                  className="w-full sm:w-64 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
+                  className="w-full sm:w-72 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
                 >
                   {TASBIH_LIST.map((item) => (
                     <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100 py-1">
@@ -256,8 +273,8 @@ export const TasbihWirid: React.FC = () => {
               </div>
             </div>
 
-            {/* Kad Bacaan Zikir Semasa Menggunakan ArabicQuranText */}
-            <div className="pt-3 border-t border-slate-800 text-center space-y-1.5">
+            {/* Kad Bacaan Zikir Semasa */}
+            <div className="pt-3 border-t border-slate-800 text-center space-y-2">
               <ArabicQuranText
                 text={activeTasbih.arabic}
                 className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed block text-center"
@@ -265,9 +282,22 @@ export const TasbihWirid: React.FC = () => {
               <p className="text-xs sm:text-sm text-slate-300 italic font-medium">
                 &quot;{activeTasbih.transliteration}&quot;
               </p>
-              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xl mx-auto">
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
                 {activeTasbih.translation}
               </p>
+
+              {/* Paparan Fadilat / Kelebihan Hadis */}
+              {(activeTasbih as any).fadilat && (
+                <div className="mt-3 text-left bg-emerald-950/40 border border-emerald-500/25 rounded-2xl p-3 flex items-start gap-2.5 shadow-inner">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="text-[11px] sm:text-xs text-emerald-100/90 leading-relaxed">
+                    <strong className="text-amber-300 font-semibold uppercase tracking-wider block sm:inline mr-1">
+                      Fadilat & Kelebihan:
+                    </strong>
+                    {(activeTasbih as any).fadilat}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -275,7 +305,7 @@ export const TasbihWirid: React.FC = () => {
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/20 text-center shadow-2xl relative overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-800">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {[33, 99, 100, 0].map((t) => (
+                {availableTargets.map((t) => (
                   <button
                     key={t}
                     type="button"
@@ -285,7 +315,7 @@ export const TasbihWirid: React.FC = () => {
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
                       targetCount === t
-                        ? 'bg-emerald-600 text-white shadow-sm'
+                        ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-900/50'
                         : 'bg-slate-900 text-slate-400 hover:bg-slate-800'
                     }`}
                   >
@@ -329,6 +359,7 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
+            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
