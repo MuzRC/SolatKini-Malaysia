@@ -9,7 +9,8 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Fingerprint
 } from 'lucide-react';
 import { WIRID_LIST, TASBIH_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
@@ -24,6 +25,24 @@ export const TasbihWirid: React.FC = () => {
   const [lapCount, setLapCount] = useState<number>(0);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
+
+  // Mod Sentuhan Bebas (Free Touch)
+  const [freeTouchEnabled, setFreeTouchEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('solatkini_tasbih_free_touch') === 'true';
+    }
+    return false;
+  });
+
+  const toggleFreeTouch = () => {
+    setFreeTouchEnabled((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_tasbih_free_touch', String(next));
+      }
+      return next;
+    });
+  };
 
   // State pilihan tasbih daripada senarai luar (wiridAndDoa.ts)
   const [selectedTasbihId, setSelectedTasbihId] = useState<string>('tasbih');
@@ -155,7 +174,7 @@ export const TasbihWirid: React.FC = () => {
     };
   }, [activeSection]);
 
-  // Digital Tasbih Tap
+  // Digital Tasbih Tap (Menguruskan kiraan, audio klik & getaran)
   const handleTap = () => {
     const nextCount = count + 1;
     setCount(nextCount);
@@ -212,7 +231,7 @@ export const TasbihWirid: React.FC = () => {
     },
   }[fontSize];
 
-  // Senarai butang target pantas
+  // Senarai butang sasaran pantas
   const availableTargets = Array.from(
     new Set([33, 99, 100, activeTasbih?.defaultTarget || 0, 0])
   ).sort((a, b) => (a === 0 ? 1 : b === 0 ? -1 : a - b));
@@ -250,31 +269,74 @@ export const TasbihWirid: React.FC = () => {
       {activeSection === 'tasbih' ? (
         /* DIGITAL TASBIH INTERFACE */
         <div className="space-y-4">
-          {/* PEMILIH TASBIH / ZIKIR */}
-          <div className="glass-panel rounded-3xl p-4 sm:p-5 border border-emerald-500/20 bg-slate-900/60 shadow-xl space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          {/* KAD ATAS: PEMILIH TASBIH + ZON SENTUHAN BEBAS (FREE TOUCH) */}
+          <div
+            onClick={() => {
+              if (freeTouchEnabled) {
+                handleTap();
+              }
+            }}
+            className={`glass-panel rounded-3xl p-4 sm:p-5 border transition-all duration-150 select-none ${
+              freeTouchEnabled
+                ? 'border-emerald-400/50 bg-emerald-950/20 shadow-emerald-950/50 cursor-pointer active:scale-[0.99] active:bg-emerald-950/40 touch-manipulation'
+                : 'border-emerald-500/20 bg-slate-900/60'
+            } shadow-xl space-y-3 relative`}
+          >
+            {/* Header: Label Pilihan & Suis Togol Free Touch */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-800/80">
               <label className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 Pilih Zikir / Amalan Tasbih:
               </label>
-              <div className="relative">
-                <select
-                  value={selectedTasbihId}
-                  onChange={(e) => handleSelectTasbih(e.target.value)}
-                  className="w-full sm:w-72 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
+
+              {/* Butang Togol Sentuhan Bebas (Hentikan Event Propagation agar tidak ter-kira semasa klik butang) */}
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2 self-end sm:self-auto bg-slate-950/80 px-2.5 py-1 rounded-xl border border-slate-800"
+              >
+                <Fingerprint
+                  className={`w-3.5 h-3.5 transition-colors ${
+                    freeTouchEnabled ? 'text-emerald-400' : 'text-slate-500'
+                  }`}
+                />
+                <span className="text-[11px] font-medium text-slate-300">
+                  Sentuhan Bebas
+                </span>
+                <button
+                  type="button"
+                  onClick={toggleFreeTouch}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    freeTouchEnabled ? 'bg-emerald-500' : 'bg-slate-700'
+                  }`}
+                  title={freeTouchEnabled ? 'Nyahaktifkan Sentuhan Bebas' : 'Aktifkan Sentuhan Bebas'}
                 >
-                  {TASBIH_LIST.map((item) => (
-                    <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100 py-1">
-                      {item.name} {item.defaultTarget > 0 ? `(${item.defaultTarget}x)` : ''}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                      freeTouchEnabled ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
 
-            {/* Kad Bacaan Zikir Semasa */}
-            <div className="pt-3 border-t border-slate-800 text-center space-y-2">
+            {/* Dropdown Pemilih (Hentikan Event Propagation agar tidak ter-kira semasa memilih zikir) */}
+            <div className="relative" onClick={(e) => e.stopPropagation()}>
+              <select
+                value={selectedTasbihId}
+                onChange={(e) => handleSelectTasbih(e.target.value)}
+                className="w-full bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
+              >
+                {TASBIH_LIST.map((item) => (
+                  <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100 py-1">
+                    {item.name} {item.defaultTarget > 0 ? `(${item.defaultTarget}x)` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+
+            {/* Kad Bacaan Zikir Semasa (Bila Free Touch ON, kawasan ini boleh diketik terus) */}
+            <div className="pt-2 text-center space-y-2">
               <ArabicQuranText
                 text={activeTasbih.arabic}
                 className="font-arabic text-2xl sm:text-3xl text-emerald-300 font-bold leading-relaxed block text-center"
@@ -298,10 +360,24 @@ export const TasbihWirid: React.FC = () => {
                   </p>
                 </div>
               )}
+
+              {/* Lencana Kiraan Semasa Bila Sentuhan Bebas Aktif (Pengguna tak perlu scroll bawah untuk pantau kiraan) */}
+              {freeTouchEnabled && (
+                <div className="mt-3 pt-2.5 border-t border-emerald-500/20 flex items-center justify-between text-xs px-3 py-2 rounded-2xl bg-emerald-900/30 border text-emerald-300 animate-in fade-in duration-200">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                    Ketik mana-mana pada kad ini
+                  </span>
+                  <span className="font-mono font-bold text-amber-300 text-sm">
+                    Kiraan: <strong className="text-base text-white">{count}</strong>
+                    {targetCount > 0 ? ` / ${targetCount}` : ' (Bebas)'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* KAUNTER TASBIH INTERFACE */}
+          {/* KAUNTER TASBIH INTERFACE ASAL DI BAWAH */}
           <div className="glass-panel rounded-3xl p-6 sm:p-8 border border-emerald-500/20 text-center shadow-2xl relative overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-slate-800">
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -359,7 +435,7 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
-            {/* Bulatan Ketik - Dengan touch-manipulation */}
+            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
@@ -521,7 +597,7 @@ export const TasbihWirid: React.FC = () => {
                     </p>
                   )}
 
-                  {/* 4. KOTAK FADILAT & HADIS SAHIH */}
+                  {/* 4. Paparan Fadilat Wirid */}
                   {item.fadilat && (
                     <div className="mt-2 text-left bg-emerald-950/40 border border-emerald-500/25 rounded-2xl p-3 flex items-start gap-2.5 shadow-inner">
                       <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
