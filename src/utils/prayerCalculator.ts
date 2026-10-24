@@ -52,11 +52,17 @@ function sunCoordinates(d: number) {
   const q = fixAngle(280.459 + 0.98564736 * d);
   const L = fixAngle(q + 1.915 * Math.sin(toRadians(g)) + 0.02 * Math.sin(toRadians(2 * g)));
   const e = 23.439 - 0.00000036 * d;
-  const RA = toDegrees(
-    Math.atan2(Math.cos(toRadians(e)) * Math.sin(toRadians(L)), Math.cos(toRadians(L)))
-  ) / 15;
+  const RA =
+    toDegrees(
+      Math.atan2(Math.cos(toRadians(e)) * Math.sin(toRadians(L)), Math.cos(toRadians(L)))
+    ) / 15;
   const dec = toDegrees(Math.asin(Math.sin(toRadians(e)) * Math.sin(toRadians(L))));
-  const EqT = q / 15 - fixHour(RA);
+  
+  // Normalisasikan Equation of Time (EqT) agar sentiasa dalam julat [-12, +12] jam (sekitar -16 min hingga +16 min)
+  let EqT = q / 15 - fixHour(RA);
+  if (EqT > 12) EqT -= 24;
+  if (EqT < -12) EqT += 24;
+
   return { dec, EqT };
 }
 
@@ -80,18 +86,26 @@ function hourAngleForAltitude(lat: number, dec: number, altitude: number): numbe
   return toDegrees(Math.acos(cosHA));
 }
 
-// Format fractional hours to "HH:mm"
+// Format fractional hours to "HH:mm" secara selamat (elak nilai negatif atau >= 24)
 export function formatHour(hour: number): string {
-  const totalMinutes = Math.round(hour * 60);
+  const hFixed = fixHour(hour);
+  const totalMinutes = Math.round(hFixed * 60);
   const h = Math.floor(totalMinutes / 60) % 24;
   const m = totalMinutes % 60;
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
+// Format "HH:mm" 24-jam kepada format paparan 12-jam "h:mm AM/PM" (kebal ralat crash jika input kosong/undefined)
 export function formatDisplayTime(time24: string): string {
-  const [hStr, mStr] = time24.split(':');
+  if (!time24 || typeof time24 !== 'string' || !time24.includes(':')) {
+    return '--:--';
+  }
+  const [hStr, mStr] = time24.trim().split(':');
   let h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) {
+    return '--:--';
+  }
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12;
   h = h ? h : 12; // 0 becomes 12
