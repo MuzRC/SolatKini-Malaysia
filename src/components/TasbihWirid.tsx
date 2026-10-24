@@ -26,7 +26,7 @@ export const TasbihWirid: React.FC = () => {
   const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
 
   // State pilihan tasbih daripada senarai luar (wiridAndDoa.ts)
-  const [selectedTasbihId, setSelectedTasbihId] = useState<string>('subhanallah');
+  const [selectedTasbihId, setSelectedTasbihId] = useState<string>('tasbih');
   const activeTasbih = TASBIH_LIST.find((t) => t.id === selectedTasbihId) || TASBIH_LIST[0];
 
   const handleSelectTasbih = (id: string) => {
@@ -212,7 +212,7 @@ export const TasbihWirid: React.FC = () => {
     },
   }[fontSize];
 
-  // Senarai butang target pantas (termasuk sasaran khas zikir jika ada)
+  // Senarai butang target pantas
   const availableTargets = Array.from(
     new Set([33, 99, 100, activeTasbih?.defaultTarget || 0, 0])
   ).sort((a, b) => (a === 0 ? 1 : b === 0 ? -1 : a - b));
@@ -286,15 +286,15 @@ export const TasbihWirid: React.FC = () => {
                 {activeTasbih.translation}
               </p>
 
-              {/* Paparan Fadilat / Kelebihan Hadis */}
-              {(activeTasbih as any).fadilat && (
+              {/* Paparan Fadilat Zikir */}
+              {activeTasbih.fadilat && (
                 <div className="mt-3 text-left bg-emerald-950/40 border border-emerald-500/25 rounded-2xl p-3 flex items-start gap-2.5 shadow-inner">
                   <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                   <p className="text-[11px] sm:text-xs text-emerald-100/90 leading-relaxed">
                     <strong className="text-amber-300 font-semibold uppercase tracking-wider block sm:inline mr-1">
                       Fadilat & Kelebihan:
                     </strong>
-                    {(activeTasbih as any).fadilat}
+                    {activeTasbih.fadilat}
                   </p>
                 </div>
               )}
@@ -359,7 +359,7 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
-            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
+            {/* Bulatan Ketik - Dengan touch-manipulation */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
@@ -499,7 +499,7 @@ export const TasbihWirid: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* Teks Arab Dikuasakan oleh ArabicQuranText */}
+                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText */}
                   {showArabic && (
                     <ArabicQuranText
                       text={item.arabic}
@@ -507,21 +507,34 @@ export const TasbihWirid: React.FC = () => {
                     />
                   )}
 
-                  {/* Teks Rumi */}
+                  {/* 2. Teks Rumi */}
                   {showRumi && (
                     <p className={`text-slate-300 italic leading-relaxed transition-all duration-150 ${fontStyles.rumi}`}>
                       &quot;{item.transliteration}&quot;
                     </p>
                   )}
 
-                  {/* Teks Terjemahan */}
+                  {/* 3. Teks Terjemahan */}
                   {showTranslation && (
                     <p className={`text-slate-400 leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
                       <strong className="text-slate-300">Terjemahan:</strong> {item.translation}
                     </p>
                   )}
 
-                  {!showArabic && !showRumi && !showTranslation && (
+                  {/* 4. KOTAK FADILAT & HADIS SAHIH */}
+                  {item.fadilat && (
+                    <div className="mt-2 text-left bg-emerald-950/40 border border-emerald-500/25 rounded-2xl p-3 flex items-start gap-2.5 shadow-inner">
+                      <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <p className="text-[11px] sm:text-xs text-emerald-100/90 leading-relaxed">
+                        <strong className="text-amber-300 font-semibold uppercase tracking-wider block sm:inline mr-1">
+                          Fadilat & Hadis Sahih:
+                        </strong>
+                        {item.fadilat}
+                      </p>
+                    </div>
+                  )}
+
+                  {!showArabic && !showRumi && !showTranslation && !item.fadilat && (
                     <div className="py-2.5 px-3 rounded-xl bg-slate-900/40 border border-dashed border-slate-800 text-center text-xs text-slate-500 italic">
                       Teks disorokkan. Klik <strong>Jawi</strong>, <strong>Rumi</strong>, atau <strong>Maksud</strong> di atas untuk memaparkan kembali.
                     </div>
