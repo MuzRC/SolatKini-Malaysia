@@ -443,6 +443,13 @@ public class AzanAlarmPlugin extends Plugin {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
 
+            // Segerakkan dan paparkan notifikasi berterusan waktu solat secara native serta-merta
+            try {
+                AzanAlarmReceiver.updatePersistentNotificationNatively(context);
+            } catch (Exception e) {
+                Log.w(TAG, "Gagal mengemas kini notifikasi berterusan native: " + e.getMessage());
+            }
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("scheduledCount", scheduledCount);
