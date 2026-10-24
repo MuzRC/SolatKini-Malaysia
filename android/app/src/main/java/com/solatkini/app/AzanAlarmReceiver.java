@@ -10,6 +10,10 @@ import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -41,7 +45,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         long scheduledTime = intent.getLongExtra("scheduled_timestamp", 0);
         long now = System.currentTimeMillis();
 
-        // 1. Keselamatan Jam Dianjak: Abaikan jika penggera lewat lebih 15 minit (contohnya jam telefon diusik)
+        // 1. Keselamatan Jam Dianjak: Abaikan jika penggera lewat lebih 15 minit
         if (scheduledTime > 0 && Math.abs(now - scheduledTime) > (15 * 60 * 1000)) {
             Log.w(TAG, "Penggera solat (" + prayerName + ") tersasar dari masa sebenar. Dibatalkan demi keselamatan.");
             return;
@@ -69,7 +73,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         // 3. Paparkan Notifikasi Masuk Waktu Solat
         showPrayerAlertNotification(context, prayerName);
 
-        // 4. KUNCI UTAMA: Kemas kini Notifikasi Berterusan ke Waktu Solat Seterusnya SECARA NATIVE!
+        // 4. Kemas kini Notifikasi Berterusan ke Waktu Solat Seterusnya SECARA NATIVE
         updatePersistentNotificationNatively(context);
     }
 
@@ -102,7 +106,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Mengemas kini notifikasi kekal terus dari Java tanpa perlu kejutkan enjin JavaScript/React
+     * Mengemas kini notifikasi kekal terus dari Java dan mengaktifkan live countdown
      */
     public static void updatePersistentNotificationNatively(Context context) {
         try {
@@ -141,8 +145,18 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 String nextName = nextPrayer.optString("prayerName", "Solat");
                 long nextTimestamp = nextPrayer.optLong("timestamp", 0);
 
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault());
-                String formattedTime = nextTimestamp > 0 ? sdf.format(new java.util.Date(nextTimestamp)) : "";
+                // Pastikan timestamp sentiasa di hadapan waktu semasa (anjak hari jika perlu)
+                if (nextTimestamp > 0 && nextTimestamp <= now) {
+                    Calendar cal = Calendar.getInstance();
+                    cal.setTimeInMillis(nextTimestamp);
+                    while (cal.getTimeInMillis() <= now) {
+                        cal.add(Calendar.DAY_OF_YEAR, 1);
+                    }
+                    nextTimestamp = cal.getTimeInMillis();
+                }
+
+                SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.getDefault());
+                String formattedTime = nextTimestamp > 0 ? sdf.format(new Date(nextTimestamp)) : "";
 
                 Intent appIntent = new Intent(context, MainActivity.class);
                 appIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -156,14 +170,28 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 NotificationCompat.Builder persistentBuilder = new NotificationCompat.Builder(context, CHANNEL_ID_PERSISTENT)
                     .setSmallIcon(R.mipmap.ic_launcher)
                     .setContentTitle("Solat Seterusnya: " + nextName + " (" + formattedTime + ")")
-                    .setContentText("SolatKini • Waktu solat sentiasa dikemas kini automatik")
+                    .setContentText("Waktu masuk pada jam " + formattedTime)
                     .setOngoing(true)
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setContentIntent(contentIntent);
 
+                // =========================================================================
+                // ENJIN KIRAAN DETIK AUTOMATIK (CHRONOMETER COUNTDOWN)
+                // =========================================================================
+                if (nextTimestamp > now) {
+                    persistentBuilder.setWhen(nextTimestamp)
+                        .setShowWhen(true)
+                        .setUsesChronometer(true);
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        persistentBuilder.setChronometerCountDown(true);
+                    }
+                }
+                // =========================================================================
+
                 nm.notify(NOTIFICATION_ID_PERSISTENT, persistentBuilder.build());
-                Log.i(TAG, "Notifikasi berterusan berjaya disegarkan secara native: " + nextName + " (" + formattedTime + ")");
+                Log.i(TAG, "Notifikasi berterusan live countdown berjaya diaktifkan: " + nextName + " (" + formattedTime + ")");
             }
         } catch (Exception e) {
             Log.e(TAG, "Ralat mengemas kini notifikasi berterusan native", e);
@@ -181,6 +209,8 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 );
                 pChannel.setDescription("Memaparkan waktu solat seterusnya pada bar notifikasi");
                 pChannel.setShowBadge(false);
+                pChannel.enableVibration(false);
+                pChannel.setSound(null, null);
                 nm.createNotificationChannel(pChannel);
             }
 
