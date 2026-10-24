@@ -103,6 +103,10 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return true;
   });
 
+  // Deklarasi awal hijri & recommendation supaya sentiasa selamat diakses
+  const hijri = getHijriDate(currentTime);
+  const recommendation = getFastingRecommendation(currentTime, hijri);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -139,11 +143,12 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
       // Segarkan notifikasi berterusan secara automatik bila aplikasi dibuka semula
       if (prayerTimes && currentZone) {
+        const currentHijri = getHijriDate(now);
         const isPersistentEnabled = notificationSettings.persistentNotification ?? true;
         widgetService.syncPersistentNotification(
           prayerTimes,
           currentZone,
-          hijri.formatted,
+          currentHijri.formatted,
           isPersistentEnabled
         );
       }
@@ -156,7 +161,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       window.removeEventListener('focus', checkPermsAndState);
       document.removeEventListener('visibilitychange', checkPermsAndState);
     };
-  }, [prayerTimes, onLiveSync]);
+  }, [prayerTimes, onLiveSync, currentZone]);
 
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
     if (typeof window !== 'undefined') {
@@ -219,17 +224,17 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
     audioNotificationService.stopAudio();
     setIsPlayingPreview(false);
-    
+
     // 1. Simpan tetapan suara peranti
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
     setSelectedVoice(opt.id);
-    
+
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_azan_voice', opt.id);
       localStorage.setItem('solatkini_active_device_voice', opt.id);
     }
-    
+
     // Maklumkan native alarm pasal pertukaran suara
     try {
       if (typeof nativeAlarmService.setActiveVoice === 'function') {
@@ -238,8 +243,8 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     } catch (e) {
       console.warn('Gagal tetapkan active voice native:', e);
     }
-    
-    // 2. Kemas kini state notifikasi (useEffect sedia ada akan kendalikan schedulePrayers secara selamat)
+
+    // 2. Kemas kini state notifikasi (useEffect di bawah akan uruskan penjadualan semula secara automatik)
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
@@ -277,50 +282,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
       } catch (err) {
         console.warn('Pra-simpanan audio latar belakang gagal:', err);
-      } finally {
-        setDownloadingVoiceId(null);
-      }
-    }
-  };
-
-    if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
-      const list = PRAYER_KEYS_ORDER.map((k) => ({
-        key: k,
-        label: PRAYER_LABELS[k],
-        time: prayerTimes.times[k],
-        displayTime: formatDisplayTime(prayerTimes.times[k]),
-        voice: (k === 'subuh' ? 'subuh_special' : opt.id) as AzanVoice,
-      }));
-      const enabledMap: Record<PrayerKey, boolean> = {
-        imsak: false,
-        subuh: notificationSettings.preferences.subuh?.enabled ?? true,
-        syuruk: false,
-        zohor: notificationSettings.preferences.zohor?.enabled ?? true,
-        asar: notificationSettings.preferences.asar?.enabled ?? true,
-        maghrib: notificationSettings.preferences.maghrib?.enabled ?? true,
-        isyak: notificationSettings.preferences.isyak?.enabled ?? true,
-      };
-      nativeAlarmService.schedulePrayers(list, opt.id, enabledMap);
-    }
-
-    setAudioToast(`Berjaya! ${opt.title} ditetapkan untuk solat harian (Subuh kekal Azan Subuh khas).`);
-    setTimeout(() => setAudioToast(null), 4000);
-
-    if (!cachedVoiceIds.includes(opt.id)) {
-      setDownloadingVoiceId(opt.id);
-      setDownloadProgress(0);
-      try {
-        await audioStorageService.downloadAndCacheAzan(
-          opt.id,
-          opt.audioUrl,
-          opt.filename,
-          false,
-          (p) => setDownloadProgress(p),
-          opt.fallbackUrl
-        );
-        setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
-      } catch (err) {
-        console.warn('Pra-simpanan audio latar belakang:', err);
       } finally {
         setDownloadingVoiceId(null);
       }
@@ -437,9 +398,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       }
     }
   }, [prayerTimes, selectedVoice, notificationSettings]);
-
-  const hijri = getHijriDate(currentTime);
-  const recommendation = getFastingRecommendation(currentTime, hijri);
 
   useEffect(() => {
     if (prayerTimes && currentZone) {
@@ -601,10 +559,10 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         preferences: {
           ...prev.preferences,
           subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          zohor: { ...(prev.preferences?.zohor || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          zohor: { ...(prev.preferences?.zohor || {}), voice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           asar: { ...(prev.preferences?.asar || {}), voice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          maghrib: { ...(prev.preferences?.maghrib || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          isyak: { ...(prev.preferences?.isyak || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          maghrib: { ...(prev.preferences?.maghrib || {}), voice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          isyak: { ...(prev.preferences?.isyak || {}), voice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
         },
       };
       if (typeof window !== 'undefined') {
