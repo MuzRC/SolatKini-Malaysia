@@ -229,6 +229,9 @@ class NativeAlarmService {
     }
 
     try {
+      // 1. Batalkan semua penggera lama terlebih dahulu bagi mengelakkan pertindihan penggera (ghost/duplicate alarms)
+      await this.cancelAllAlarms();
+
       const now = new Date();
       const alarms: NativeAlarmItem[] = [];
 
