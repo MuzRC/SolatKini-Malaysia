@@ -219,16 +219,27 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
     audioNotificationService.stopAudio();
     setIsPlayingPreview(false);
-
+    
+    // 1. Simpan tetapan suara peranti
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
     setSelectedVoice(opt.id);
+    
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_azan_voice', opt.id);
       localStorage.setItem('solatkini_active_device_voice', opt.id);
     }
-    nativeAlarmService.setActiveVoice(opt.id);
-
+    
+    // Maklumkan native alarm pasal pertukaran suara
+    try {
+      if (typeof nativeAlarmService.setActiveVoice === 'function') {
+        nativeAlarmService.setActiveVoice(opt.id);
+      }
+    } catch (e) {
+      console.warn('Gagal tetapkan active voice native:', e);
+    }
+    
+    // 2. Kemas kini state notifikasi (useEffect sedia ada akan kendalikan schedulePrayers secara selamat)
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
@@ -236,7 +247,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           ...prev.preferences,
           subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           zohor: { ...(prev.preferences?.zohor || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          asar: { ...(prev.preferences?.asar || {}), voice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          asar: { ...(prev.preferences?.asar || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           maghrib: { ...(prev.preferences?.maghrib || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           isyak: { ...(prev.preferences?.isyak || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
         },
@@ -246,6 +257,31 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       }
       return updated;
     });
+
+    setAudioToast(`Berjaya! ${opt.title} ditetapkan untuk solat harian.`);
+    setTimeout(() => setAudioToast(null), 3500);
+
+    // 3. Muat turun fail audio latar belakang secara asynchronous tanpa menyekat UI
+    if (!cachedVoiceIds.includes(opt.id) && opt.audioUrl) {
+      setDownloadingVoiceId(opt.id);
+      setDownloadProgress(0);
+      try {
+        await audioStorageService.downloadAndCacheAzan(
+          opt.id,
+          opt.audioUrl,
+          opt.filename,
+          false,
+          (p) => setDownloadProgress(p),
+          opt.fallbackUrl
+        );
+        setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
+      } catch (err) {
+        console.warn('Pra-simpanan audio latar belakang gagal:', err);
+      } finally {
+        setDownloadingVoiceId(null);
+      }
+    }
+  };
 
     if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
