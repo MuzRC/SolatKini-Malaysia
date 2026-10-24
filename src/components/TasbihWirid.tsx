@@ -1,105 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, RotateCcw, BookOpen, Play, Pause, Eye, EyeOff, ChevronDown } from 'lucide-react';
-import { WIRID_LIST } from '../data/wiridAndDoa';
+import { WIRID_LIST, TASBIH_LIST } from '../data/wiridAndDoa';
 import { audioNotificationService } from '../services/audioNotificationService';
 import { ArabicQuranText } from './QuranAyahBadge';
 
 type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
-// 1. Senarai Zikir & Tasbih Pilihan
-export interface TasbihPreset {
-  id: string;
-  name: string;
-  arabic: string;
-  transliteration: string;
-  translation: string;
-  defaultTarget: number;
-}
-
-export const SENARAI_TASBIH: TasbihPreset[] = [
-  {
-    id: 'subhanallah',
-    name: 'Tasbih (Subhanallah)',
-    arabic: 'سُبْحَانَ اللَّهِ',
-    transliteration: 'Subhanallah',
-    translation: 'Maha Suci Allah',
-    defaultTarget: 33,
-  },
-  {
-    id: 'alhamdulillah',
-    name: 'Tahmid (Alhamdulillah)',
-    arabic: 'الْحَمْدُ لِلَّهِ',
-    transliteration: 'Alhamdulillah',
-    translation: 'Segala puji bagi Allah',
-    defaultTarget: 33,
-  },
-  {
-    id: 'allahuakbar',
-    name: 'Takbir (Allahu Akbar)',
-    arabic: 'اللَّهُ أَكْبَرُ',
-    transliteration: 'Allahu Akbar',
-    translation: 'Allah Maha Besar',
-    defaultTarget: 33,
-  },
-  {
-    id: 'tahlil',
-    name: 'Tahlil (La ilaha illallah)',
-    arabic: 'لَا إِلَهَ إِلَّا اللَّهُ',
-    transliteration: 'Laa ilaaha illallah',
-    translation: 'Tiada Tuhan selain Allah',
-    defaultTarget: 100,
-  },
-  {
-    id: 'istighfar',
-    name: 'Istighfar (Astaghfirullah)',
-    arabic: 'أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ',
-    transliteration: 'Astaghfirullahalzim',
-    translation: 'Aku memohon ampun kepada Allah Yang Maha Agung',
-    defaultTarget: 100,
-  },
-  {
-    id: 'selawat',
-    name: 'Selawat Ke Atas Nabi',
-    arabic: 'اللَّهُمَّ صَلِّ عَلَىٰ سَيِّدِنَا مُحَمَّدٍ',
-    transliteration: 'Allahumma salli ala sayyidina Muhammad',
-    translation: 'Ya Allah limpahkanlah rahmat ke atas junjungan kami Nabi Muhammad',
-    defaultTarget: 100,
-  },
-  {
-    id: 'hauqalah',
-    name: 'Hauqalah (La hawla wa la...)',
-    arabic: 'لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ',
-    transliteration: 'La hawla wa la quwwata illa billahil aliyyil azim',
-    translation: 'Tiada daya dan kekuatan melainkan dengan pertolongan Allah',
-    defaultTarget: 33,
-  },
-  {
-    id: 'bebas',
-    name: 'Zikir Bebas / Umum',
-    arabic: 'ذِكْرُ اللَّهِ',
-    transliteration: 'Zikrullah',
-    translation: 'Mengingati Allah secara umum tanpa ikatan lafaz khusus',
-    defaultTarget: 0,
-  },
-];
-
 export const TasbihWirid: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<'tasbih' | 'wirid'>('wirid');
+  const [activeSection, setActiveSection] = useState<'tasbih' | 'wirid'>('tasbih');
   const [count, setCount] = useState<number>(0);
   const [targetCount, setTargetCount] = useState<number>(33);
   const [lapCount, setLapCount] = useState<number>(0);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
 
-  // State zikir yang dipilih oleh pengguna
+  // State pilihan tasbih daripada senarai luar (wiridAndDoa.ts)
   const [selectedTasbihId, setSelectedTasbihId] = useState<string>('subhanallah');
-  const activeTasbih = SENARAI_TASBIH.find((t) => t.id === selectedTasbihId) || SENARAI_TASBIH[0];
+  const activeTasbih = TASBIH_LIST.find((t) => t.id === selectedTasbihId) || TASBIH_LIST[0];
 
   const handleSelectTasbih = (id: string) => {
     setSelectedTasbihId(id);
     setCount(0);
     setLapCount(0);
-    const item = SENARAI_TASBIH.find((t) => t.id === id);
+    const item = TASBIH_LIST.find((t) => t.id === id);
     if (item) {
       setTargetCount(item.defaultTarget);
     }
@@ -323,7 +246,7 @@ export const TasbihWirid: React.FC = () => {
                   onChange={(e) => handleSelectTasbih(e.target.value)}
                   className="w-full sm:w-64 bg-slate-950 text-slate-100 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 pr-9 border border-emerald-500/30 focus:border-emerald-400 focus:outline-none appearance-none cursor-pointer"
                 >
-                  {SENARAI_TASBIH.map((item) => (
+                  {TASBIH_LIST.map((item) => (
                     <option key={item.id} value={item.id} className="bg-slate-900 text-slate-100 py-1">
                       {item.name} {item.defaultTarget > 0 ? `(${item.defaultTarget}x)` : ''}
                     </option>
@@ -406,7 +329,6 @@ export const TasbihWirid: React.FC = () => {
               </span>
             </div>
 
-            {/* Bulatan Ketik - Dioptimumkan dengan touch-manipulation */}
             <div className="my-8 flex justify-center">
               <button
                 type="button"
@@ -546,7 +468,7 @@ export const TasbihWirid: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText */}
+                  {/* Teks Arab Dikuasakan oleh ArabicQuranText */}
                   {showArabic && (
                     <ArabicQuranText
                       text={item.arabic}
@@ -554,14 +476,14 @@ export const TasbihWirid: React.FC = () => {
                     />
                   )}
 
-                  {/* 2. Teks Rumi */}
+                  {/* Teks Rumi */}
                   {showRumi && (
                     <p className={`text-slate-300 italic leading-relaxed transition-all duration-150 ${fontStyles.rumi}`}>
                       &quot;{item.transliteration}&quot;
                     </p>
                   )}
 
-                  {/* 3. Teks Terjemahan */}
+                  {/* Teks Terjemahan */}
                   {showTranslation && (
                     <p className={`text-slate-400 leading-relaxed transition-all duration-150 ${fontStyles.translation}`}>
                       <strong className="text-slate-300">Terjemahan:</strong> {item.translation}
