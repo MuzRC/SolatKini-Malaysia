@@ -5,33 +5,38 @@ export interface LogEntry {
   id?: number;
   date: string;
   time: string;
-  // Ditambah kategori 'action' untuk aktiviti pengguna
   type: 'critical' | 'error' | 'warn' | 'action';
   message: string;
   stack?: string;
   size: number;
 }
 
+// Kod Cheat Code asal dikembalikan
+const CHEAT_CODE = './musalog';
 const MAX_STORAGE_BYTES = 10 * 1024 * 1024; // Had 10 MB
 const DB_NAME = 'MusaLogDatabase';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Dinaikkan versi agar storan sentiasa segar
 const STORE_LOGS = 'logs';
 const STORE_META = 'metadata';
 
 const getDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_LOGS)) {
-        db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
-      }
-      if (!db.objectStoreNames.contains(STORE_META)) {
-        db.createObjectStore(STORE_META, { keyPath: 'key' });
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_LOGS)) {
+          db.createObjectStore(STORE_LOGS, { keyPath: 'id', autoIncrement: true });
+        }
+        if (!db.objectStoreNames.contains(STORE_META)) {
+          db.createObjectStore(STORE_META, { keyPath: 'key' });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
@@ -42,11 +47,12 @@ export const MusaLog: React.FC = () => {
   const [totalBytesUsed, setTotalBytesUsed] = useState<number>(0);
   const isProcessingQueue = useRef(false);
   const logQueue = useRef<Omit<LogEntry, 'id' | 'size'>[]>([]);
+  const logsRef = useRef<LogEntry[]>([]);
   const tapCountRef = useRef(0);
   const lastTapTimeRef = useRef(0);
 
   const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 KB';
+    if (!bytes || bytes === 0) return '0 KB';
     const mb = bytes / (1024 * 1024);
     if (mb >= 1) return `${mb.toFixed(2)} MB`;
     return `${(bytes / 1024).toFixed(1)} KB`;
@@ -65,11 +71,13 @@ export const MusaLog: React.FC = () => {
       tx.oncomplete = () => {
         const allLogs: LogEntry[] = logsReq.result || [];
         allLogs.reverse();
+        logsRef.current = allLogs;
         setLogs(allLogs);
         setTotalBytesUsed(metaReq.result?.value || 0);
       };
     } catch (e) {
-      console.warn('Gagal memuatkan rekod MusaLog:', e);
+      // Jika DB gagal, kekalkan log dalam memori
+      setLogs([...logsRef.current]);
     }
   }, []);
 
@@ -84,7 +92,7 @@ export const MusaLog: React.FC = () => {
       const metaStore = tx.objectStore(STORE_META);
       const metaReq = metaStore.get('total_size');
 
-      metaReq.onsuccess = async () => {
+      metaReq.onsuccess = () => {
         let currentSize: number = metaReq.result ? metaReq.result.value : 0;
         const itemsToInsert = [...logQueue.current];
         logQueue.current = [];
@@ -131,13 +139,21 @@ export const MusaLog: React.FC = () => {
 
   const enqueueLog = (type: LogEntry['type'], message: string, stack?: string) => {
     const now = new Date();
-    logQueue.current.push({
+    const newEntry: LogEntry = {
       date: now.toLocaleDateString('en-GB'),
       time: now.toLocaleTimeString('en-GB', { hour12: false }),
       type,
       message,
       stack,
-    });
+      size: 300,
+    };
+
+    // Sentiasa simpan serta-merta ke memori pantas
+    logsRef.current = [newEntry, ...logsRef.current].slice(0, 300);
+    setLogs([...logsRef.current]);
+
+    // Simpan ke arkib storan kekal
+    logQueue.current.push(newEntry);
     processLogQueue();
   };
 
@@ -175,30 +191,31 @@ export const MusaLog: React.FC = () => {
     // MULA: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
     // ==========================================
     const handleUserInteraction = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement)?.closest(
-        'button, [role="button"], a, input, select, [class*="cursor-pointer"]'
-      ) as HTMLElement | null;
+      try {
+        const rawTarget = e.target;
+        if (!rawTarget || !(rawTarget instanceof Element)) return;
 
-      if (!target) return;
+        const target = rawTarget.closest(
+          'button, [role="button"], a, input, select, [class*="cursor-pointer"]'
+        ) as HTMLElement | null;
 
-      // Jangan log jika pengguna tengah menekan butang dalam tetingkap MusaLog itu sendiri
-      if (target.closest('#musalog-modal-root')) return;
+        if (!target) return;
+        if (target.closest('#musalog-modal-root')) return;
 
-      // Ekstrak label atau teks butang yang ditekan oleh pengguna
-      let label =
-        target.getAttribute('aria-label') ||
-        target.getAttribute('title') ||
-        target.innerText?.trim() ||
-        (target as HTMLInputElement).value ||
-        target.getAttribute('placeholder') ||
-        target.tagName.toLowerCase();
+        let label =
+          target.getAttribute('aria-label') ||
+          target.getAttribute('title') ||
+          target.innerText?.trim() ||
+          (target as HTMLInputElement).value ||
+          target.getAttribute('placeholder') ||
+          target.tagName.toLowerCase();
 
-      // Buang baris baru dan hadkan panjang teks supaya kemas
-      label = label.replace(/\s+/g, ' ').slice(0, 45);
+        label = String(label).replace(/\s+/g, ' ').slice(0, 40);
 
-      if (label) {
-        enqueueLog('action', `Aktiviti: Tekan butang/elemen "${label}"`);
-      }
+        if (label && !label.includes('musalog')) {
+          enqueueLog('action', `Aktiviti: Tekan "${label}"`);
+        }
+      } catch {}
     };
 
     document.addEventListener('click', handleUserInteraction, true);
@@ -206,36 +223,39 @@ export const MusaLog: React.FC = () => {
     // AKHIR: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
     // ==========================================
 
-    // Semakan Cheat Code
-    const checkTargetValue = (target: HTMLInputElement | HTMLTextAreaElement) => {
-      if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return false;
-      const val = (target.value || '').toLowerCase().trim();
+    // ==========================================
+    // MULA: PENGESAN CHEAT CODE (DIPULIHKAN SEPENUHNYA)
+    // ==========================================
+    const handleCheatCheck = (e: Event) => {
+      const target = e.target as HTMLInputElement | HTMLTextAreaElement;
+      if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return;
 
-      if (val.includes('musalog')) {
+      const val = (target.value || '').trim().toLowerCase();
+
+      // Semak sama ada padan tepat ./musalog ATAU musalog
+      if (val === CHEAT_CODE.toLowerCase() || val === 'musalog' || val.endsWith('musalog')) {
         setIsOpen(true);
         reloadLogsFromDB();
         target.value = '';
         target.dispatchEvent(new Event('input', { bubbles: true }));
-        return true;
       }
-      return false;
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.keyCode === 13) {
-        checkTargetValue(e.target as HTMLInputElement);
+        handleCheatCheck(e);
       }
     };
 
-    const handleGeneralInput = (e: Event) => {
-      checkTargetValue(e.target as HTMLInputElement);
-    };
+    document.addEventListener('input', handleCheatCheck);
+    document.addEventListener('keyup', handleCheatCheck);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('change', handleCheatCheck);
+    // ==========================================
+    // AKHIR: PENGESAN CHEAT CODE
+    // ==========================================
 
-    const handleFocusOut = (e: FocusEvent) => {
-      checkTargetValue(e.target as HTMLInputElement);
-    };
-
-    // Sandaran: Ketuk header 5 kali
+    // Sandaran kecemasan: Ketuk 5 kali pada bahagian logo atas skrin
     const handleSecretTap = (e: MouseEvent | TouchEvent) => {
       const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
       if (clientY !== undefined && clientY < 80) {
@@ -254,13 +274,6 @@ export const MusaLog: React.FC = () => {
         }
       }
     };
-
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('input', handleGeneralInput);
-    document.addEventListener('change', handleGeneralInput);
-    document.addEventListener('search', handleGeneralInput);
-    document.addEventListener('submit', handleGeneralInput, true);
-    document.addEventListener('focusout', handleFocusOut, true);
     window.addEventListener('click', handleSecretTap);
 
     return () => {
@@ -277,12 +290,10 @@ export const MusaLog: React.FC = () => {
       // AKHIR: PEMBERSIHAN LISTENER AKTIVITI PENGGUNA
       // ==========================================
 
+      document.removeEventListener('input', handleCheatCheck);
+      document.removeEventListener('keyup', handleCheatCheck);
       document.removeEventListener('keydown', handleKeyDown);
-      document.removeEventListener('input', handleGeneralInput);
-      document.removeEventListener('change', handleGeneralInput);
-      document.removeEventListener('search', handleGeneralInput);
-      document.removeEventListener('submit', handleGeneralInput, true);
-      document.removeEventListener('focusout', handleFocusOut, true);
+      document.removeEventListener('change', handleCheatCheck);
       window.removeEventListener('click', handleSecretTap);
     };
   }, [reloadLogsFromDB]);
@@ -290,16 +301,16 @@ export const MusaLog: React.FC = () => {
   const clearAllLogs = async () => {
     if (!window.confirm('Padam semua rekod log dalam storan kekal?')) return;
     try {
+      logsRef.current = [];
+      setLogs([]);
+      setTotalBytesUsed(0);
       const db = await getDB();
       const tx = db.transaction([STORE_LOGS, STORE_META], 'readwrite');
       tx.objectStore(STORE_LOGS).clear();
       tx.objectStore(STORE_META).put({ key: 'total_size', value: 0 });
-      tx.oncomplete = () => {
-        setLogs([]);
-        setTotalBytesUsed(0);
-      };
     } catch {
-      alert('Gagal membersihkan storan.');
+      setLogs([]);
+      setTotalBytesUsed(0);
     }
   };
 
@@ -308,7 +319,7 @@ export const MusaLog: React.FC = () => {
     const fullText = logs
       .map(
         (l) =>
-          `[${l.date} ${l.time}] [${l.type.toUpperCase()}]\n${l.message}${l.stack ? '\nStack: ' + l.stack : ''}`
+          `[${l.date} ${l.time}] [${(l.type || 'LOG').toUpperCase()}]\n${l.message}${l.stack ? '\nStack: ' + l.stack : ''}`
       )
       .join('\n----------------------------------------\n');
 
@@ -500,7 +511,6 @@ export const MusaLog: React.FC = () => {
                   {item.date} {item.time}
                 </span>
 
-                {/* Badge Label Warna Mengikut Jenis Log */}
                 <span
                   style={{
                     fontSize: '9.5px',
@@ -525,13 +535,13 @@ export const MusaLog: React.FC = () => {
                         : '#FDE68A',
                   }}
                 >
-                  {item.type === 'action' ? 'AKTIVITI' : item.type.toUpperCase()}
+                  {item.type === 'action' ? 'AKTIVITI' : (item.type || 'LOG').toUpperCase()}
                 </span>
               </div>
 
               <div
                 style={{
-                  color: item.type === 'action' ? '#E2E8F0' : '#E2E8F0',
+                  color: '#E2E8F0',
                   wordBreak: 'break-word',
                   lineHeight: '1.4',
                 }}
