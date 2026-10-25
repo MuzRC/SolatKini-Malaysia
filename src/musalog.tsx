@@ -5,7 +5,8 @@ export interface LogEntry {
   id?: number;
   date: string;
   time: string;
-  type: 'critical' | 'error' | 'warn';
+  // Ditambah kategori 'action' untuk aktiviti pengguna
+  type: 'critical' | 'error' | 'warn' | 'action';
   message: string;
   stack?: string;
   size: number;
@@ -37,7 +38,7 @@ const getDB = (): Promise<IDBDatabase> => {
 export const MusaLog: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [filter, setFilter] = useState<'all' | 'critical' | 'error' | 'warn'>('all');
+  const [filter, setFilter] = useState<'all' | 'action' | 'critical' | 'error' | 'warn'>('all');
   const [totalBytesUsed, setTotalBytesUsed] = useState<number>(0);
   const isProcessingQueue = useRef(false);
   const logQueue = useRef<Omit<LogEntry, 'id' | 'size'>[]>([]);
@@ -170,12 +171,46 @@ export const MusaLog: React.FC = () => {
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handlePromiseError);
 
-    // Fungsi semakan cheat code menyeluruh
+    // ==========================================
+    // MULA: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
+    // ==========================================
+    const handleUserInteraction = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest(
+        'button, [role="button"], a, input, select, [class*="cursor-pointer"]'
+      ) as HTMLElement | null;
+
+      if (!target) return;
+
+      // Jangan log jika pengguna tengah menekan butang dalam tetingkap MusaLog itu sendiri
+      if (target.closest('#musalog-modal-root')) return;
+
+      // Ekstrak label atau teks butang yang ditekan oleh pengguna
+      let label =
+        target.getAttribute('aria-label') ||
+        target.getAttribute('title') ||
+        target.innerText?.trim() ||
+        (target as HTMLInputElement).value ||
+        target.getAttribute('placeholder') ||
+        target.tagName.toLowerCase();
+
+      // Buang baris baru dan hadkan panjang teks supaya kemas
+      label = label.replace(/\s+/g, ' ').slice(0, 45);
+
+      if (label) {
+        enqueueLog('action', `Aktiviti: Tekan butang/elemen "${label}"`);
+      }
+    };
+
+    document.addEventListener('click', handleUserInteraction, true);
+    // ==========================================
+    // AKHIR: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
+    // ==========================================
+
+    // Semakan Cheat Code
     const checkTargetValue = (target: HTMLInputElement | HTMLTextAreaElement) => {
       if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return false;
       const val = (target.value || '').toLowerCase().trim();
 
-      // Terima apa-apa variasi: ./musalog, musalog, atau ada simbol
       if (val.includes('musalog')) {
         setIsOpen(true);
         reloadLogsFromDB();
@@ -186,14 +221,12 @@ export const MusaLog: React.FC = () => {
       return false;
     };
 
-    // 1. Tangkap butang Next/Enter di Keyboard Android (keyCode 13 / Enter)
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.keyCode === 13) {
         checkTargetValue(e.target as HTMLInputElement);
       }
     };
 
-    // 2. Tangkap semasa menaip, ubah teks, submit form, carian atau tutup keyboard (blur)
     const handleGeneralInput = (e: Event) => {
       checkTargetValue(e.target as HTMLInputElement);
     };
@@ -202,7 +235,7 @@ export const MusaLog: React.FC = () => {
       checkTargetValue(e.target as HTMLInputElement);
     };
 
-    // 3. Sandaran kecemasan: Ketuk header atas (bawah 80px) 5 kali laju-laju
+    // Sandaran: Ketuk header 5 kali
     const handleSecretTap = (e: MouseEvent | TouchEvent) => {
       const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
       if (clientY !== undefined && clientY < 80) {
@@ -235,6 +268,15 @@ export const MusaLog: React.FC = () => {
       console.warn = origWarn;
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handlePromiseError);
+
+      // ==========================================
+      // MULA: PEMBERSIHAN LISTENER AKTIVITI PENGGUNA
+      // ==========================================
+      document.removeEventListener('click', handleUserInteraction, true);
+      // ==========================================
+      // AKHIR: PEMBERSIHAN LISTENER AKTIVITI PENGGUNA
+      // ==========================================
+
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('input', handleGeneralInput);
       document.removeEventListener('change', handleGeneralInput);
@@ -280,6 +322,7 @@ export const MusaLog: React.FC = () => {
 
   return (
     <div
+      id="musalog-modal-root"
       style={{
         position: 'fixed',
         inset: 0,
@@ -332,6 +375,28 @@ export const MusaLog: React.FC = () => {
         >
           Semua ({logs.length})
         </button>
+
+        {/* ========================================== */}
+        {/* MULA: BUTANG FILTER AKTIVITI PENGGUNA      */}
+        {/* ========================================== */}
+        <button
+          onClick={() => setFilter('action')}
+          style={{
+            background: filter === 'action' ? '#059669' : '#1E293B',
+            color: '#A7F3D0',
+            border: '1px solid #065F46',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+          }}
+        >
+          Aktiviti ({logs.filter((l) => l.type === 'action').length})
+        </button>
+        {/* ========================================== */}
+        {/* AKHIR: BUTANG FILTER AKTIVITI PENGGUNA     */}
+        {/* ========================================== */}
+
         <button
           onClick={() => setFilter('critical')}
           style={{
@@ -418,7 +483,7 @@ export const MusaLog: React.FC = () => {
       >
         {filteredLogs.length === 0 ? (
           <div style={{ color: '#64748B', textAlign: 'center', marginTop: '60px' }}>
-            Tiada log ralat dikesan. Storan bersih mantap!
+            Tiada log dikesan. Bersih mantap!
           </div>
         ) : (
           filteredLogs.slice(0, 150).map((item, idx) => (
@@ -434,6 +499,8 @@ export const MusaLog: React.FC = () => {
                 <span style={{ color: '#64748B', fontSize: '10px' }}>
                   {item.date} {item.time}
                 </span>
+
+                {/* Badge Label Warna Mengikut Jenis Log */}
                 <span
                   style={{
                     fontSize: '9.5px',
@@ -441,24 +508,34 @@ export const MusaLog: React.FC = () => {
                     borderRadius: '3px',
                     fontWeight: 'bold',
                     backgroundColor:
-                      item.type === 'critical'
+                      item.type === 'action'
+                        ? '#064E3B'
+                        : item.type === 'critical'
                         ? '#7F1D1D'
                         : item.type === 'error'
                         ? '#450A0A'
                         : '#78350F',
                     color:
-                      item.type === 'critical'
+                      item.type === 'action'
+                        ? '#6EE7B7'
+                        : item.type === 'critical'
                         ? '#FECACA'
                         : item.type === 'error'
                         ? '#FCA5A5'
                         : '#FDE68A',
                   }}
                 >
-                  {item.type.toUpperCase()}
+                  {item.type === 'action' ? 'AKTIVITI' : item.type.toUpperCase()}
                 </span>
               </div>
 
-              <div style={{ color: '#E2E8F0', wordBreak: 'break-word', lineHeight: '1.4' }}>
+              <div
+                style={{
+                  color: item.type === 'action' ? '#E2E8F0' : '#E2E8F0',
+                  wordBreak: 'break-word',
+                  lineHeight: '1.4',
+                }}
+              >
                 {item.message}
               </div>
 
