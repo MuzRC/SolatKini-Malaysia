@@ -1,29 +1,62 @@
 package com.solatkini.app;
 
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
+import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Build;
+import android.os.PowerManager;
 import android.util.Log;
-import androidx.core.app.NotificationCompat;
+import java.util.Calendar;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class AzanAlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AzanAlarmReceiver";
     public static final String ACTION_TRIGGER_AZAN = "com.solatkini.app.TRIGGER_AZAN";
-    
-    // Saluran & ID Notifikasi Berterusan (Mesti sepadan dengan widgetService)
-    public static final String CHANNEL_ID_PERSISTENT = "solatkini_persistent_channel_v2";
-    public static final int NOTIFICATION_ID_PERSISTENT = 1001;
 
-    // Saluran Notifikasi Laungan Azan / Penggera
-    public static final String CHANNEL_ID_ALARM = "solatkini_alarm_channel";
-    public static final int NOTIFICATION_ID_ALARM = 2001;
+    private static PowerManager.WakeLock sReceiverWakeLock;
 
-    private static final String PREFS_NAME = "SolatKiniAlarms";
-    private static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
+    /**
+     * Memegang WakeLock serta-merta semasa broadcast masuk agar CPU Snapdragon / MediaTek
+     * tidak sempat tidur semula sebelum servis latar depan dimulakan.
+     */
+    public static synchronized void acquireReceiverWakeLock(Context context) {
+        try {
+            if (sReceiverWakeLock == null) {
+                PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+                if (pm != null) {
+                    sReceiverWakeLock = pm.newWakeLock(
+                        PowerManager.PARTIAL_WAKE_LOCK,
+                        "SolatKini::ReceiverWakeLock"
+                    );
+                    sReceiverWakeLock.setReferenceCounted(false);
+                }
+            }
+            if (sReceiverWakeLock != null && !sReceiverWakeLock.isHeld()) {
+                sReceiverWakeLock.acquire(45 * 1000L); // Tahan selama 45 saat untuk serahan ke servis
+                Log.d(TAG, "Receiver WakeLock berjaya dipegang.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Gagal memegang Receiver WakeLock", e);
+        }
+    }
+
+    /**
+     * Dilepaskan oleh AzanAudioService sebaik sahaja servis berjaya memegang wakelock sendiri.
+     */
+    public static synchronized void releaseReceiverWakeLock() {
+        try {
+            if (sReceiverWakeLock != null && sReceiverWakeLock.isHeld()) {
+                sReceiverWakeLock.release();
+                Log.d(TAG, "Receiver WakeLock berjaya dilepaskan oleh audio service.");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Ralat melepaskan Receiver WakeLock", e);
+        }
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -32,21 +65,27 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             return;
         }
 
+        // 1. Kunci CPU serta-merta tanpa berlengah (Penting untuk MediaTek CorePilot & Snapdragon)
+        acquireReceiverWakeLock(context);
+
         String prayerName = intent.getStringExtra("prayer_name");
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
         long scheduledTime = intent.getLongExtra("scheduled_timestamp", 0);
         long now = System.currentTimeMillis();
 
-        // 1. Keselamatan Jam Dianjak: Abaikan jika penggera lewat lebih 15 minit
-        if (scheduledTime > 0 && Math.abs(now - scheduledTime) > (15 * 60 * 1000)) {
+        boolean isTest = "test".equalsIgnoreCase(prayerKey);
+
+        // 2. Semakan Keselamatan Masa: Hanya abaikan jika tersasar > 15 minit bagi waktu solat sebenar
+        if (!isTest && scheduledTime > 0 && Math.abs(now - scheduledTime) > (15 * 60 * 1000L)) {
             Log.w(TAG, "Penggera solat (" + prayerName + ") tersasar dari masa sebenar. Dibatalkan demi keselamatan.");
+            releaseReceiverWakeLock();
             return;
         }
 
         Log.i(TAG, "Penggera masuk waktu: " + prayerName + " [" + voice + "]");
 
-        // 2. Bunyikan Audio Azan melalui Foreground Service
+        // 3. Lancarkan AzanAudioService (Audio Foreground Service rasmi yang membawa Heads-Up Notification)
         try {
             Intent audioServiceIntent = new Intent(context, AzanAudioService.class);
             audioServiceIntent.setAction(AzanAudioService.ACTION_PLAY_AZAN);
@@ -60,85 +99,91 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 context.startService(audioServiceIntent);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Gagal melancarkan AzanAudioService", e);
+            Log.e(TAG, "Gagal melancarkan AzanAudioService dari receiver", e);
+            releaseReceiverWakeLock();
         }
 
-        // 3. Paparkan Notifikasi Masuk Waktu Solat (Popup alert yang boleh swipe buang)
-        showPrayerAlertNotification(context, prayerName);
-
-        // 4. Notifikasi berterusan dimatikan di sini agar tidak bertindih dengan SolatWidgetPlugin
-        // updatePersistentNotificationNatively(context);
+        // 4. Jadualkan semula waktu solat ini untuk hari esok (+24 jam) supaya penggera tidak putus
+        if (!isTest && scheduledTime > 0 && prayerKey != null) {
+            rescheduleForTomorrow(context, prayerKey, prayerName, voice, scheduledTime);
+        }
     }
 
-    private void showPrayerAlertNotification(Context context, String prayerName) {
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm == null) return;
-
-        createNotificationChannels(context, nm);
-
-        Intent openAppIntent = new Intent(context, MainActivity.class);
-        openAppIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        PendingIntent pi = PendingIntent.getActivity(
-            context,
-            0,
-            openAppIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID_ALARM)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Masuk Waktu Solat " + prayerName)
-            .setContentText("Telah masuk waktu solat fardu " + prayerName + " bagi kawasan anda.")
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setContentIntent(pi);
-
-        nm.notify(NOTIFICATION_ID_ALARM, builder.build());
-    }
-
-    /**
-     * Dinonaktifkan: Membatalkan sebarang notifikasi silent lama dan menghalang
-     * notifikasi bertindih daripada dibina semula.
-     */
-    public static void updatePersistentNotificationNatively(Context context) {
+    private void rescheduleForTomorrow(Context context, String prayerKey, String prayerName, String voice, long previousTimestamp) {
         try {
-            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) {
-                nm.cancel(NOTIFICATION_ID_PERSISTENT);
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager == null) return;
+
+            Calendar cal = Calendar.getInstance();
+            cal.setTimeInMillis(previousTimestamp);
+            cal.add(Calendar.DAY_OF_YEAR, 1);
+            long nextTimestamp = cal.getTimeInMillis();
+
+            int requestCode = AzanAlarmPlugin.getRequestCodeForPrayer(prayerKey, 0);
+
+            Intent nextIntent = new Intent(context, AzanAlarmReceiver.class);
+            nextIntent.setAction(ACTION_TRIGGER_AZAN);
+            nextIntent.putExtra("prayer_key", prayerKey);
+            nextIntent.putExtra("prayer_name", prayerName);
+            nextIntent.putExtra("voice", voice);
+            nextIntent.putExtra("scheduled_timestamp", nextTimestamp);
+
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                nextIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            Intent showAppIntent = new Intent(context, MainActivity.class);
+            showAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent showPendingIntent = PendingIntent.getActivity(
+                context,
+                requestCode + 10000,
+                showAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(nextTimestamp, showPendingIntent);
+                    alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTimestamp, pendingIntent);
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, nextTimestamp, pendingIntent);
+                }
+                Log.i(TAG, "Penggera solat (" + prayerName + ") berjaya dijadualkan semula untuk esok pada: " + nextTimestamp);
+            } catch (SecurityException se) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, nextTimestamp, pendingIntent);
+                }
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Ralat membatalkan notifikasi silent", e);
+
+            // Kemas kini rekod dalam SharedPreferences
+            updateStoredAlarmJson(context, prayerKey, nextTimestamp);
+        } catch (Exception ex) {
+            Log.e(TAG, "Ralat semasa menjadualkan semula waktu solat esok: " + ex.getMessage());
         }
     }
 
-    private static void createNotificationChannels(Context context, NotificationManager nm) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Saluran Notifikasi Berterusan (Senyap, Priority Low)
-            if (nm.getNotificationChannel(CHANNEL_ID_PERSISTENT) == null) {
-                NotificationChannel pChannel = new NotificationChannel(
-                    CHANNEL_ID_PERSISTENT,
-                    "Waktu Solat Berterusan",
-                    NotificationManager.IMPORTANCE_LOW
-                );
-                pChannel.setDescription("Memaparkan waktu solat seterusnya pada bar notifikasi");
-                pChannel.setShowBadge(false);
-                pChannel.enableVibration(false);
-                pChannel.setSound(null, null);
-                nm.createNotificationChannel(pChannel);
-            }
+    private void updateStoredAlarmJson(Context context, String prayerKey, long newTimestamp) {
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(AzanAlarmPlugin.PREFS_NAME, Context.MODE_PRIVATE);
+            String rawJson = prefs.getString(AzanAlarmPlugin.KEY_STORED_ALARMS, null);
+            if (rawJson == null) return;
 
-            // Saluran Penggera Azan (High Priority)
-            if (nm.getNotificationChannel(CHANNEL_ID_ALARM) == null) {
-                NotificationChannel aChannel = new NotificationChannel(
-                    CHANNEL_ID_ALARM,
-                    "Laungan Azan & Peringatan Solat",
-                    NotificationManager.IMPORTANCE_HIGH
-                );
-                aChannel.setDescription("Notifikasi masuk waktu solat fardu");
-                nm.createNotificationChannel(aChannel);
+            JSONArray list = new JSONArray(rawJson);
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject item = list.getJSONObject(i);
+                if (prayerKey.equalsIgnoreCase(item.optString("prayerKey"))) {
+                    item.put("timestamp", newTimestamp);
+                    break;
+                }
             }
+            prefs.edit().putString(AzanAlarmPlugin.KEY_STORED_ALARMS, list.toString()).apply();
+        } catch (Exception e) {
+            Log.w(TAG, "Gagal mengemas kini SharedPreferences JSON: " + e.getMessage());
         }
     }
 }
