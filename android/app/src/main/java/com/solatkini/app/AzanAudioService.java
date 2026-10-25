@@ -101,7 +101,7 @@ public class AzanAudioService extends Service {
         sLastPrayerKey = prayerKey;
 
         Log.i(TAG, "Memulakan audio azan untuk: " + prayerName + " (Kunci: " + prayerKey + ", Suara: " + voice + ")");
-        playAzanAudio(voice);
+        playAzanAudio(prayerName, prayerKey, voice);
 
         return START_NOT_STICKY;
     }
@@ -250,7 +250,7 @@ public class AzanAudioService extends Service {
         }
     }
 
-    private void playAzanAudio(String voice) {
+    private void playAzanAudio(String prayerName, String prayerKey, String voice) {
         stopAzanPlaybackOnly();
 
         try {
@@ -336,6 +336,22 @@ public class AzanAudioService extends Service {
 
             if (!loaded) {
                 Log.e(TAG, "Gagal memuatkan sebarang fail audio azan!");
+
+                // ==============================================================================================
+                // [MULA KOD BOLEH PADAM] : CATAT LOG FAIL AUDIO TIDAK DIJUMPAI
+                // Padam dari baris ini jika mahu membuang fungsi log di kemudian hari
+                // ==============================================================================================
+                AzanHistoryLogger.record(
+                    this,
+                    prayerName,
+                    prayerKey,
+                    AzanHistoryLogger.STATUS_FAILED,
+                    "Gagal memuatkan sebarang fail audio (" + mappedVoice + ")"
+                );
+                // ==============================================================================================
+                // [TAMAT KOD BOLEH PADAM] : CATAT LOG FAIL AUDIO TIDAK DIJUMPAI
+                // ==============================================================================================
+
                 stopAzan();
                 stopSelf();
                 return;
@@ -352,6 +368,22 @@ public class AzanAudioService extends Service {
 
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                 Log.e(TAG, "MediaPlayer ralat: what=" + what + ", extra=" + extra);
+
+                // ==============================================================================================
+                // [MULA KOD BOLEH PADAM] : CATAT LOG MEDIA PLAYER ERROR
+                // Padam dari baris ini jika mahu membuang fungsi log di kemudian hari
+                // ==============================================================================================
+                AzanHistoryLogger.record(
+                    this,
+                    prayerName,
+                    prayerKey,
+                    AzanHistoryLogger.STATUS_FAILED,
+                    "MediaPlayer ralat kod: what=" + what + ", extra=" + extra
+                );
+                // ==============================================================================================
+                // [TAMAT KOD BOLEH PADAM] : CATAT LOG MEDIA PLAYER ERROR
+                // ==============================================================================================
+
                 stopAzan();
                 stopSelf();
                 return true;
@@ -359,8 +391,40 @@ public class AzanAudioService extends Service {
 
             mediaPlayer.start();
             Log.i(TAG, "MediaPlayer azan berkumandang pada paras STREAM_ALARM (" + mappedVoice + ").");
+
+            // ==============================================================================================
+            // [MULA KOD BOLEH PADAM] : CATAT LOG AZAN BERJAYA
+            // Padam dari baris ini jika mahu membuang fungsi log di kemudian hari
+            // ==============================================================================================
+            AzanHistoryLogger.record(
+                this,
+                prayerName,
+                prayerKey,
+                AzanHistoryLogger.STATUS_SUCCESS,
+                "Azan berkumandang lancar (" + mappedVoice + ")"
+            );
+            // ==============================================================================================
+            // [TAMAT KOD BOLEH PADAM] : CATAT LOG AZAN BERJAYA
+            // ==============================================================================================
+
         } catch (Exception e) {
             Log.e(TAG, "Gagal memainkan audio azan pada aras penggera", e);
+
+            // ==============================================================================================
+            // [MULA KOD BOLEH PADAM] : CATAT LOG AZAN GAGAL
+            // Padam dari baris ini jika mahu membuang fungsi log di kemudian hari
+            // ==============================================================================================
+            AzanHistoryLogger.record(
+                this,
+                prayerName,
+                prayerKey,
+                AzanHistoryLogger.STATUS_FAILED,
+                "MediaPlayer ralat pengecualian: " + e.getMessage()
+            );
+            // ==============================================================================================
+            // [TAMAT KOD BOLEH PADAM] : CATAT LOG AZAN GAGAL
+            // ==============================================================================================
+
             stopAzan();
             stopSelf();
         }
