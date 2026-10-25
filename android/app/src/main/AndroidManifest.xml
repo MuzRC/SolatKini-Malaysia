@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Kebenaran Rangkaian & Asas -->
+    <!-- Kebenaran Rangkaian & Lokasi Asas -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -11,23 +11,22 @@
     <!-- Kebenaran Notifikasi Android 13+ (TargetSDK 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Penggera Tepat & Penguncian Skrin (Exact Alarm & Wake Lock) -->
+    <!-- Penggera Tepat & Penguncian CPU Skrin Mati (Exact Alarm & Wake Lock) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Kebenaran Auto-Start / Boot Completed -->
+    <!-- Kebenaran Auto-Start & Hidupkan Penggera Semula -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.QUICKBOOT_POWERON" />
 
-    <!-- Skrin Kunci & Penggera Penuh -->
+    <!-- Skrin Kunci & Penggera Skrin Penuh (Heads-up Call/Alarm Style) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
-    <!-- Perkhidmatan Latar Depan Audio Azan (Android 14+) -->
+    <!-- Perkhidmatan Latar Depan Audio Azan (Wajib Android 14+ / API 34) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".SolatKiniApplication"
@@ -81,17 +80,17 @@
                 android:resource="@xml/solat_widget_info" />
         </receiver>
 
-        <!-- Penerima Penggera Azan Asli (Exact Alarm Receiver) -->
+        <!-- Penerima Penggera Azan Asli (Diselaraskan 100% dengan Java Action TRIGGER_AZAN) -->
         <receiver
             android:name=".AzanAlarmReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.solatkini.app.TRIGGER_AZAN_ALARM" />
+                <action android:name="com.solatkini.app.TRIGGER_AZAN" />
             </intent-filter>
         </receiver>
 
-        <!-- Penerima Auto-Start Selepas Restart Telefon (Direct Boot Aware & Multi-OEM Supported) -->
+        <!-- Penerima Auto-Start & Penyelarasan Masa (Kalis Doze & Sokongan Penuh Multi-OEM) -->
         <receiver
             android:name=".AzanBootReceiver"
             android:enabled="true"
@@ -103,11 +102,14 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <!-- Penyelaras jam automatik sistem peranti -->
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 
-        <!-- Servis Latar Depan Audio Laungan Azan -->
+        <!-- Servis Latar Depan Audio Laungan Azan (Dengan pengesahan mediaPlayback untuk Android 14) -->
         <service
             android:name=".AzanAudioService"
             android:enabled="true"
