@@ -23,6 +23,15 @@ import { nativeAlarmService } from '../services/nativeAlarmService';
 import { PRAYER_KEYS_ORDER, PRAYER_LABELS } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
 
+// ==============================================================================================
+// [MULA KOD BOLEH PADAM] : IMPORT KAD LOG AZAN
+// Padam 3 baris ini jika mahu membuang modul log di kemudian hari
+// ==============================================================================================
+import { AzanHistoryCard } from './AzanHistoryCard';
+// ==============================================================================================
+// [TAMAT KOD BOLEH PADAM] : IMPORT KAD LOG AZAN
+// ==============================================================================================
+
 interface SettingsViewProps {
   currentLang: Language;
   onLanguageChange: (lang: Language) => void;
@@ -494,6 +503,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ============================================================================================== */}
+      {/* [MULA KOD BOLEH PADAM] : KAD LOG DIAGNOSTIK AZAN 24 JAM */}
+      {/* Padam blok ini jika mahu membuang paparan log dari halaman Tetapan di kemudian hari */}
+      {/* ============================================================================================== */}
+      <AzanHistoryCard />
+      {/* ============================================================================================== */}
+      {/* [TAMAT KOD BOLEH PADAM] : KAD LOG DIAGNOSTIK AZAN 24 JAM */}
+      {/* ============================================================================================== */}
 
       {/* 6. KAD WIDGET SKRIN UTAMA TELEFON */}
       <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
