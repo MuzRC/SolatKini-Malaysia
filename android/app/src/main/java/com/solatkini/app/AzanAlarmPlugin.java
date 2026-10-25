@@ -2,7 +2,6 @@ package com.solatkini.app;
 
 import android.Manifest;
 import android.app.AlarmManager;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
@@ -19,7 +18,6 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -40,8 +38,8 @@ import org.json.JSONObject;
 )
 public class AzanAlarmPlugin extends Plugin {
     private static final String TAG = "AzanAlarmPlugin";
-    private static final String PREFS_NAME = "SolatKiniAlarms";
-    private static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
+    public static final String PREFS_NAME = "SolatKiniAlarms";
+    public static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
 
     @PluginMethod
     public void checkNotificationPermission(PluginCall call) {
@@ -135,7 +133,7 @@ public class AzanAlarmPlugin extends Plugin {
                 call.resolve(ret);
                 return;
             } catch (Exception e) {
-                Log.w(TAG, "Gagal membuka tetapan exact alarm khusus, mencuba tetapan aplikasi", e);
+                Log.w(TAG, "Gagal membuka tetapan exact alarm khusus, beralih ke tetapan perincian aplikasi", e);
             }
         }
 
@@ -171,18 +169,11 @@ public class AzanAlarmPlugin extends Plugin {
             ret.put("opened", true);
             call.resolve(ret);
         } catch (Exception e) {
-            Log.e(TAG, "Gagal membuka tetapan notifikasi khusus, beralih ke tetapan aplikasi", e);
-            try {
-                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                fallback.setData(Uri.parse("package:" + context.getPackageName()));
-                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(fallback);
-                JSObject ret = new JSObject();
-                ret.put("opened", true);
-                call.resolve(ret);
-            } catch (Exception err) {
-                call.reject("Tidak dapat membuka tetapan sistem: " + err.getMessage());
-            }
+            Log.e(TAG, "Gagal membuka tetapan notifikasi khusus, beralih ke tetapan umum", e);
+            openAppDetailsSettings(context);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
         }
     }
 
@@ -355,6 +346,19 @@ public class AzanAlarmPlugin extends Plugin {
         }
     }
 
+    public static int getRequestCodeForPrayer(String prayerKey, int fallbackIndex) {
+        if (prayerKey == null) return 2000 + fallbackIndex;
+        switch (prayerKey.toLowerCase()) {
+            case "subuh": return 2001;
+            case "syuruk": return 2002;
+            case "zohor": return 2003;
+            case "asar": return 2004;
+            case "maghrib": return 2005;
+            case "isyak": return 2006;
+            default: return 2010 + fallbackIndex;
+        }
+    }
+
     @PluginMethod
     public void schedulePrayerAlarms(PluginCall call) {
         try {
@@ -381,7 +385,7 @@ public class AzanAlarmPlugin extends Plugin {
                 String prayerName = obj.optString("prayerName", "Solat");
                 String voice = obj.optString("voice", "jakim");
                 long timestamp = obj.optLong("timestamp", 0);
-                int requestCode = 2000 + i;
+                int requestCode = getRequestCodeForPrayer(prayerKey, i);
 
                 // Anjak ke hari esok jika waktu solat sudah berlalu hari ini
                 if (timestamp > 0) {
@@ -418,14 +422,34 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
-                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
-                    } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                    // ShowIntent yang selamat menghala ke MainActivity (bukan mencetuskan azan)
+                    Intent showAppIntent = new Intent(context, MainActivity.class);
+                    showAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    PendingIntent showPendingIntent = PendingIntent.getActivity(
+                        context,
+                        requestCode + 10000,
+                        showAppIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
+                            alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        } else {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        }
+                    } catch (SecurityException se) {
+                        Log.w(TAG, "Exact alarm dihadkan oleh sistem, menggunakan fallback idle: " + se.getMessage());
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        } else {
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        }
                     }
+
                     scheduledCount++;
                     Log.i(TAG, "Penggera solat (" + prayerName + ") suara [" + voice + "] dijadualkan pada: " + timestamp);
                 }
@@ -433,13 +457,6 @@ public class AzanAlarmPlugin extends Plugin {
 
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
-
-            // Panggilan notifikasi berterusan native dimatikan di sini
-            // try {
-            //     AzanAlarmReceiver.updatePersistentNotificationNatively(context);
-            // } catch (Exception e) {
-            //     Log.w(TAG, "Gagal mengemas kini notifikasi berterusan native: " + e.getMessage());
-            // }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -458,12 +475,14 @@ public class AzanAlarmPlugin extends Plugin {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
             if (alarmManager != null) {
-                for (int i = 0; i < 20; i++) {
+                String[] standardKeys = new String[]{"subuh", "syuruk", "zohor", "asar", "maghrib", "isyak"};
+                for (int i = 0; i < standardKeys.length; i++) {
+                    int reqCode = getRequestCodeForPrayer(standardKeys[i], i);
                     Intent intent = new Intent(context, AzanAlarmReceiver.class);
                     intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
                     PendingIntent pendingIntent = PendingIntent.getBroadcast(
                         context,
-                        2000 + i,
+                        reqCode,
                         intent,
                         PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
                     );
@@ -511,14 +530,30 @@ public class AzanAlarmPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
+            Intent showAppIntent = new Intent(context, MainActivity.class);
+            PendingIntent showPendingIntent = PendingIntent.getActivity(
+                context,
+                19999,
+                showAppIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
             if (alarmManager != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent);
-                    alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
-                } else {
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent);
+                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    }
+                } catch (SecurityException se) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    } else {
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    }
                 }
             }
 
@@ -544,7 +579,6 @@ public class AzanAlarmPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    // Alias sokongan bagi panggilan frontend
     @PluginMethod
     public void setActiveVoice(PluginCall call) {
         setActiveAzanVoice(call);
