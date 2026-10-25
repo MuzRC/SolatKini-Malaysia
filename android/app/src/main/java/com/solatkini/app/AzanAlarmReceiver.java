@@ -6,16 +6,9 @@ import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.os.Build;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 public class AzanAlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AzanAlarmReceiver";
@@ -70,10 +63,10 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             Log.e(TAG, "Gagal melancarkan AzanAudioService", e);
         }
 
-        // 3. Paparkan Notifikasi Masuk Waktu Solat
+        // 3. Paparkan Notifikasi Masuk Waktu Solat (Popup alert yang boleh swipe buang)
         showPrayerAlertNotification(context, prayerName);
 
-        // 4. Kemas kini Notifikasi Berterusan ke Waktu Solat Seterusnya SECARA NATIVE
+        // 4. Notifikasi berterusan dimatikan di sini agar tidak bertindih dengan SolatWidgetPlugin
         // updatePersistentNotificationNatively(context);
     }
 
@@ -106,95 +99,17 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Mengemas kini notifikasi kekal terus dari Java dan mengaktifkan live countdown
+     * Dinonaktifkan: Membatalkan sebarang notifikasi silent lama dan menghalang
+     * notifikasi bertindih daripada dibina semula.
      */
     public static void updatePersistentNotificationNatively(Context context) {
         try {
             NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm == null) return;
-
-            createNotificationChannels(context, nm);
-
-            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String storedAlarmsJson = prefs.getString(KEY_STORED_ALARMS, null);
-            if (storedAlarmsJson == null || storedAlarmsJson.isEmpty()) {
-                return;
-            }
-
-            JSONArray alarms = new JSONArray(storedAlarmsJson);
-            long now = System.currentTimeMillis();
-            JSONObject nextPrayer = null;
-
-            // Cari solat seterusnya yang mempunyai timestamp masa depan terdekat
-            for (int i = 0; i < alarms.length(); i++) {
-                JSONObject item = alarms.getJSONObject(i);
-                long t = item.optLong("timestamp", 0);
-                if (t > now) {
-                    if (nextPrayer == null || t < nextPrayer.optLong("timestamp", Long.MAX_VALUE)) {
-                        nextPrayer = item;
-                    }
-                }
-            }
-
-            if (nextPrayer == null && alarms.length() > 0) {
-                // Jika semua solat hari ini sudah lepas, ambil solat pertama (Subuh esok)
-                nextPrayer = alarms.getJSONObject(0);
-            }
-
-            if (nextPrayer != null) {
-                String nextName = nextPrayer.optString("prayerName", "Solat");
-                long nextTimestamp = nextPrayer.optLong("timestamp", 0);
-
-                // Pastikan timestamp sentiasa di hadapan waktu semasa (anjak hari jika perlu)
-                if (nextTimestamp > 0 && nextTimestamp <= now) {
-                    Calendar cal = Calendar.getInstance();
-                    cal.setTimeInMillis(nextTimestamp);
-                    while (cal.getTimeInMillis() <= now) {
-                        cal.add(Calendar.DAY_OF_YEAR, 1);
-                    }
-                    nextTimestamp = cal.getTimeInMillis();
-                }
-
-                SimpleDateFormat sdf = new SimpleDateFormat("hh:mm a", Locale.getDefault());
-                String formattedTime = nextTimestamp > 0 ? sdf.format(new Date(nextTimestamp)) : "";
-
-                Intent appIntent = new Intent(context, MainActivity.class);
-                appIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                PendingIntent contentIntent = PendingIntent.getActivity(
-                    context,
-                    100,
-                    appIntent,
-                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                );
-
-                NotificationCompat.Builder persistentBuilder = new NotificationCompat.Builder(context, CHANNEL_ID_PERSISTENT)
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setContentTitle("Solat Seterusnya: " + nextName + " (" + formattedTime + ")")
-                    .setContentText("Waktu masuk pada jam " + formattedTime)
-                    .setOngoing(true)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .setContentIntent(contentIntent);
-
-                // =========================================================================
-                // ENJIN KIRAAN DETIK AUTOMATIK (CHRONOMETER COUNTDOWN)
-                // =========================================================================
-                if (nextTimestamp > now) {
-                    persistentBuilder.setWhen(nextTimestamp)
-                        .setShowWhen(true)
-                        .setUsesChronometer(true);
-
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        persistentBuilder.setChronometerCountDown(true);
-                    }
-                }
-                // =========================================================================
-
-                nm.notify(NOTIFICATION_ID_PERSISTENT, persistentBuilder.build());
-                Log.i(TAG, "Notifikasi berterusan live countdown berjaya diaktifkan: " + nextName + " (" + formattedTime + ")");
+            if (nm != null) {
+                nm.cancel(NOTIFICATION_ID_PERSISTENT);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Ralat mengemas kini notifikasi berterusan native", e);
+            Log.e(TAG, "Ralat membatalkan notifikasi silent", e);
         }
     }
 
