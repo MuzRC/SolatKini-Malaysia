@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './types/prayer';
 import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
-import { fetchDayPrayerTimes } from './services/prayerService';
+import { fetchDayPrayerTimes, PRAYER_KEYS_ORDER, PRAYER_LABELS } from './services/prayerService';
 import { audioNotificationService } from './services/audioNotificationService';
 import { nativeAlarmService } from './services/nativeAlarmService';
 import { widgetService } from './services/widgetService';
@@ -30,9 +30,9 @@ import { OnboardingChecklist } from './components/OnboardingChecklist';
 import { Language, getSavedLanguage, t, saveLanguage } from './utils/i18n';
 import { ThemeId, getSavedTheme, applyTheme, THEME_OPTIONS } from './utils/theme';
 import { getHijriDate } from './utils/hijriCalendar';
+import { formatDisplayTime } from './utils/prayerCalculator';
 
 export default function App() {
-  // Semak status permulaan (hanya dipaparkan jika pemasangan baru kali pertama)
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('solatkini_onboarding_completed') !== 'true';
@@ -44,7 +44,6 @@ export default function App() {
   const [currentLang, setCurrentLang] = useState<Language>(() => getSavedLanguage());
   const [currentTheme, setCurrentTheme] = useState<ThemeId>(() => getSavedTheme());
 
-  // Warna tema aktif mengikut pilihan pengguna di Pusat Tetapan
   const currentThemeAccent =
     THEME_OPTIONS?.find((t) => t.id === currentTheme)?.accentHex || '#10b981';
 
@@ -68,14 +67,12 @@ export default function App() {
     return true;
   });
 
-  const [isDndGuideOpen, setIsDndGuideOpen] = useState(false);
+  const [_isDndGuideOpen, setIsDndGuideOpen] = useState(false);
 
-  // Guna tema aktif secara global
   useEffect(() => {
     applyTheme(currentTheme);
   }, [currentTheme]);
 
-  // Zon JAKIM aktif (Lalai: WLY01 Kuala Lumpur & Putrajaya atau zon tersimpan)
   const [currentZone, setCurrentZone] = useState<JakimZone>(() => {
     if (typeof window !== 'undefined') {
       const savedCode = localStorage.getItem('solatkini_active_zone');
@@ -95,7 +92,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLiveSyncing, setIsLiveSyncing] = useState(false);
 
-  // Status Geolocation Automatik
   const [geoStatus, setGeoStatus] = useState<{
     type: 'detected' | 'error' | null;
     message: string;
@@ -104,7 +100,6 @@ export default function App() {
 
   const hasAutoLocatedRef = useRef(false);
 
-  // Modal Notifikasi Penuh Penggera Azan
   const [alarmModalState, setAlarmModalState] = useState<{
     isOpen: boolean;
     prayerKey: PrayerKey;
@@ -117,7 +112,49 @@ export default function App() {
     voice: 'jakim',
   });
 
-  // 1. Pengesanan GPS automatik ketika aplikasi mula dibuka (hanya selepas onboarding selesai)
+  // Fungsi pembantu untuk menjadwalkan alarm ke sistem Android
+  const syncAlarmsToNative = (times: DayPrayerTimes, voice: AzanVoice) => {
+    if (!times || !times.times) return;
+    try {
+      let enabledMap: Record<PrayerKey, boolean> = {
+        imsak: false,
+        subuh: true,
+        syuruk: false,
+        zohor: true,
+        asar: true,
+        maghrib: true,
+        isyak: true,
+      };
+
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('solatkini_notif_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.preferences) {
+            enabledMap.subuh = parsed.preferences.subuh?.enabled ?? true;
+            enabledMap.zohor = parsed.preferences.zohor?.enabled ?? true;
+            enabledMap.asar = parsed.preferences.asar?.enabled ?? true;
+            enabledMap.maghrib = parsed.preferences.maghrib?.enabled ?? true;
+            enabledMap.isyak = parsed.preferences.isyak?.enabled ?? true;
+          }
+        }
+      }
+
+      const list = PRAYER_KEYS_ORDER.map((k) => ({
+        key: k,
+        label: PRAYER_LABELS[k],
+        time: times.times[k],
+        displayTime: formatDisplayTime(times.times[k]),
+        voice: (k === 'subuh' ? 'subuh_special' : voice) as AzanVoice,
+      }));
+
+      nativeAlarmService.schedulePrayers(list, voice, enabledMap);
+    } catch (e) {
+      console.warn('Gagal menjadualkan penggera dari App:', e);
+    }
+  };
+
+  // 1. Deteksi GPS otomatis
   useEffect(() => {
     if (showOnboarding) return;
     if (hasAutoLocatedRef.current) return;
@@ -154,7 +191,7 @@ export default function App() {
     }
   }, [showOnboarding]);
 
-  // 2. Muat data waktu solat semasa pelancaran & bila zon bertukar
+  // 2. Muat data waktu solat & jadwalkan alarm native
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -163,6 +200,7 @@ export default function App() {
       if (isMounted) {
         setPrayerData(data);
         setIsLoading(false);
+        syncAlarmsToNative(data.times, selectedVoice);
       }
     });
 
@@ -173,7 +211,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentZone]);
+  }, [currentZone, selectedVoice]);
 
   // 3. Semakan anjakan hari tengah malam (00:00 Auto-Refresh)
   useEffect(() => {
@@ -184,23 +222,25 @@ export default function App() {
         lastDate = currentDate;
         fetchDayPrayerTimes(currentZone, new Date(), true).then((data) => {
           setPrayerData(data);
+          syncAlarmsToNative(data.times, selectedVoice);
         });
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [currentZone]);
+  }, [currentZone, selectedVoice]);
 
   const handleLiveSync = async () => {
     setIsLiveSyncing(true);
     try {
       const data = await fetchDayPrayerTimes(currentZone, new Date(), true);
       setPrayerData(data);
+      syncAlarmsToNative(data.times, selectedVoice);
     } finally {
       setIsLiveSyncing(false);
     }
   };
 
-  // 4. Minta kebenaran notifikasi Android 13+ & dengar acara azan asli
+  // 4. Periksa izin notifikasi Android 13+ & tangani event azan asli
   useEffect(() => {
     nativeAlarmService.checkPermissions().then((status) => {
       if (!status.notificationsGranted) {
@@ -233,7 +273,7 @@ export default function App() {
     return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
   }, []);
 
-  // 5. Pendengar picu azan untuk pelayar web
+  // 5. Listener untuk peramban web
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
@@ -268,6 +308,10 @@ export default function App() {
       localStorage.setItem('solatkini_azan_voice', voice);
       localStorage.setItem('solatkini_active_device_voice', voice);
     }
+    nativeAlarmService.setActiveVoice(voice);
+    if (prayerData && prayerData.times) {
+      syncAlarmsToNative(prayerData.times, voice);
+    }
   };
 
   const handleTogglePersistentNotification = async () => {
@@ -299,7 +343,6 @@ export default function App() {
     setShowOnboarding(false);
   };
 
-  // Paparkan checklist kebenaran hanya untuk pengguna baru
   if (showOnboarding) {
     return <OnboardingChecklist onComplete={handleOnboardingComplete} />;
   }
@@ -316,10 +359,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#070d0b] text-slate-100 flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200">
-      {/* Subtle Ambient Night Sky Light */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[300px] bg-emerald-950/20 rounded-full blur-[120px] pointer-events-none" />
 
-      {/* TOP NOTIFICATION TOAST FOR AUTOMATIC GEOLOCATION */}
       {geoStatus && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-full max-w-md px-4 animate-in slide-in-from-top-4 duration-300">
           <div className="glass-panel p-4 rounded-2xl border border-emerald-500/40 bg-[#0d1f18]/95 shadow-2xl flex items-start justify-between gap-3 text-left">
@@ -342,11 +383,8 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP DESKTOP & MOBILE HEADER */}
       <header className="sticky top-0 z-40 bg-[#070d0b]/80 backdrop-blur-xl border-b border-emerald-900/30 px-4 sm:px-6 lg:px-8 py-3.5">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4 lg:gap-8">
-          
-          {/* Zone 1: Logo Bulan Sabit & Bintang Islamik (MoonStar) Dinamik */}
           <div
             onClick={() => setActiveTab('solat')}
             className="flex items-center gap-2.5 cursor-pointer select-none shrink-0"
@@ -372,7 +410,6 @@ export default function App() {
             </span>
           </div>
 
-          {/* Zone 2: Navigation Links (Desktop sahaja) */}
           <nav className="hidden md:flex items-center gap-1.5 bg-slate-900/70 p-1.5 rounded-2xl border border-slate-800/80 shadow-inner">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -398,7 +435,6 @@ export default function App() {
             })}
           </nav>
 
-          {/* Zone 3: Primary Action (Menguji alunan azan harian pilihan pengguna) */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={() => handleTriggerTestAlarm('zohor', 'Zohor', selectedVoice)}
@@ -412,11 +448,9 @@ export default function App() {
               <span className="hidden sm:inline">Uji</span> Azan
             </button>
           </div>
-
         </div>
       </header>
 
-      {/* MAIN CONTENT VIEWPORT */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pt-5 pb-20 md:pb-12">
         {isLoading || !prayerData ? (
           <div className="min-h-[50vh] flex flex-col items-center justify-center text-center space-y-3">
@@ -479,7 +513,6 @@ export default function App() {
         )}
       </main>
 
-      {/* GLOBAL FOOTER */}
       <footer className="mt-auto border-t border-emerald-950/60 bg-[#060a08]/90 backdrop-blur-md py-6 px-4 sm:px-6 mb-16 md:mb-0">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
           <div className="space-y-1">
@@ -524,7 +557,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* MOBILE BOTTOM NAVIGATION BAR */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070d0b]/95 backdrop-blur-xl border-t border-emerald-900/30 px-2 py-2 pb-safe shadow-2xl">
         <div className="grid grid-cols-7 items-center gap-1">
           {navItems.map((item) => {
@@ -552,7 +584,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* FULL-SCREEN AZAN ALARM NOTIFICATION MODAL */}
       <AzanAlarmModal
         isOpen={alarmModalState.isOpen}
         prayerKey={alarmModalState.prayerKey}
