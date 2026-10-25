@@ -10,9 +10,18 @@ import android.util.Log;
 
 public class SolatKiniApplication extends Application {
     private static final String TAG = "SolatKiniApp";
+
+    // 1. Saluran Penggera Azan (Maksima & Tembus Mod Senyap / DND)
     public static final String AZAN_CHANNEL_ID = "solatkini_azan_channel_v3";
+
+    // 2. Saluran Peringatan Sebelum Masuk Waktu Solat
     public static final String REMINDER_CHANNEL_ID = "solatkini_reminder_channel";
-    public static final String PERSISTENT_CHANNEL_ID = "solatkini_top_widget_channel_v2";
+
+    // 3. Saluran Widget Bar Notifikasi 5 Waktu Solat Teratas
+    public static final String PERSISTENT_WIDGET_CHANNEL_ID = "solatkini_top_widget_channel_v2";
+
+    // 4. Saluran Notifikasi Waktu Solat Berterusan / Boot (Sepadan 100% dengan AzanBootReceiver)
+    public static final String BOOT_PERSISTENT_CHANNEL_ID = "solatkini_persistent_channel_v2";
 
     @Override
     public void onCreate() {
@@ -25,14 +34,15 @@ public class SolatKiniApplication extends Application {
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager == null) return;
 
-            // Padamkan saluran lama jika ada untuk mengelakkan konfigurasi bertindih
+            // Padamkan saluran versi lama untuk mengelakkan konfigurasi lapuk bertindih
             try {
                 manager.deleteNotificationChannel("solatkini_azan_channel");
                 manager.deleteNotificationChannel("solatkini_azan_channel_v2");
                 manager.deleteNotificationChannel("solatkini_persistent_channel");
+                manager.deleteNotificationChannel("solatkini_alarm_channel");
             } catch (Exception ignored) {}
 
-            // 1. Saluran Penggera Azan (Audio dimainkan khusus oleh MediaPlayer pada STREAM_ALARM)
+            // 1. Saluran Penggera Azan (Audio dikendalikan oleh MediaPlayer pada STREAM_ALARM)
             NotificationChannel azanChannel = new NotificationChannel(
                 AZAN_CHANNEL_ID,
                 "Penggera Azan SolatKini",
@@ -43,38 +53,52 @@ public class SolatKiniApplication extends Application {
             azanChannel.enableVibration(true);
             azanChannel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000});
             azanChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            // Senyapkan saluran notifikasi agar sistem tidak memainkan bunyi lalai bertindih
+            // Senyapkan saluran agar sistem Android tidak memainkan nada dering bawaan yang memotong vokal azan
             azanChannel.setSound(null, null);
 
-            // 2. Saluran Peringatan Waktu Solat
+            // 2. Saluran Peringatan Waktu Solat (Notifikasi pop-up biasa)
             NotificationChannel reminderChannel = new NotificationChannel(
                 REMINDER_CHANNEL_ID,
                 "Peringatan Waktu Solat",
                 NotificationManager.IMPORTANCE_DEFAULT
             );
-            reminderChannel.setDescription("Pemberitahuan peringatan waktu solat");
+            reminderChannel.setDescription("Pemberitahuan peringatan sebelum dan semasa masuk waktu solat");
             reminderChannel.enableVibration(true);
             reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
-            // 3. Saluran Notifikasi Tetap Waktu Solat Teratas (Widget Bar 5 Waktu Solat)
-            NotificationChannel persistentChannel = new NotificationChannel(
-                PERSISTENT_CHANNEL_ID,
+            // 3. Saluran Widget Bar 5 Waktu Solat Teratas (Kekal di status bar)
+            NotificationChannel widgetChannel = new NotificationChannel(
+                PERSISTENT_WIDGET_CHANNEL_ID,
                 "Widget Bar 5 Waktu Solat Teratas",
                 NotificationManager.IMPORTANCE_HIGH
             );
-            persistentChannel.setDescription("Paparan kekal 5 waktu solat harian pada kedudukan teratas bar notifikasi");
-            persistentChannel.setShowBadge(false);
-            persistentChannel.enableLights(false);
-            persistentChannel.enableVibration(false);
-            persistentChannel.setSound(null, null);
-            persistentChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            widgetChannel.setDescription("Paparan kekal 5 waktu solat harian pada kedudukan teratas bar notifikasi");
+            widgetChannel.setShowBadge(false);
+            widgetChannel.enableLights(false);
+            widgetChannel.enableVibration(false);
+            widgetChannel.setSound(null, null);
+            widgetChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
-            // Daftarkan semua saluran ke sistem Android
+            // 4. Saluran Waktu Solat Berterusan / Boot (Digunakan oleh AzanBootReceiver selepas restart telefon)
+            NotificationChannel bootChannel = new NotificationChannel(
+                BOOT_PERSISTENT_CHANNEL_ID,
+                "Waktu Solat Berterusan",
+                NotificationManager.IMPORTANCE_DEFAULT
+            );
+            bootChannel.setDescription("Paparan waktu solat berterusan pada panel notifikasi selepas telefon dihidupkan");
+            bootChannel.setShowBadge(false);
+            bootChannel.enableLights(false);
+            bootChannel.enableVibration(false);
+            bootChannel.setSound(null, null);
+            bootChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+
+            // Daftarkan kesemua 4 saluran ke sistem Android sekaligus
             manager.createNotificationChannel(azanChannel);
             manager.createNotificationChannel(reminderChannel);
-            manager.createNotificationChannel(persistentChannel);
+            manager.createNotificationChannel(widgetChannel);
+            manager.createNotificationChannel(bootChannel);
 
-            Log.i(TAG, "Semua saluran notifikasi SolatKini berjaya didaftarkan ke sistem Android.");
+            Log.i(TAG, "Kesemua 4 saluran notifikasi SolatKini berjaya didaftarkan ke sistem Android.");
         }
     }
 }
