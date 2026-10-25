@@ -330,4 +330,49 @@ class NativeAlarmService {
   }
 }
 
+// ==============================================================================================
+// [MULA KOD BOLEH PADAM] : DEFINISI & FUNGSI BACA LOG AZAN 24 JAM
+// Padam dari baris ini jika mahu membuang modul log di kemudian hari
+// ==============================================================================================
+export interface AzanLogEntry {
+  prayerName: string;
+  prayerKey: string;
+  timestamp: number;
+  timeFormatted: string;
+  dateFormatted: string;
+  status: 'BERJAYA' | 'DICETUSKAN' | 'GAGAL' | string;
+  details: string;
+}
+
+// Tambah dua fungsi ini ke dalam objek atau kelas nativeAlarmService anda:
+export const getAzanHistoryLogs = async (): Promise<AzanLogEntry[]> => {
+  try {
+    // Memanggil kaedah plugin AzanAlarm yang telah didaftarkan
+    const AzanAlarmPlugin = (window as any).Capacitor?.Plugins?.AzanAlarm;
+    if (AzanAlarmPlugin && typeof AzanAlarmPlugin.getAzanHistory === 'function') {
+      const res = await AzanAlarmPlugin.getAzanHistory();
+      return res && res.history ? res.history : [];
+    }
+  } catch (err) {
+    console.warn('Gagal memuatkan rekod log azan:', err);
+  }
+  return [];
+};
+
+export const clearAzanHistoryLogs = async (): Promise<boolean> => {
+  try {
+    const AzanAlarmPlugin = (window as any).Capacitor?.Plugins?.AzanAlarm;
+    if (AzanAlarmPlugin && typeof AzanAlarmPlugin.clearAzanHistory === 'function') {
+      await AzanAlarmPlugin.clearAzanHistory();
+      return true;
+    }
+  } catch (err) {
+    console.warn('Gagal memadam rekod log azan:', err);
+  }
+  return false;
+};
+// ==============================================================================================
+// [TAMAT KOD BOLEH PADAM] : DEFINISI & FUNGSI BACA LOG AZAN 24 JAM
+// ==============================================================================================
+
 export const nativeAlarmService = new NativeAlarmService();
