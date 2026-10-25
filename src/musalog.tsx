@@ -8,17 +8,15 @@ export interface LogEntry {
   type: 'critical' | 'error' | 'warn';
   message: string;
   stack?: string;
-  size: number; // Saiz dalam bytes
+  size: number;
 }
 
-const CHEAT_CODE = './musalog';
-const MAX_STORAGE_BYTES = 10 * 1024 * 1024; // Had siling 10 Megabytes (10,485,760 Bytes)
+const MAX_STORAGE_BYTES = 10 * 1024 * 1024; // Had 10 MB
 const DB_NAME = 'MusaLogDatabase';
 const DB_VERSION = 1;
 const STORE_LOGS = 'logs';
 const STORE_META = 'metadata';
 
-// Pembantu IndexedDB
 const getDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -43,8 +41,9 @@ export const MusaLog: React.FC = () => {
   const [totalBytesUsed, setTotalBytesUsed] = useState<number>(0);
   const isProcessingQueue = useRef(false);
   const logQueue = useRef<Omit<LogEntry, 'id' | 'size'>[]>([]);
+  const tapCountRef = useRef(0);
+  const lastTapTimeRef = useRef(0);
 
-  // Format bait kepada paparan mesra mata (KB / MB)
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 KB';
     const mb = bytes / (1024 * 1024);
@@ -52,7 +51,6 @@ export const MusaLog: React.FC = () => {
     return `${(bytes / 1024).toFixed(1)} KB`;
   };
 
-  // Muat data dari IndexedDB ke skrin
   const reloadLogsFromDB = useCallback(async () => {
     try {
       const db = await getDB();
@@ -65,7 +63,6 @@ export const MusaLog: React.FC = () => {
 
       tx.oncomplete = () => {
         const allLogs: LogEntry[] = logsReq.result || [];
-        // Susun daripada yang paling baru ke lama
         allLogs.reverse();
         setLogs(allLogs);
         setTotalBytesUsed(metaReq.result?.value || 0);
@@ -75,7 +72,6 @@ export const MusaLog: React.FC = () => {
     }
   }, []);
 
-  // Simpan log ke IndexedDB & perlaksanaan F.I.F.O bila cecah 10MB
   const processLogQueue = async () => {
     if (isProcessingQueue.current || logQueue.current.length === 0) return;
     isProcessingQueue.current = true;
@@ -85,8 +81,6 @@ export const MusaLog: React.FC = () => {
       const tx = db.transaction([STORE_LOGS, STORE_META], 'readwrite');
       const logStore = tx.objectStore(STORE_LOGS);
       const metaStore = tx.objectStore(STORE_META);
-
-      // Ambil saiz semasa
       const metaReq = metaStore.get('total_size');
 
       metaReq.onsuccess = async () => {
@@ -103,9 +97,8 @@ export const MusaLog: React.FC = () => {
           currentSize += itemSize;
         }
 
-        // F.I.F.O: Buang rekod paling lama jika melepasi had 10MB
         if (currentSize > MAX_STORAGE_BYTES) {
-          const cursorReq = logStore.openCursor(); // Buka cursor daripada id paling kecil (paling awal disimpan)
+          const cursorReq = logStore.openCursor();
           cursorReq.onsuccess = () => {
             const cursor = cursorReq.result;
             if (cursor && currentSize > MAX_STORAGE_BYTES) {
@@ -124,9 +117,7 @@ export const MusaLog: React.FC = () => {
 
       tx.oncomplete = () => {
         isProcessingQueue.current = false;
-        if (isOpen) {
-          reloadLogsFromDB();
-        }
+        if (isOpen) reloadLogsFromDB();
       };
 
       tx.onerror = () => {
@@ -139,47 +130,36 @@ export const MusaLog: React.FC = () => {
 
   const enqueueLog = (type: LogEntry['type'], message: string, stack?: string) => {
     const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB'); // DD/MM/YYYY
-    const timeStr = now.toLocaleTimeString('en-GB', { hour12: false }); // HH:mm:ss
-
     logQueue.current.push({
-      date: dateStr,
-      time: timeStr,
+      date: now.toLocaleDateString('en-GB'),
+      time: now.toLocaleTimeString('en-GB', { hour12: false }),
       type,
       message,
       stack,
     });
-
-    // Jalankan simpanan ke storan
     processLogQueue();
   };
 
   useEffect(() => {
-    // 1. Muat rekod sesi lepas semasa app baru dibuka
     reloadLogsFromDB();
 
-    // 2. Pintas console asal
     const origError = console.error;
     const origWarn = console.warn;
 
     console.error = (...args: any[]) => {
       origError(...args);
-      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      enqueueLog('error', msg);
+      enqueueLog('error', args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
     };
 
     console.warn = (...args: any[]) => {
       origWarn(...args);
-      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      enqueueLog('warn', msg);
+      enqueueLog('warn', args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
     };
 
-    // 3. Tangkap Crash Kritikal (Uncaught Runtime Error)
     const handleGlobalError = (event: ErrorEvent) => {
       enqueueLog('critical', event.message || 'Ralat Runtime Kritikal', event.error?.stack);
     };
 
-    // 4. Tangkap Crash API/Promise (Unhandled Rejections)
     const handlePromiseError = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const stack = reason instanceof Error ? reason.stack : undefined;
@@ -190,27 +170,78 @@ export const MusaLog: React.FC = () => {
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handlePromiseError);
 
-    // 5. Tangkap Cheat Code ./musalog di mana-mana kotak carian
-    const handleInput = (e: Event) => {
-      const target = e.target as HTMLInputElement | HTMLTextAreaElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
-        if (target.value.trim().toLowerCase() === CHEAT_CODE.toLowerCase()) {
+    // Fungsi semakan cheat code menyeluruh
+    const checkTargetValue = (target: HTMLInputElement | HTMLTextAreaElement) => {
+      if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return false;
+      const val = (target.value || '').toLowerCase().trim();
+
+      // Terima apa-apa variasi: ./musalog, musalog, atau ada simbol
+      if (val.includes('musalog')) {
+        setIsOpen(true);
+        reloadLogsFromDB();
+        target.value = '';
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      }
+      return false;
+    };
+
+    // 1. Tangkap butang Next/Enter di Keyboard Android (keyCode 13 / Enter)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        checkTargetValue(e.target as HTMLInputElement);
+      }
+    };
+
+    // 2. Tangkap semasa menaip, ubah teks, submit form, carian atau tutup keyboard (blur)
+    const handleGeneralInput = (e: Event) => {
+      checkTargetValue(e.target as HTMLInputElement);
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      checkTargetValue(e.target as HTMLInputElement);
+    };
+
+    // 3. Sandaran kecemasan: Ketuk header atas (bawah 80px) 5 kali laju-laju
+    const handleSecretTap = (e: MouseEvent | TouchEvent) => {
+      const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
+      if (clientY !== undefined && clientY < 80) {
+        const now = Date.now();
+        if (now - lastTapTimeRef.current < 500) {
+          tapCountRef.current += 1;
+        } else {
+          tapCountRef.current = 1;
+        }
+        lastTapTimeRef.current = now;
+
+        if (tapCountRef.current >= 5) {
+          tapCountRef.current = 0;
           setIsOpen(true);
           reloadLogsFromDB();
-          target.value = '';
-          target.dispatchEvent(new Event('input', { bubbles: true }));
         }
       }
     };
 
-    document.addEventListener('input', handleInput);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('input', handleGeneralInput);
+    document.addEventListener('change', handleGeneralInput);
+    document.addEventListener('search', handleGeneralInput);
+    document.addEventListener('submit', handleGeneralInput, true);
+    document.addEventListener('focusout', handleFocusOut, true);
+    window.addEventListener('click', handleSecretTap);
 
     return () => {
       console.error = origError;
       console.warn = origWarn;
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handlePromiseError);
-      document.removeEventListener('input', handleInput);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('input', handleGeneralInput);
+      document.removeEventListener('change', handleGeneralInput);
+      document.removeEventListener('search', handleGeneralInput);
+      document.removeEventListener('submit', handleGeneralInput, true);
+      document.removeEventListener('focusout', handleFocusOut, true);
+      window.removeEventListener('click', handleSecretTap);
     };
   }, [reloadLogsFromDB]);
 
@@ -225,7 +256,7 @@ export const MusaLog: React.FC = () => {
         setLogs([]);
         setTotalBytesUsed(0);
       };
-    } catch (e) {
+    } catch {
       alert('Gagal membersihkan storan.');
     }
   };
@@ -240,7 +271,7 @@ export const MusaLog: React.FC = () => {
       .join('\n----------------------------------------\n');
 
     navigator.clipboard.writeText(fullText);
-    alert(`Berjaya salin ${logs.length} entri log ke clipboard!`);
+    alert(`Berjaya salin ${logs.length} entri log!`);
   };
 
   if (!isOpen) return null;
@@ -260,14 +291,13 @@ export const MusaLog: React.FC = () => {
         fontFamily: 'monospace',
       }}
     >
-      {/* Bar Atas / Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div>
-          <div style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span>⚡ MusaLog Autosave Console</span>
+          <div style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: '15px' }}>
+            ⚡ MusaLog Autosave Console
           </div>
           <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>
-            Saiz Storan: <strong style={{ color: '#38BDF8' }}>{formatBytes(totalBytesUsed)}</strong> / 10.00 MB (F.I.F.O Auto-Trim)
+            Saiz: <strong style={{ color: '#38BDF8' }}>{formatBytes(totalBytesUsed)}</strong> / 10.00 MB (F.I.F.O)
           </div>
         </div>
 
@@ -288,7 +318,6 @@ export const MusaLog: React.FC = () => {
         </button>
       </div>
 
-      {/* Butang Kawalan & Filter */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <button
           onClick={() => setFilter('all')}
@@ -376,7 +405,6 @@ export const MusaLog: React.FC = () => {
         </button>
       </div>
 
-      {/* Skrin Terminal Senarai Log */}
       <div
         style={{
           flex: 1,
@@ -390,7 +418,7 @@ export const MusaLog: React.FC = () => {
       >
         {filteredLogs.length === 0 ? (
           <div style={{ color: '#64748B', textAlign: 'center', marginTop: '60px' }}>
-            Tiada log dalam rekod. Storan bersih mantap!
+            Tiada log ralat dikesan. Storan bersih mantap!
           </div>
         ) : (
           filteredLogs.slice(0, 150).map((item, idx) => (
