@@ -5,17 +5,16 @@ export interface LogEntry {
   id?: number;
   date: string;
   time: string;
-  type: 'critical' | 'error' | 'warn' | 'action';
+  type: 'critical' | 'error' | 'warn';
   message: string;
   stack?: string;
   size: number;
 }
 
-// Kod Cheat Code asal dikembalikan
 const CHEAT_CODE = './musalog';
-const MAX_STORAGE_BYTES = 10 * 1024 * 1024; // Had 10 MB
+const MAX_STORAGE_BYTES = 2 * 1024 * 1024; // Had siling 2 Megabytes (F.I.F.O)
 const DB_NAME = 'MusaLogDatabase';
-const DB_VERSION = 2; // Dinaikkan versi agar storan sentiasa segar
+const DB_VERSION = 3;
 const STORE_LOGS = 'logs';
 const STORE_META = 'metadata';
 
@@ -43,7 +42,7 @@ const getDB = (): Promise<IDBDatabase> => {
 export const MusaLog: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [filter, setFilter] = useState<'all' | 'action' | 'critical' | 'error' | 'warn'>('all');
+  const [filter, setFilter] = useState<'all' | 'critical' | 'error' | 'warn'>('all');
   const [totalBytesUsed, setTotalBytesUsed] = useState<number>(0);
   const isProcessingQueue = useRef(false);
   const logQueue = useRef<Omit<LogEntry, 'id' | 'size'>[]>([]);
@@ -75,8 +74,7 @@ export const MusaLog: React.FC = () => {
         setLogs(allLogs);
         setTotalBytesUsed(metaReq.result?.value || 0);
       };
-    } catch (e) {
-      // Jika DB gagal, kekalkan log dalam memori
+    } catch {
       setLogs([...logsRef.current]);
     }
   }, []);
@@ -106,13 +104,14 @@ export const MusaLog: React.FC = () => {
           currentSize += itemSize;
         }
 
+        // F.I.F.O: Buang log lama jika melepasi 2 MB
         if (currentSize > MAX_STORAGE_BYTES) {
           const cursorReq = logStore.openCursor();
           cursorReq.onsuccess = () => {
             const cursor = cursorReq.result;
             if (cursor && currentSize > MAX_STORAGE_BYTES) {
               const record = cursor.value as LogEntry;
-              currentSize -= record.size || 500;
+              currentSize -= record.size || 400;
               cursor.delete();
               cursor.continue();
             } else {
@@ -145,14 +144,12 @@ export const MusaLog: React.FC = () => {
       type,
       message,
       stack,
-      size: 300,
+      size: 350,
     };
 
-    // Sentiasa simpan serta-merta ke memori pantas
     logsRef.current = [newEntry, ...logsRef.current].slice(0, 300);
     setLogs([...logsRef.current]);
 
-    // Simpan ke arkib storan kekal
     logQueue.current.push(newEntry);
     processLogQueue();
   };
@@ -163,20 +160,31 @@ export const MusaLog: React.FC = () => {
     const origError = console.error;
     const origWarn = console.warn;
 
+    // 1. Tapis console.error (Beri tanda khas jika melibatkan penggera/azan)
     console.error = (...args: any[]) => {
       origError(...args);
-      enqueueLog('error', args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      const isAlarmIssue = /azan|alarm|audio|penggera|sound|notif|permission/i.test(msg);
+      enqueueLog(
+        isAlarmIssue ? 'critical' : 'error',
+        isAlarmIssue ? `⚠️ [ISU PENGGERA]: ${msg}` : msg
+      );
     };
 
+    // 2. Tapis console.warn (Fokus kepada amaran penjadualan azan / sistem)
     console.warn = (...args: any[]) => {
       origWarn(...args);
-      enqueueLog('warn', args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' '));
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      const isAlarmIssue = /azan|alarm|audio|penggera|jadual|permission/i.test(msg);
+      enqueueLog('warn', isAlarmIssue ? `🔔 [AMARAN AZAN]: ${msg}` : msg);
     };
 
+    // 3. Tangkap Crash Kritikal JS
     const handleGlobalError = (event: ErrorEvent) => {
       enqueueLog('critical', event.message || 'Ralat Runtime Kritikal', event.error?.stack);
     };
 
+    // 4. Tangkap Kegagalan Async / Promise
     const handlePromiseError = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
       const stack = reason instanceof Error ? reason.stack : undefined;
@@ -184,55 +192,29 @@ export const MusaLog: React.FC = () => {
       enqueueLog('critical', `Promise Rejection: ${message}`, stack);
     };
 
+    // 5. SENSOR KHAS: Tangkap terus jika audio azan disekat oleh Android / Browser
+    const origAudioPlay = HTMLAudioElement.prototype.play;
+    HTMLAudioElement.prototype.play = function (...args) {
+      return origAudioPlay.apply(this, args).catch((err: any) => {
+        const audioSrc = this.src || 'Fail Audio Azan';
+        enqueueLog(
+          'critical',
+          `🚨 [ALARM GAGAL BERBUNYI]: Audio disekat atau gagal dimainkan (${err?.name || 'Error'}: ${err?.message || err}) | Sumber: ${audioSrc}`
+        );
+        throw err;
+      });
+    };
+
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handlePromiseError);
 
-    // ==========================================
-    // MULA: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
-    // ==========================================
-    const handleUserInteraction = (e: MouseEvent) => {
-      try {
-        const rawTarget = e.target;
-        if (!rawTarget || !(rawTarget instanceof Element)) return;
-
-        const target = rawTarget.closest(
-          'button, [role="button"], a, input, select, [class*="cursor-pointer"]'
-        ) as HTMLElement | null;
-
-        if (!target) return;
-        if (target.closest('#musalog-modal-root')) return;
-
-        let label =
-          target.getAttribute('aria-label') ||
-          target.getAttribute('title') ||
-          target.innerText?.trim() ||
-          (target as HTMLInputElement).value ||
-          target.getAttribute('placeholder') ||
-          target.tagName.toLowerCase();
-
-        label = String(label).replace(/\s+/g, ' ').slice(0, 40);
-
-        if (label && !label.includes('musalog')) {
-          enqueueLog('action', `Aktiviti: Tekan "${label}"`);
-        }
-      } catch {}
-    };
-
-    document.addEventListener('click', handleUserInteraction, true);
-    // ==========================================
-    // AKHIR: LOG AKTIVITI PENGGUNA (SENSOR AUTO-KLIK)
-    // ==========================================
-
-    // ==========================================
-    // MULA: PENGESAN CHEAT CODE (DIPULIHKAN SEPENUHNYA)
-    // ==========================================
+    // Semakan Cheat Code
     const handleCheatCheck = (e: Event) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement;
       if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return;
 
       const val = (target.value || '').trim().toLowerCase();
 
-      // Semak sama ada padan tepat ./musalog ATAU musalog
       if (val === CHEAT_CODE.toLowerCase() || val === 'musalog' || val.endsWith('musalog')) {
         setIsOpen(true);
         reloadLogsFromDB();
@@ -247,15 +229,7 @@ export const MusaLog: React.FC = () => {
       }
     };
 
-    document.addEventListener('input', handleCheatCheck);
-    document.addEventListener('keyup', handleCheatCheck);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('change', handleCheatCheck);
-    // ==========================================
-    // AKHIR: PENGESAN CHEAT CODE
-    // ==========================================
-
-    // Sandaran kecemasan: Ketuk 5 kali pada bahagian logo atas skrin
+    // Sandaran ketuk logo 5 kali
     const handleSecretTap = (e: MouseEvent | TouchEvent) => {
       const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
       if (clientY !== undefined && clientY < 80) {
@@ -274,22 +248,19 @@ export const MusaLog: React.FC = () => {
         }
       }
     };
+
+    document.addEventListener('input', handleCheatCheck);
+    document.addEventListener('keyup', handleCheatCheck);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('change', handleCheatCheck);
     window.addEventListener('click', handleSecretTap);
 
     return () => {
       console.error = origError;
       console.warn = origWarn;
+      HTMLAudioElement.prototype.play = origAudioPlay;
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handlePromiseError);
-
-      // ==========================================
-      // MULA: PEMBERSIHAN LISTENER AKTIVITI PENGGUNA
-      // ==========================================
-      document.removeEventListener('click', handleUserInteraction, true);
-      // ==========================================
-      // AKHIR: PEMBERSIHAN LISTENER AKTIVITI PENGGUNA
-      // ==========================================
-
       document.removeEventListener('input', handleCheatCheck);
       document.removeEventListener('keyup', handleCheatCheck);
       document.removeEventListener('keydown', handleKeyDown);
@@ -299,7 +270,7 @@ export const MusaLog: React.FC = () => {
   }, [reloadLogsFromDB]);
 
   const clearAllLogs = async () => {
-    if (!window.confirm('Padam semua rekod log dalam storan kekal?')) return;
+    if (!window.confirm('Padam semua rekod log dalam storan?')) return;
     try {
       logsRef.current = [];
       setLogs([]);
@@ -327,6 +298,37 @@ export const MusaLog: React.FC = () => {
     alert(`Berjaya salin ${logs.length} entri log!`);
   };
 
+  // Fungsi muat turun fail .txt fizikal ke folder Download
+  const exportAsTextFile = () => {
+    if (logs.length === 0) return alert('Tiada log untuk dieksport.');
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `MusaLog_SolatKini_${timestamp}.txt`;
+
+    const content = [
+      '=====================================================',
+      ` MUSA LOG REPORT - SOLATKINI MALAYSIA`,
+      ` Tarikh Eksport: ${new Date().toLocaleString('en-GB')}`,
+      ` Jumlah Rekod : ${logs.length} entri`,
+      ` Saiz Storan   : ${formatBytes(totalBytesUsed)} / 2.00 MB`,
+      '=====================================================\n',
+      ...logs.map(
+        (l) =>
+          `[${l.date} ${l.time}] [${(l.type || 'LOG').toUpperCase()}]\n${l.message}${l.stack ? '\nStack Trace:\n' + l.stack : ''}\n-----------------------------------------------------`
+      ),
+    ].join('\n');
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (!isOpen) return null;
 
   const filteredLogs = logs.filter((l) => (filter === 'all' ? true : l.type === filter));
@@ -337,7 +339,7 @@ export const MusaLog: React.FC = () => {
       style={{
         position: 'fixed',
         inset: 0,
-        backgroundColor: 'rgba(5, 8, 12, 0.96)',
+        backgroundColor: 'rgba(5, 8, 12, 0.97)',
         zIndex: 999999,
         display: 'flex',
         flexDirection: 'column',
@@ -345,13 +347,14 @@ export const MusaLog: React.FC = () => {
         fontFamily: 'monospace',
       }}
     >
+      {/* Header Modal */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div>
           <div style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: '15px' }}>
-            ⚡ MusaLog Autosave Console
+            ⚡ MusaLog System (Error & Alarm Monitor)
           </div>
           <div style={{ color: '#94A3B8', fontSize: '11px', marginTop: '2px' }}>
-            Saiz: <strong style={{ color: '#38BDF8' }}>{formatBytes(totalBytesUsed)}</strong> / 10.00 MB (F.I.F.O)
+            Storan: <strong style={{ color: '#38BDF8' }}>{formatBytes(totalBytesUsed)}</strong> / 2.00 MB (F.I.F.O Auto-Trim)
           </div>
         </div>
 
@@ -372,6 +375,7 @@ export const MusaLog: React.FC = () => {
         </button>
       </div>
 
+      {/* Bar Butang Tindakan */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <button
           onClick={() => setFilter('all')}
@@ -387,27 +391,6 @@ export const MusaLog: React.FC = () => {
           Semua ({logs.length})
         </button>
 
-        {/* ========================================== */}
-        {/* MULA: BUTANG FILTER AKTIVITI PENGGUNA      */}
-        {/* ========================================== */}
-        <button
-          onClick={() => setFilter('action')}
-          style={{
-            background: filter === 'action' ? '#059669' : '#1E293B',
-            color: '#A7F3D0',
-            border: '1px solid #065F46',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: 'bold',
-          }}
-        >
-          Aktiviti ({logs.filter((l) => l.type === 'action').length})
-        </button>
-        {/* ========================================== */}
-        {/* AKHIR: BUTANG FILTER AKTIVITI PENGGUNA     */}
-        {/* ========================================== */}
-
         <button
           onClick={() => setFilter('critical')}
           style={{
@@ -420,8 +403,9 @@ export const MusaLog: React.FC = () => {
             fontWeight: 'bold',
           }}
         >
-          Kritikal ({logs.filter((l) => l.type === 'critical').length})
+          Kritikal / Alarm ({logs.filter((l) => l.type === 'critical').length})
         </button>
+
         <button
           onClick={() => setFilter('error')}
           style={{
@@ -435,6 +419,7 @@ export const MusaLog: React.FC = () => {
         >
           Error ({logs.filter((l) => l.type === 'error').length})
         </button>
+
         <button
           onClick={() => setFilter('warn')}
           style={{
@@ -449,6 +434,24 @@ export const MusaLog: React.FC = () => {
           Warning ({logs.filter((l) => l.type === 'warn').length})
         </button>
 
+        {/* Butang Export Fail .txt */}
+        <button
+          onClick={exportAsTextFile}
+          style={{
+            background: '#2563EB',
+            color: '#FFFFFF',
+            border: 'none',
+            padding: '4px 10px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            marginLeft: 'auto',
+            cursor: 'pointer',
+          }}
+        >
+          💾 Muat Turun (.txt)
+        </button>
+
         <button
           onClick={copyAllLogs}
           style={{
@@ -458,11 +461,10 @@ export const MusaLog: React.FC = () => {
             padding: '4px 10px',
             borderRadius: '4px',
             fontSize: '11px',
-            marginLeft: 'auto',
             cursor: 'pointer',
           }}
         >
-          📋 Salin Semua
+          📋 Salin
         </button>
 
         <button
@@ -477,10 +479,11 @@ export const MusaLog: React.FC = () => {
             cursor: 'pointer',
           }}
         >
-          🗑️ Padam Storan
+          🗑️ Padam
         </button>
       </div>
 
+      {/* Terminal View */}
       <div
         style={{
           flex: 1,
@@ -494,7 +497,7 @@ export const MusaLog: React.FC = () => {
       >
         {filteredLogs.length === 0 ? (
           <div style={{ color: '#64748B', textAlign: 'center', marginTop: '60px' }}>
-            Tiada log dikesan. Bersih mantap!
+            Tiada ralat atau amaran penggera dikesan. Sistem berjalan bersih!
           </div>
         ) : (
           filteredLogs.slice(0, 150).map((item, idx) => (
@@ -518,32 +521,29 @@ export const MusaLog: React.FC = () => {
                     borderRadius: '3px',
                     fontWeight: 'bold',
                     backgroundColor:
-                      item.type === 'action'
-                        ? '#064E3B'
-                        : item.type === 'critical'
+                      item.type === 'critical'
                         ? '#7F1D1D'
                         : item.type === 'error'
                         ? '#450A0A'
                         : '#78350F',
                     color:
-                      item.type === 'action'
-                        ? '#6EE7B7'
-                        : item.type === 'critical'
+                      item.type === 'critical'
                         ? '#FECACA'
                         : item.type === 'error'
                         ? '#FCA5A5'
                         : '#FDE68A',
                   }}
                 >
-                  {item.type === 'action' ? 'AKTIVITI' : (item.type || 'LOG').toUpperCase()}
+                  {item.type.toUpperCase()}
                 </span>
               </div>
 
               <div
                 style={{
-                  color: '#E2E8F0',
+                  color: item.message.includes('ALARM') || item.message.includes('PENGGERA') ? '#FCA5A5' : '#E2E8F0',
                   wordBreak: 'break-word',
                   lineHeight: '1.4',
+                  fontWeight: item.message.includes('ALARM') ? 'bold' : 'normal',
                 }}
               >
                 {item.message}
