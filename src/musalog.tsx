@@ -14,7 +14,7 @@ export interface LogEntry {
 const CHEAT_CODE = './musalog';
 const MAX_STORAGE_BYTES = 2 * 1024 * 1024; // Had siling 2 Megabytes (F.I.F.O)
 const DB_NAME = 'MusaLogDatabase';
-const DB_VERSION = 3;
+const DB_VERSION = 5; // Versi storan dikemas kini
 const STORE_LOGS = 'logs';
 const STORE_META = 'metadata';
 
@@ -75,6 +75,7 @@ export const MusaLog: React.FC = () => {
         setTotalBytesUsed(metaReq.result?.value || 0);
       };
     } catch {
+      // Guna memori sedia ada jika storan gagal dibaca
       setLogs([...logsRef.current]);
     }
   }, []);
@@ -104,7 +105,7 @@ export const MusaLog: React.FC = () => {
           currentSize += itemSize;
         }
 
-        // F.I.F.O: Buang log lama jika melepasi 2 MB
+        // F.I.F.O Auto-Trim jika melebihi 2 MB
         if (currentSize > MAX_STORAGE_BYTES) {
           const cursorReq = logStore.openCursor();
           cursorReq.onsuccess = () => {
@@ -147,9 +148,11 @@ export const MusaLog: React.FC = () => {
       size: 350,
     };
 
+    // Kemas kini memori pantas serta-merta
     logsRef.current = [newEntry, ...logsRef.current].slice(0, 300);
     setLogs([...logsRef.current]);
 
+    // Simpan ke IndexedDB
     logQueue.current.push(newEntry);
     processLogQueue();
   };
@@ -159,19 +162,20 @@ export const MusaLog: React.FC = () => {
 
     const origError = console.error;
     const origWarn = console.warn;
+    const origInfo = console.info;
 
-    // 1. Tapis console.error (Beri tanda khas jika melibatkan penggera/azan)
+    // 1. Pintas console.error
     console.error = (...args: any[]) => {
       origError(...args);
       const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      const isAlarmIssue = /azan|alarm|audio|penggera|sound|notif|permission/i.test(msg);
+      const isAlarmIssue = /azan|alarm|audio|penggera|sound|permission/i.test(msg);
       enqueueLog(
         isAlarmIssue ? 'critical' : 'error',
         isAlarmIssue ? `⚠️ [ISU PENGGERA]: ${msg}` : msg
       );
     };
 
-    // 2. Tapis console.warn (Fokus kepada amaran penjadualan azan / sistem)
+    // 2. Pintas console.warn
     console.warn = (...args: any[]) => {
       origWarn(...args);
       const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
@@ -179,20 +183,61 @@ export const MusaLog: React.FC = () => {
       enqueueLog('warn', isAlarmIssue ? `🔔 [AMARAN AZAN]: ${msg}` : msg);
     };
 
-    // 3. Tangkap Crash Kritikal JS
-    const handleGlobalError = (event: ErrorEvent) => {
-      enqueueLog('critical', event.message || 'Ralat Runtime Kritikal', event.error?.stack);
+    // 3. Pintas console.info (Fokus ralat berkaitan lokasi)
+    console.info = (...args: any[]) => {
+      origInfo(...args);
+      const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+      if (/lokasi|geolokasi|gps|geolocation/i.test(msg)) {
+        enqueueLog('warn', `📍 [INFO LOKASI]: ${msg}`);
+      }
     };
 
-    // 4. Tangkap Kegagalan Async / Promise
-    const handlePromiseError = (event: PromiseRejectionEvent) => {
-      const reason = event.reason;
-      const stack = reason instanceof Error ? reason.stack : undefined;
-      const message = reason instanceof Error ? reason.message : String(reason);
-      enqueueLog('critical', `Promise Rejection: ${message}`, stack);
-    };
+    // 4. Sensor Geolocation: Pintas bila GPS gagal berfungsi
+    let origGetCurrentPosition: any = null;
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      origGetCurrentPosition = navigator.geolocation.getCurrentPosition;
+      navigator.geolocation.getCurrentPosition = function (success, error, options) {
+        const customErrorCallback: PositionErrorCallback = (err) => {
+          let errorType = 'Ralat Tidak Diketahui';
+          if (err.code === 1) errorType = 'Kebenaran GPS Ditolak (Permission Denied)';
+          if (err.code === 2) errorType = 'GPS Mati / Tiada Signal (Position Unavailable)';
+          if (err.code === 3) errorType = 'Masa Tamat Mencari GPS (Timeout)';
 
-    // 5. SENSOR KHAS: Tangkap terus jika audio azan disekat oleh Android / Browser
+          enqueueLog(
+            'error',
+            `📍 [GAGAL KESAN LOKASI]: Kod ${err.code} - ${errorType} | Mesej: ${err.message || 'Tiada maklumat ralat'}`
+          );
+
+          if (error) error(err);
+        };
+
+        return origGetCurrentPosition.call(navigator.geolocation, success, customErrorCallback, options);
+      };
+    }
+
+    // 5. Sensor Anjakan Masa / Tarikh Telefon Tidak Selaras
+    const checkSystemTimeSanity = () => {
+      try {
+        const lastSavedEpoch = localStorage.getItem('musalog_last_known_time');
+        const currentEpoch = Date.now();
+
+        if (lastSavedEpoch) {
+          const diff = currentEpoch - parseInt(lastSavedEpoch, 10);
+          if (diff < -600000) {
+            enqueueLog(
+              'critical',
+              `⏰ [AMARAN MASA PERANTI]: Jam telefon dikesan diundur ke masa lampau secara manual atau tetapan masa automatik dimatikan! (Perbezaan: ${Math.round(
+                diff / 60000
+              )} minit)`
+            );
+          }
+        }
+        localStorage.setItem('musalog_last_known_time', currentEpoch.toString());
+      } catch {}
+    };
+    checkSystemTimeSanity();
+
+    // 6. Sensor Audio Azan Disekat Android
     const origAudioPlay = HTMLAudioElement.prototype.play;
     HTMLAudioElement.prototype.play = function (...args) {
       return origAudioPlay.apply(this, args).catch((err: any) => {
@@ -205,16 +250,27 @@ export const MusaLog: React.FC = () => {
       });
     };
 
+    // 7. Tangkap Uncaught Runtime Crash & Unhandled Promise
+    const handleGlobalError = (event: ErrorEvent) => {
+      enqueueLog('critical', event.message || 'Ralat Runtime Kritikal', event.error?.stack);
+    };
+
+    const handlePromiseError = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      const stack = reason instanceof Error ? reason.stack : undefined;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      enqueueLog('critical', `Promise Rejection: ${message}`, stack);
+    };
+
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handlePromiseError);
 
-    // Semakan Cheat Code
+    // Semakan Cheat Code ./musalog
     const handleCheatCheck = (e: Event) => {
       const target = e.target as HTMLInputElement | HTMLTextAreaElement;
       if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) return;
 
       const val = (target.value || '').trim().toLowerCase();
-
       if (val === CHEAT_CODE.toLowerCase() || val === 'musalog' || val.endsWith('musalog')) {
         setIsOpen(true);
         reloadLogsFromDB();
@@ -229,7 +285,7 @@ export const MusaLog: React.FC = () => {
       }
     };
 
-    // Sandaran ketuk logo 5 kali
+    // Sandaran ketuk logo 5 kali laju
     const handleSecretTap = (e: MouseEvent | TouchEvent) => {
       const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY;
       if (clientY !== undefined && clientY < 80) {
@@ -258,6 +314,10 @@ export const MusaLog: React.FC = () => {
     return () => {
       console.error = origError;
       console.warn = origWarn;
+      console.info = origInfo;
+      if (origGetCurrentPosition && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition = origGetCurrentPosition;
+      }
       HTMLAudioElement.prototype.play = origAudioPlay;
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handlePromiseError);
@@ -268,6 +328,18 @@ export const MusaLog: React.FC = () => {
       window.removeEventListener('click', handleSecretTap);
     };
   }, [reloadLogsFromDB]);
+
+  // Fungsi Ujian Diagnostik Pantas
+  const triggerSelfTest = () => {
+    console.warn('Ujian Diagnostik: Pemantau sistem aktif & menapis amaran.');
+    console.error('⚠️ [ISU PENGGERA]: Gagal memainkan audio azan (Simulasi Ujian).');
+    enqueueLog(
+      'critical',
+      'Simulasi Crash: Ralat runtime berjaya ditangkap oleh MusaLog!',
+      'at SelfTest (musalog.tsx:1)\n    at triggerSelfTest (musalog.tsx:285)'
+    );
+    alert('3 ralat ujian berjaya dihantar ke dalam MusaLog!');
+  };
 
   const clearAllLogs = async () => {
     if (!window.confirm('Padam semua rekod log dalam storan?')) return;
@@ -298,7 +370,6 @@ export const MusaLog: React.FC = () => {
     alert(`Berjaya salin ${logs.length} entri log!`);
   };
 
-  // Fungsi muat turun fail .txt fizikal ke folder Download
   const exportAsTextFile = () => {
     if (logs.length === 0) return alert('Tiada log untuk dieksport.');
 
@@ -347,7 +418,7 @@ export const MusaLog: React.FC = () => {
         fontFamily: 'monospace',
       }}
     >
-      {/* Header Modal */}
+      {/* Bahagian Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
         <div>
           <div style={{ color: '#F59E0B', fontWeight: 'bold', fontSize: '15px' }}>
@@ -375,7 +446,7 @@ export const MusaLog: React.FC = () => {
         </button>
       </div>
 
-      {/* Bar Butang Tindakan */}
+      {/* Bar Butang Kawalan & Fungsi */}
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         <button
           onClick={() => setFilter('all')}
@@ -403,7 +474,7 @@ export const MusaLog: React.FC = () => {
             fontWeight: 'bold',
           }}
         >
-          Kritikal / Alarm ({logs.filter((l) => l.type === 'critical').length})
+          Kritikal ({logs.filter((l) => l.type === 'critical').length})
         </button>
 
         <button
@@ -434,11 +505,11 @@ export const MusaLog: React.FC = () => {
           Warning ({logs.filter((l) => l.type === 'warn').length})
         </button>
 
-        {/* Butang Export Fail .txt */}
+        {/* Butang Self-Test */}
         <button
-          onClick={exportAsTextFile}
+          onClick={triggerSelfTest}
           style={{
-            background: '#2563EB',
+            background: '#7C3AED',
             color: '#FFFFFF',
             border: 'none',
             padding: '4px 10px',
@@ -449,9 +520,27 @@ export const MusaLog: React.FC = () => {
             cursor: 'pointer',
           }}
         >
+          🧪 Uji Ralat
+        </button>
+
+        {/* Butang Export .txt */}
+        <button
+          onClick={exportAsTextFile}
+          style={{
+            background: '#2563EB',
+            color: '#FFFFFF',
+            border: 'none',
+            padding: '4px 10px',
+            borderRadius: '4px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+          }}
+        >
           💾 Muat Turun (.txt)
         </button>
 
+        {/* Butang Salin */}
         <button
           onClick={copyAllLogs}
           style={{
@@ -467,6 +556,7 @@ export const MusaLog: React.FC = () => {
           📋 Salin
         </button>
 
+        {/* Butang Padam */}
         <button
           onClick={clearAllLogs}
           style={{
@@ -483,7 +573,7 @@ export const MusaLog: React.FC = () => {
         </button>
       </div>
 
-      {/* Terminal View */}
+      {/* Paparan Terminal Log */}
       <div
         style={{
           flex: 1,
@@ -497,7 +587,7 @@ export const MusaLog: React.FC = () => {
       >
         {filteredLogs.length === 0 ? (
           <div style={{ color: '#64748B', textAlign: 'center', marginTop: '60px' }}>
-            Tiada ralat atau amaran penggera dikesan. Sistem berjalan bersih!
+            Tiada ralat atau amaran dikesan. Tekan butang "🧪 Uji Ralat" untuk simulasi!
           </div>
         ) : (
           filteredLogs.slice(0, 150).map((item, idx) => (
@@ -540,10 +630,20 @@ export const MusaLog: React.FC = () => {
 
               <div
                 style={{
-                  color: item.message.includes('ALARM') || item.message.includes('PENGGERA') ? '#FCA5A5' : '#E2E8F0',
+                  color:
+                    item.message.includes('ALARM') ||
+                    item.message.includes('PENGGERA') ||
+                    item.message.includes('LOKASI')
+                      ? '#FCA5A5'
+                      : '#E2E8F0',
                   wordBreak: 'break-word',
                   lineHeight: '1.4',
-                  fontWeight: item.message.includes('ALARM') ? 'bold' : 'normal',
+                  fontWeight:
+                    item.message.includes('ALARM') ||
+                    item.message.includes('PENGGERA') ||
+                    item.message.includes('LOKASI')
+                      ? 'bold'
+                      : 'normal',
                 }}
               >
                 {item.message}
