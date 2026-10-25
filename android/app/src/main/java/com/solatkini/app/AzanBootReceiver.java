@@ -29,7 +29,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent != null ? intent.getAction() : "";
-        Log.i(TAG, "Menerima siaran sistem boot/masa: " + action);
+        Log.i(TAG, "Menerima siaran sistem boot/waktu: " + action);
 
         boolean isBootAction = Intent.ACTION_BOOT_COMPLETED.equals(action) ||
             Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(action) ||
@@ -41,14 +41,12 @@ public class AzanBootReceiver extends BroadcastReceiver {
             Intent.ACTION_TIMEZONE_CHANGED.equals(action);
 
         if (isBootAction || isTimeChangeAction) {
-
-            // Gunakan Device Protected Storage secara selamat jika peranti masih di skrin kunci Direct Boot
             Context safeContext = context;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 safeContext = context.isDeviceProtectedStorage() ? context : context.createDeviceProtectedStorageContext();
             }
 
-            // 1. Semak tetapan auto-start pengguna (Lalai: TRUE)
+            // 1. Periksa setelan auto-start
             boolean isAutoStartEnabled = true;
             try {
                 SharedPreferences appPrefs = safeContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
@@ -61,43 +59,39 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     isAutoStartEnabled = "true".equalsIgnoreCase(val);
                 }
             } catch (Exception e) {
-                Log.w(TAG, "Gagal membaca tetapan auto-start: " + e.getMessage());
+                Log.w(TAG, "Gagal membaca setelan auto-start: " + e.getMessage());
             }
 
             if (!isAutoStartEnabled) {
-                Log.d(TAG, "Pengguna telah mematikan fungsi auto-start SolatKini.");
+                Log.d(TAG, "Pengguna menonaktifkan auto-start SolatKini.");
                 return;
             }
 
-            // 2. Jadualkan semula semua penggera azan di latar belakang secara SENYAP
-            Log.i(TAG, "Menjadualkan semula penggera waktu solat (Tindakan: " + action + ")...");
+            // 2. Jadwalkan ulang seluruh alarm azan secara aman di latar belakang
+            Log.i(TAG, "Menjadwalkan ulang alarm waktu sholat (Aksi: " + action + ")...");
             rescheduleStoredAlarms(safeContext);
 
-            // 3. Kemas kini Widget Skrin Utama
+            // 3. Perbarui widget layar utama
             try {
                 Intent widgetIntent = new Intent(safeContext, SolatWidgetProvider.class);
                 widgetIntent.setAction("com.solatkini.app.UPDATE_PRAYER_TIMES");
                 safeContext.sendBroadcast(widgetIntent);
             } catch (Exception e) {
-                Log.w(TAG, "Gagal mengemas kini widget: " + e.getMessage());
+                Log.w(TAG, "Gagal memperbarui widget: " + e.getMessage());
             }
 
-            // 4. Paparkan notifikasi permulaan (hanya semasa boot telefon, bukan setiap kali tukar jam manual)
+            // 4. Tampilkan notifikasi awal hanya saat boot perangkat
             if (isBootAction) {
                 try {
                     showInitialBootNotification(safeContext);
-                    Log.i(TAG, "Notifikasi boot berjaya dipaparkan.");
+                    Log.i(TAG, "Notifikasi boot berhasil ditampilkan.");
                 } catch (Exception e) {
-                    Log.e(TAG, "Gagal memaparkan notifikasi boot: " + e.getMessage());
+                    Log.e(TAG, "Gagal menampilkan notifikasi boot: " + e.getMessage());
                 }
             }
         }
     }
 
-    /**
-     * Memaparkan notifikasi permulaan selepas reboot.
-     * Menggunakan setAutoCancel(true) supaya automatik padam apabila ditekan.
-     */
     public static void showInitialBootNotification(Context context) {
         try {
             NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -136,7 +130,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     String name = obj.optString("prayerName", "");
                     String key = obj.optString("prayerKey", "");
 
-                    // Abaikan Imsak dan Syuruk daripada paparan solat seterusnya
                     if ("imsak".equalsIgnoreCase(key) || "syuruk".equalsIgnoreCase(key)) {
                         continue;
                     }
@@ -167,8 +160,8 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(nextPrayerTitle)
                 .setContentText(nextPrayerDetails)
-                .setOngoing(false) // Boleh dileret (swipe) buang
-                .setAutoCancel(true) // Automatik padam bila ditekan
+                .setOngoing(false)
+                .setAutoCancel(true)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentIntent(contentPendingIntent)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
@@ -214,11 +207,10 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     String prayerName = obj.optString("prayerName", "Solat");
                     String voice = obj.optString("voice", "jakim");
                     long timestamp = obj.optLong("timestamp", 0);
-                    int requestCode = obj.optInt("requestCode", 2000 + i);
+                    int requestCode = AzanAlarmPlugin.getRequestCodeForPrayer(prayerKey, i);
 
                     if (timestamp <= 0) continue;
 
-                    // Kunci azan Subuh khas
                     if ("subuh".equalsIgnoreCase(prayerKey)) {
                         voice = "subuh_special";
                     }
@@ -232,7 +224,6 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     targetCal.set(Calendar.SECOND, 0);
                     targetCal.set(Calendar.MILLISECOND, 0);
 
-                    // Jika waktu hari ini sudah berlalu berbanding masa semasa, jadualkan keesokan harinya
                     if (targetCal.getTimeInMillis() <= now) {
                         targetCal.add(Calendar.DAY_OF_YEAR, 1);
                     }
@@ -246,11 +237,11 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     }
 
                     Intent alarmIntent = new Intent(context, AzanAlarmReceiver.class);
-                    alarmIntent.setAction("com.solatkini.app.TRIGGER_AZAN_ALARM");
+                    // Diselaraskan 100% dengan AzanAlarmReceiver.ACTION_TRIGGER_AZAN
+                    alarmIntent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
                     alarmIntent.putExtra("prayer_key", prayerKey);
                     alarmIntent.putExtra("prayer_name", prayerName);
                     alarmIntent.putExtra("voice", voice);
-                    // Bekalkan scheduled_timestamp untuk semakan had masa
                     alarmIntent.putExtra("scheduled_timestamp", triggerTimestamp);
 
                     PendingIntent pendingIntent = PendingIntent.getBroadcast(
@@ -260,13 +251,30 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerTimestamp, pendingIntent);
-                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
-                    } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
+                    Intent showAppIntent = new Intent(context, MainActivity.class);
+                    showAppIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    PendingIntent showPendingIntent = PendingIntent.getActivity(
+                        context,
+                        requestCode + 10000,
+                        showAppIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerTimestamp, showPendingIntent);
+                            alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
+                        } else {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
+                        }
+                    } catch (SecurityException se) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
+                        } else {
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTimestamp, pendingIntent);
+                        }
                     }
 
                     rescheduledCount++;
