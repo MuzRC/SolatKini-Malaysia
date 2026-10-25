@@ -74,7 +74,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         showPrayerAlertNotification(context, prayerName);
 
         // 4. Kemas kini Notifikasi Berterusan ke Waktu Solat Seterusnya SECARA NATIVE
-        updatePersistentNotificationNatively(context);
+        // updatePersistentNotificationNatively(context);
     }
 
     private void showPrayerAlertNotification(Context context, String prayerName) {
