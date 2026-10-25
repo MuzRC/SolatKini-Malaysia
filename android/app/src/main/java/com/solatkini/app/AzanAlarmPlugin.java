@@ -645,4 +645,40 @@ public class AzanAlarmPlugin extends Plugin {
             }
         }
     }
+
+    // ==============================================================================================
+    // [MULA KOD BOLEH PADAM] : MODUL DIAGNOSTIK LOG REKOD AZAN 24 JAM
+    // Padam dari baris ini jika mahu membuang fungsi log di kemudian hari
+    // ==============================================================================================
+
+    @PluginMethod
+    public void getAzanHistory(PluginCall call) {
+        try {
+            String historyJson = AzanHistoryLogger.getLogsJson(getContext());
+            JSObject ret = new JSObject();
+            ret.put("history", new JSArray(historyJson));
+            call.resolve(ret);
+        } catch (Exception e) {
+            JSObject ret = new JSObject();
+            ret.put("history", new JSArray());
+            call.resolve(ret);
+        }
+    }
+
+    @PluginMethod
+    public void clearAzanHistory(PluginCall call) {
+        try {
+            AzanHistoryLogger.clearLogs(getContext());
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal memadam log sejarah azan: " + e.getMessage(), e);
+        }
+    }
+
+    // ==============================================================================================
+    // [TAMAT KOD BOLEH PADAM] : MODUL DIAGNOSTIK LOG REKOD AZAN 24 JAM
+    // Padam sehingga baris ini sahaja
+    // ==============================================================================================
 }
