@@ -32,6 +32,14 @@ import { ThemeId, getSavedTheme, applyTheme, THEME_OPTIONS } from './utils/theme
 import { getHijriDate } from './utils/hijriCalendar';
 import { formatDisplayTime } from './utils/prayerCalculator';
 
+// ==========================================
+// MULA: MUSALOG (PADAM BAHAGIAN INI UNTUK BUANG)
+// ==========================================
+import { MusaLog } from './musalog';
+// ==========================================
+// AKHIR: MUSALOG
+// ==========================================
+
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -591,6 +599,14 @@ export default function App() {
         voice={alarmModalState.voice}
         onClose={() => setAlarmModalState((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      {/* ========================================== */}
+      {/* MULA: MUSALOG (PADAM BAHAGIAN INI UNTUK BUANG) */}
+      {/* ========================================== */}
+      <MusaLog />
+      {/* ========================================== */}
+      {/* AKHIR: MUSALOG */}
+      {/* ========================================== */}
     </div>
   );
 }
