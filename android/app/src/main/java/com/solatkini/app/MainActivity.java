@@ -23,26 +23,17 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // 1. Daftarkan plugin asli sebelum super.onCreate
         registerPlugin(SolatWidgetPlugin.class);
         registerPlugin(AzanAlarmPlugin.class);
 
-        // 2. Hidupkan dan buka skrin kunci untuk paparan azan
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
-        // 3. Padam serta-merta notifikasi boot sementara (ID 1001) bila aplikasi dibuka
         clearInitialBootNotification();
 
-        // 4. Tangani intent pelancaran (Cold Start) dengan kelewatan selamat
         final Intent launchIntent = getIntent();
         if (launchIntent != null) {
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    handleAzanIntent(launchIntent);
-                }
-            }, 1200);
+            dispatchAzanIntentWithRetry(launchIntent, 0);
         }
     }
 
@@ -50,12 +41,8 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         clearInitialBootNotification();
-        // Pemasa automatik 700ms dikeluarkan agar dialog dipicu secara teratur oleh OnboardingChecklist
     }
 
-    /**
-     * Memadamkan notifikasi permulaan boot (ID 1001) supaya hanya notifikasi rasmi penuh yang kekal
-     */
     private void clearInitialBootNotification() {
         try {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
@@ -111,6 +98,22 @@ public class MainActivity extends BridgeActivity {
         } catch (Exception e) {
             Log.w(TAG, "Gagal mengkonfigurasi bendera bangunkan skrin", e);
         }
+    }
+
+    private void dispatchAzanIntentWithRetry(final Intent intent, final int attempt) {
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (getBridge() != null && getBridge().getWebView() != null) {
+                    handleAzanIntent(intent);
+                } else if (attempt < 4) {
+                    Log.d(TAG, "Capacitor Bridge belum bersedia, mencuba semula (percubaan " + (attempt + 1) + ")...");
+                    dispatchAzanIntentWithRetry(intent, attempt + 1);
+                } else {
+                    handleAzanIntent(intent);
+                }
+            }
+        }, attempt == 0 ? 1000 : 800);
     }
 
     private void handleAzanIntent(Intent intent) {
