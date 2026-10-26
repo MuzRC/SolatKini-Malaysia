@@ -4,18 +4,28 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.os.Build;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "SolatWidget")
 public class SolatWidgetPlugin extends Plugin {
+    private static final String TAG = "SolatWidgetPlugin";
     public static final int PERSISTENT_NOTIFICATION_ID = 8801;
     public static final String ACTION_SYNC_PRAYER = "com.solatkini.app.ACTION_SYNC_PRAYER";
+    public static final String PREFS_PERSISTENT = "SolatKiniPersistentPrefs";
 
     @PluginMethod
     public void updateWidget(PluginCall call) {
@@ -25,30 +35,14 @@ public class SolatWidgetPlugin extends Plugin {
             intent.setAction(SolatWidgetProvider.ACTION_UPDATE_PRAYER_TIMES);
             intent.setPackage(context.getPackageName());
 
-            if (call.hasOption("zone")) {
-                intent.putExtra("zone", call.getString("zone"));
-            }
-            if (call.hasOption("next_label")) {
-                intent.putExtra("next_label", call.getString("next_label"));
-            }
-            if (call.hasOption("next_time")) {
-                intent.putExtra("next_time", call.getString("next_time"));
-            }
-            if (call.hasOption("subuh")) {
-                intent.putExtra("subuh", call.getString("subuh"));
-            }
-            if (call.hasOption("zohor")) {
-                intent.putExtra("zohor", call.getString("zohor"));
-            }
-            if (call.hasOption("asar")) {
-                intent.putExtra("asar", call.getString("asar"));
-            }
-            if (call.hasOption("maghrib")) {
-                intent.putExtra("maghrib", call.getString("maghrib"));
-            }
-            if (call.hasOption("isyak")) {
-                intent.putExtra("isyak", call.getString("isyak"));
-            }
+            if (call.hasOption("zone")) intent.putExtra("zone", call.getString("zone"));
+            if (call.hasOption("next_label")) intent.putExtra("next_label", call.getString("next_label"));
+            if (call.hasOption("next_time")) intent.putExtra("next_time", call.getString("next_time"));
+            if (call.hasOption("subuh")) intent.putExtra("subuh", call.getString("subuh"));
+            if (call.hasOption("zohor")) intent.putExtra("zohor", call.getString("zohor"));
+            if (call.hasOption("asar")) intent.putExtra("asar", call.getString("asar"));
+            if (call.hasOption("maghrib")) intent.putExtra("maghrib", call.getString("maghrib"));
+            if (call.hasOption("isyak")) intent.putExtra("isyak", call.getString("isyak"));
 
             context.sendBroadcast(intent);
 
@@ -64,18 +58,12 @@ public class SolatWidgetPlugin extends Plugin {
     public void updatePersistentNotification(PluginCall call) {
         try {
             Context context = getContext();
-            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager == null) {
-                call.reject("NotificationManager tidak tersedia");
-                return;
-            }
 
             String zone = call.getString("zone", "Malaysia");
             String hijri = call.getString("hijri", "");
             String nextLabel = call.getString("next_label", "Solat");
             String nextTime = call.getString("next_time", "--:--");
 
-            // Dapatkan target timestamp jika dihantar oleh TypeScript
             long targetTimestamp = 0L;
             if (call.hasOption("target_timestamp")) {
                 try {
@@ -86,9 +74,8 @@ public class SolatWidgetPlugin extends Plugin {
                 } catch (Exception ignored) {}
             }
 
-            // Sandaran Pintar: Jika tiada atau tamat, kira sendiri terus daripada teks nextTime (cth: "4:53 AM")
             if (targetTimestamp <= System.currentTimeMillis()) {
-                targetTimestamp = parseNextTimeToTimestamp(nextTime);
+                targetTimestamp = parseTimeToTimestamp(nextTime);
             }
 
             String subuh = call.getString("subuh", "--:--");
@@ -97,67 +84,26 @@ public class SolatWidgetPlugin extends Plugin {
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
+            // Simpan snapshot data lengkap ke SharedPreferences untuk kegunaan servis native
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_PERSISTENT, Context.MODE_PRIVATE);
+            prefs.edit()
+                .putString("zone", zone)
+                .putString("hijri", hijri)
+                .putString("next_label", nextLabel)
+                .putString("next_time", nextTime)
+                .putLong("target_timestamp", targetTimestamp)
+                .putString("subuh", subuh)
+                .putString("zohor", zohor)
+                .putString("asar", asar)
+                .putString("maghrib", maghrib)
+                .putString("isyak", isyak)
+                .apply();
 
-            String formatted5Times = String.format(
-                "Subuh %s   Zohor %s   Asar %s   Maghrib %s   Isyak %s",
-                subuh, zohor, asar, maghrib, isyak
+            // Bina dan paparkan notifikasi
+            postPersistentNotification(
+                context, zone, hijri, nextLabel, nextTime,
+                targetTimestamp, subuh, zohor, asar, maghrib, isyak
             );
-
-            // Pintasan 1: Buka Aplikasi
-            Intent openIntent = new Intent(context, MainActivity.class);
-            openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            PendingIntent openPending = PendingIntent.getActivity(
-                context,
-                2001,
-                openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-
-            // Pintasan 2: Segerak Waktu
-            Intent syncIntent = new Intent(context, MainActivity.class);
-            syncIntent.setAction(ACTION_SYNC_PRAYER);
-            syncIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            PendingIntent syncPending = PendingIntent.getActivity(
-                context,
-                2002,
-                syncIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-
-            NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
-                .setBigContentTitle("SolatKini · Zon " + zone)
-                .setSummaryText(hijri.isEmpty() ? "Waktu Solat JAKIM" : hijri)
-                .bigText(nextKicker + "\n\n" + formatted5Times);
-
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(
-                context,
-                SolatKiniApplication.PERSISTENT_CHANNEL_ID
-            )
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("SolatKini · Zon " + zone)
-                .setContentText(nextKicker)
-                .setSubText(hijri.isEmpty() ? zone : hijri)
-                .setStyle(bigStyle)
-                .setContentIntent(openPending)
-                .setOngoing(true)
-                .setOnlyAlertOnce(true)
-                .setSilent(true)
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
-                .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);
-
-            // Pengaktifan Jam Undur Natif (Chronometer)
-            if (targetTimestamp > System.currentTimeMillis()) {
-                builder.setWhen(targetTimestamp)
-                       .setShowWhen(true)              // Wajib untuk Realme UI / ColorOS
-                       .setUsesChronometer(true)       // Gunakan mod kronometer
-                       .setChronometerCountDown(true); // Kiraan menurun ke masa sasaran
-            }
-
-            manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -175,6 +121,9 @@ public class SolatWidgetPlugin extends Plugin {
             if (manager != null) {
                 manager.cancel(PERSISTENT_NOTIFICATION_ID);
             }
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_PERSISTENT, Context.MODE_PRIVATE);
+            prefs.edit().clear().apply();
+
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
@@ -184,10 +133,201 @@ public class SolatWidgetPlugin extends Plugin {
     }
 
     /**
-     * Menukar string masa seperti "4:53 AM", "12:04 PM", atau "16:30" 
-     * kepada epoch timestamp milisaat pada hari ini atau keesokan harinya.
+     * Kaedah statik native untuk mengemas kini notifikasi di background 
+     * tanpa memerlukan WebView/JavaScript aktif.
      */
-    private long parseNextTimeToTimestamp(String timeStr) {
+    public static void refreshPersistentNotification(Context context) {
+        if (context == null) return;
+        try {
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_PERSISTENT, Context.MODE_PRIVATE);
+            String zone = prefs.getString("zone", "Malaysia");
+            String hijri = prefs.getString("hijri", "");
+            String subuh = prefs.getString("subuh", "--:--");
+            String zohor = prefs.getString("zohor", "--:--");
+            String asar = prefs.getString("asar", "--:--");
+            String maghrib = prefs.getString("maghrib", "--:--");
+            String isyak = prefs.getString("isyak", "--:--");
+
+            long now = System.currentTimeMillis();
+            String nextLabel = "Solat";
+            String nextTime = "--:--";
+            long targetTimestamp = 0L;
+
+            // 1. Semak jadual lengkap dari SharedPreferences penggera azan
+            SharedPreferences alarmPrefs = context.getSharedPreferences(AzanAlarmPlugin.PREFS_NAME, Context.MODE_PRIVATE);
+            String rawAlarms = alarmPrefs.getString(AzanAlarmPlugin.KEY_STORED_ALARMS, null);
+
+            if (rawAlarms != null && !rawAlarms.trim().isEmpty()) {
+                try {
+                    JSONArray list = new JSONArray(rawAlarms);
+                    long minFutureTimestamp = Long.MAX_VALUE;
+                    JSONObject bestMatch = null;
+
+                    for (int i = 0; i < list.length(); i++) {
+                        JSONObject item = list.getJSONObject(i);
+                        long ts = item.optLong("timestamp", 0);
+                        if (ts > now && ts < minFutureTimestamp) {
+                            minFutureTimestamp = ts;
+                            bestMatch = item;
+                        }
+                    }
+
+                    if (bestMatch != null) {
+                        nextLabel = bestMatch.optString("prayerName", "Solat");
+                        targetTimestamp = minFutureTimestamp;
+                        SimpleDateFormat sdf = new SimpleDateFormat("h:mm a", Locale.ENGLISH);
+                        nextTime = sdf.format(new Date(targetTimestamp));
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Ralat parsing jadual penggera natif: " + e.getMessage());
+                }
+            }
+
+            // 2. Sandaran jika penggera natif belum ada rekod
+            if (targetTimestamp <= now) {
+                String[][] timesList = new String[][]{
+                    {"Subuh", subuh},
+                    {"Zohor", zohor},
+                    {"Asar", asar},
+                    {"Maghrib", maghrib},
+                    {"Isyak", isyak}
+                };
+
+                long minTs = Long.MAX_VALUE;
+                String matchedLabel = "";
+                String matchedTime = "";
+
+                for (String[] pair : timesList) {
+                    long ts = parseTimeToTimestamp(pair[1]);
+                    if (ts > now && ts < minTs) {
+                        minTs = ts;
+                        matchedLabel = pair[0];
+                        matchedTime = pair[1];
+                    }
+                }
+
+                if (minTs != Long.MAX_VALUE) {
+                    nextLabel = matchedLabel;
+                    nextTime = matchedTime;
+                    targetTimestamp = minTs;
+                }
+            }
+
+            if (targetTimestamp > 0) {
+                // Simpan nilai terkini
+                prefs.edit()
+                    .putString("next_label", nextLabel)
+                    .putString("next_time", nextTime)
+                    .putLong("target_timestamp", targetTimestamp)
+                    .apply();
+
+                // Paparkan notifikasi baharu
+                postPersistentNotification(
+                    context, zone, hijri, nextLabel, nextTime,
+                    targetTimestamp, subuh, zohor, asar, maghrib, isyak
+                );
+
+                // Kemas kini Homescreen Widget serentak
+                Intent widgetIntent = new Intent(context, SolatWidgetProvider.class);
+                widgetIntent.setAction(SolatWidgetProvider.ACTION_UPDATE_PRAYER_TIMES);
+                widgetIntent.setPackage(context.getPackageName());
+                widgetIntent.putExtra("zone", zone);
+                widgetIntent.putExtra("next_label", nextLabel);
+                widgetIntent.putExtra("next_time", nextTime);
+                widgetIntent.putExtra("subuh", subuh);
+                widgetIntent.putExtra("zohor", zohor);
+                widgetIntent.putExtra("asar", asar);
+                widgetIntent.putExtra("maghrib", maghrib);
+                widgetIntent.putExtra("isyak", isyak);
+                context.sendBroadcast(widgetIntent);
+
+                Log.i(TAG, "[Native Background] Notifikasi berjaya dikemas kini kepada: " + nextLabel + " (" + nextTime + ")");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Gagal mengemas kini notifikasi secara natif", e);
+        }
+    }
+
+    /**
+     * Membina dan mengeluarkan Notifikasi Tetap di status bar Android.
+     */
+    public static void postPersistentNotification(
+        Context context, String zone, String hijri, String nextLabel,
+        String nextTime, long targetTimestamp, String subuh, String zohor,
+        String asar, String maghrib, String isyak
+    ) {
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager == null) return;
+
+        String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
+        String formatted5Times = String.format(
+            "Subuh %s   Zohor %s   Asar %s   Maghrib %s   Isyak %s",
+            subuh, zohor, asar, maghrib, isyak
+        );
+
+        Intent openIntent = new Intent(context, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent openPending = PendingIntent.getActivity(
+            context,
+            2001,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Intent syncIntent = new Intent(context, MainActivity.class);
+        syncIntent.setAction(ACTION_SYNC_PRAYER);
+        syncIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent syncPending = PendingIntent.getActivity(
+            context,
+            2002,
+            syncIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
+            .setBigContentTitle("SolatKini · Zon " + zone)
+            .setSummaryText(hijri.isEmpty() ? "Waktu Solat JAKIM" : hijri)
+            .bigText(nextKicker + "\n\n" + formatted5Times);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(
+            context,
+            SolatKiniApplication.PERSISTENT_CHANNEL_ID
+        )
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("SolatKini · Zon " + zone)
+            .setContentText(nextKicker)
+            .setSubText(hijri.isEmpty() ? zone : hijri)
+            .setStyle(bigStyle)
+            .setContentIntent(openPending)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setSilent(true)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
+            .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);
+
+        // KAWALAN KRONOMETER: Hanya hidup jika waktu sasaran sah di masa hadapan.
+        // Jika sudah lepas atau tiada, matikan kronometer terus agar tiada nombor negatif.
+        if (targetTimestamp > System.currentTimeMillis()) {
+            builder.setWhen(targetTimestamp)
+                   .setShowWhen(true)
+                   .setUsesChronometer(true)
+                   .setChronometerCountDown(true);
+        } else {
+            builder.setShowWhen(false)
+                   .setUsesChronometer(false);
+        }
+
+        manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
+    }
+
+    /**
+     * Menukar string masa (cth: "12:04 PM", "4:53 AM", atau "16:30") 
+     * kepada epoch timestamp milisaat pada hari ini atau esok.
+     */
+    public static long parseTimeToTimestamp(String timeStr) {
         if (timeStr == null || timeStr.trim().isEmpty() || timeStr.contains("--:--")) {
             return 0L;
         }
@@ -215,7 +355,6 @@ public class SolatWidgetPlugin extends Plugin {
             cal.set(Calendar.SECOND, 0);
             cal.set(Calendar.MILLISECOND, 0);
 
-            // Jika masa solat sudah berlalu hari ini, sasaran adalah hari esok
             if (cal.getTimeInMillis() <= System.currentTimeMillis()) {
                 cal.add(Calendar.DAY_OF_YEAR, 1);
             }
