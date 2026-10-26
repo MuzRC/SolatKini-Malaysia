@@ -65,30 +65,35 @@ export const WIRID_LIST: WiridItem[] = [
     audioUrl: '/audio/taawuz.mp3',
     fadilat: 'Perintah langsung daripada Allah SWT untuk membina benteng rohani daripada gangguan dan waswas syaitan sebelum membaca Kalam-Nya (Surah An-Nahl: 98).',
   },
-    {
+  {
     id: 'wirid-fatihah',
     order: 6,
     title: 'Membaca Surah Al-Fatihah',
-    arabic: `بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝١
-ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ ۝٢
-ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝٣
-مَٰلِكِ يَوْمِ ٱلدِّينِ ۝٤
+    arabic: `بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝١
+ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِينَ ۝٢
+ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝٣
+مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤
 إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
-ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ ۝٦
-صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ ۝٧`,
+ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦
+صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيْهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيْهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧`,
     transliteration: 'Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.',
-    translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani. Segala puji tertentu bagi Allah, Tuhan sekalian alam. Yang Maha Pemurah, lagi Maha Mengasihani. Yang Menguasai hari Pembalasan. Engkaulah sahaja yang kami sembah dan kepada Engkaulah kami memohon pertolongan. Tunjukilah kami jalan yang lurus. Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.',
+    translation: `(1) Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+(2) Segala puji tertentu bagi Allah, Tuhan sekalian alam.
+(3) Yang Maha Pemurah, lagi Maha Mengasihani.
+(4) Yang Menguasai hari Pembalasan.
+(5) Engkaulah sahaja yang kami sembah dan kepada Engkaulah kami memohon pertolongan.
+(6) Tunjukilah kami jalan yang lurus.
+(7) Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.`,
     targetCount: 1,
     note: 'Ummul Kitab dibaca dengan tartil selepas solat fardhu.',
     audioUrl: '/audio/al_fatihah.mp3',
     fadilat: 'Surah paling agung dalam Al-Quran (As-Sab’ul Mathani), mengandungi munajat langsung antara hamba dengan Allah dan menjadi penawar (syifa’) segala penyakit hati (HR Al-Bukhari 4474).',
   },
-
   {
     id: 'wirid-baqarah-163',
     order: 7,
     title: 'Membaca Ayat Ke-163 Surah Al-Baqarah',
-    arabic: 'وَإِلَٰهُكُمۡ إِلَٰهٞ وَٰحِدٞۖ لَّآ إِلَٰهَ إِلَّا هُوَ ٱلرَّحۡمَٰنُ ٱلرَّحِيمُ ١٦٣',
+    arabic: `وَإِلَٰهُكُمۡ إِلَٰهٞ وَٰحِدٞۖ لَّآ إِلَٰهَ إِلَّا هُوَ ٱلرَّحۡمَٰنُ ٱلرَّحِيمُ ۝١٦٣`,
     transliteration: 'Wa ilāhukum ilāhuw-wāḥid, lā ilāha illā Huwar-Raḥmānur-Raḥīm.',
     translation: 'Dan Tuhan kamu ialah Tuhan Yang Maha Esa; tiada Tuhan yang berhak disembah selain Dia, Yang Maha Pemurah, lagi Maha Mengasihani.',
     targetCount: 1,
@@ -100,8 +105,8 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-5',
     order: 8,
     title: 'Ayat Al-Kursi (Surah Al-Baqarah: 255)',
-    arabic: 'اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ لَّهُ مَا فِي السَّمَاوَاتِ وَمَا فِي الْأَرْضِ مَن ذَا الَّذِي يَشْفَعُ عِندَهُ إِلَّا بِإِذْنِهِ يَعْلَمُ مَا بَيْنَ أَيْدِيهِمْ وَمَا خَلْفَهُمْ وَلَا يُحِيطُونَ بِشَيْءٍ مِّنْ عِلْمِهِ إِلَّا بِمَا شَاءَ وَسِعَ كُرْسِيُّهُ السَّمَاوَاتِ وَالْأَرْضَ وَلَا يَئُودُهُ حِفْظُهُمَا وَهُوَ الْعَلِيُّ الْعَظِيمُ',
-    transliteration: 'Allāhu lā ilāha illā Huwal-Ḥayyul-Qayyūm, lā ta’khudhuhū sinatuw-wa lā nawm, lahū mā fis-samāwāti wa mā fil-arḍ, man dhal-ladhī yasyfa‘u ‘indahū illā bi-idhnih, ya‘lamu mā baina aidīhim wa mā khalfahum, wa lā yuḥīṭūna bi-syai’im-min ‘ilmihī illā bimā syā’, wasi‘a kursiyyuhus-samāwāti wal-arḍ, wa lā ya’ūduhū ḥifẓuhumā, wa Huwal-‘Aliyyul-‘Aẓīm.',
+    arabic: `ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلۡحَيُّ ٱلۡقَيُّومُۚ لَا تَأۡخُذُهُۥ سِنَةٞ وَلَا نَوۡمٞۚ لَّهُۥ مَا فِي ٱلسَّمَٰوَٰتِ وَمَا فِي ٱلۡأَرۡضِۗ مَن ذَا ٱلَّذِي يَشۡفَعُ عِندَهُۥٓ إِلَّا بِإِذۡنِهِۦۚ يَعۡلَمُ مَا بَيۡنَ أَيۡدِيهِمۡ وَمَا خَلۡفَهُمۡۖ وَلَا يُحِيطُونَ بِشَيۡءٖ مِّنۡ عِلۡمِهِۦٓ إِلَّا بِمَا شَآءَۚ وَسِعَ كُرۡسِيُّهُ ٱلسَّمَٰوَٰتِ وَٱلۡأَرۡضَۖ وَلَا يَـُٔودُهُۥ حِفۡظُهُمَاۚ وَهُوَ ٱلۡعَلِيُّ ٱلۡعَظِيمُ ۝٢٥٥`,
+    transliteration: 'Allāhu lā ilāha illā Huwal-Ḥayyul-Qayyūm, lā ta’khudhuhū sinatuw-wa lā nawm, lahū مَا fis-samāwāti wa مَا fil-arḍ, man dhal-ladhī yasyfa‘u ‘indahū illā bi-idhnih, ya‘lamu مَا baina aidīhim wa مَا khalfahum, wa lā yuḥīṭūna bi-syai’im-min ‘ilmihī illā bimā syā’, wasi‘a kursiyyuhus-samāwāti wal-arḍ, wa lā ya’ūduhū ḥifẓuhumā, wa Huwal-‘Aliyyul-‘Aẓīm.',
     translation: 'Allah, tiada Tuhan melainkan Dia, Yang Maha Hidup, Yang Kekal mentadbirkan sekalian makhluk. Tidak mengantuk dan tidak tidur. Milik-Nya apa yang ada di langit dan di bumi. Tiada sesiapa yang dapat memberi syafaat di sisi-Nya melainkan dengan izin-Nya. Dia mengetahui apa yang ada di hadapan mereka dan apa yang ada di belakang mereka, sedangkan mereka tidak mengetahui sesuatu pun daripada ilmu-Nya melainkan apa yang dikehendaki-Nya. Luasnya Kursi Allah meliputi langit dan bumi; dan tiadalah menjadi keberatan kepada-Nya memelihara kedua-duanya, dan Dialah Yang Maha Tinggi lagi Maha Besar.',
     targetCount: 1,
     note: 'Dibaca 1 kali setiap kali selesai solat fardhu.',
@@ -112,8 +117,8 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-baqarah-284',
     order: 9,
     title: 'Membaca Ayat Ke-284 Surah Al-Baqarah',
-    arabic: 'لِّلَّهِ مَا فِي ٱلسَّمَٰوَٰتِ وَمَا فِي ٱلۡأَرۡضِۗ وَإِن تُبۡدُواْ مَا فِيٓ أَنفُسِكُمۡ أَوۡ تُخۡفُوهُ يُحَاسِبۡكُم بِهِ ٱللَّهُۖ فَيَغۡفِرُ لِمَن يَشَآءُ وَيُعَذِّبُ مَن يَشَآءُۗ وَٱللَّهُ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٨٤',
-    transliteration: 'Lillāhi mā fis-samāwāti wa mā fil-arḍ, wa in tubdū mā fī anfusikum aw tukhfūhu yuḥāsibkum bihillāh, fayaghfiru limay-yasyā’u wa yu‘adh-dhibu may-yasyā’, wallāhu ‘alā kulli syai’in qadīr.',
+    arabic: `لِّلَّهِ مَا فِي ٱلسَّمَٰوَٰتِ وَمَا فِي ٱلۡأَرۡضِۗ وَإِن تُبۡدُواْ مَا فِيٓ أَنفُسِكُمۡ أَوۡ تُخۡفُوهُ يُحَاسِبۡكُم بِهِ ٱللَّهُۖ فَيَغۡفِرُ لِمَن يَشَآءُ وَيُعَذِّبُ مَن يَشَآءُۗ وَٱللَّهُ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٨٤`,
+    transliteration: 'Lillāhi مَا fis-samāwāti wa مَا fil-arḍ, wa in tubdū مَا fī anfusikum aw tukhfūhu yuḥāsibkum bihillāh, fayaghfiru limay-yasyā’u wa yu‘adh-dhibu may-yasyā’, wallāhu ‘alā kulli syai’in qadīr.',
     translation: 'Segala yang ada di langit dan di bumi adalah kepunyaan Allah. Dan jika kamu menzahirkan apa yang ada di dalam hati kamu atau kamu menyembunyikannya, nescaya Allah akan menghitungnya bagi kamu. Kemudian Dia mengampunkan bagi sesiapa yang dikehendaki-Nya dan menyeksa sesiapa yang dikehendaki-Nya. Dan Allah Maha Kuasa atas segala sesuatu.',
     targetCount: 1,
     note: 'Ayat ke-284 Surah Al-Baqarah (permulaan 3 ayat terakhir). Dibaca 1 kali.',
@@ -124,7 +129,7 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-baqarah-285',
     order: 10,
     title: 'Membaca Ayat Ke-285 Surah Al-Baqarah',
-    arabic: 'ءَامَنَ ٱلرَّسُولُ بِمَآ أُنزِلَ إِلَيۡهِ مِن رَّبِّهِۦ وَٱلۡمُؤۡمِنُونَۚ كُلٌّ ءَامَنَ بِٱللَّهِ وَمَلَٰٓئِكَتِهِۦ وَكُتُبِهِۦ وَرُسُلِهِۦ لَا نُفَرِّقُ بَيۡنَ أَحَدٖ مِّن رُّسُلِهِۦۚ وَقَالُواْ سَمِعۡنَا وَأَطَعۡنَاۖ غُفۡرَانَكَ رَبَّنَا وَإِلَيۡكَ ٱلۡمَصِيرُ ۝٢٨٥',
+    arabic: `ءَامَنَ ٱلرَّسُولُ بِمَآ أُنزِلَ إِلَيۡهِ مِن رَّبِّهِۦ وَٱلۡمُؤۡمِنُونَۚ كُلٌّ ءَامَنَ بِٱللَّهِ وَمَلَٰٓئِكَتِهِۦ وَكُتُبِهِۦ وَرُسُلِهِۦ لَا نُفَرِّقُ بَيۡنَ أَحَدٖ مِّن رُّسُلِهِۦۚ وَقَالُواْ سَمِعۡنَا وَأَطَعۡنَاۖ غُفۡرَانَكَ رَبَّنَا وَإِلَيۡكَ ٱلۡمَصِيرُ ۝٢٨٥`,
     transliteration: 'Āmanar-Rasūlu bimā unzila ilaihi mir-Rabbihī wal-mu’minūn, kullun āmana billāhi wa malā’ikatihī wa kutubihī wa rusulih, lā nufarriqu baina aḥadim-mir-rusulih, wa qālū sami‘nā wa aṭa‘nā ghufrānaka Rabbanā wa ilaikal-maṣīr.',
     translation: 'Rasulullah telah beriman kepada apa yang diturunkan kepadanya daripada Tuhannya, demikian juga orang-orang yang beriman; semuanya beriman kepada Allah, Malaikat-malaikat-Nya, Kitab-kitab-Nya, dan Rasul-rasul-Nya. (Mereka berkata): "Kami tidak membezakan antara seorang pun daripada Rasul-rasul-Nya". Dan mereka berkata lagi: "Kami dengar dan kami taat; (kami memohon) keampunan-Mu wahai Tuhan kami, dan kepada-Mu jualah tempat kembali".',
     targetCount: 1,
@@ -136,8 +141,8 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-baqarah-286',
     order: 11,
     title: 'Membaca Ayat Ke-286 Surah Al-Baqarah',
-    arabic: 'لَا يُكَلِّفُ ٱللَّهُ نَفۡسًا إِلَّا وُسۡعَهَاۚ لَهَا مَا كَسَبَتۡ وَعَلَيۡهَا مَا ٱكۡتَسَبَتۡۗ رَبَّنَا لَا تُؤَاخِذۡنَآ إِن نَّسِينَآ أَوۡ أَخۡطَأۡنَاۚ رَبَّنَا وَلَا تَحۡمِلۡ عَلَيۡنَآ إِصۡرٗا كَمَا حَمَلۡتَهُۥ عَلَى ٱلَّذِينَ مِن قَبۡلِنَاۚ رَبَّنَا وَلَا تُحَمِّلۡنَا مَا لَا طَاقَةَ لَنَا بِهِۦۖ وَٱعۡفُ عَنَّا وَٱغۡفِرۡ لَنَا وَٱرۡحَمۡنَآۚ أَنتَ مَوۡلَىٰنَا فَٱنصُرۡنَا عَلَى ٱلۡقَوۡمِ ٱلۡكَٰفِرِينَ ۝٢٨٦',
-    transliteration: 'Lā yukallifullāhu nafsan illā wus‘ahā, lahā mā kasabat wa ‘alaihā maktasabat, Rabbanā lā tu’ākhidhnā in nasīnā aw akhṭa’nā, Rabbanā wa lā taḥmil ‘alainā iṣran kamā ḥamaltahū ‘alalladhīna min qablinā, Rabbanā wa lā tuḥammilnā mā lā ṭāqata lanā bih, wa‘fu ‘annā, waghfir lanā, warḥamnā, Anta mawlānā fanṣurnā ‘alal-qawmil-kāfirīn.',
+    arabic: `لَا يُكَلِّفُ ٱللَّهُ نَفۡسًا إِلَّا وُسۡعَهَاۚ لَهَا مَا كَسَبَتۡ وَعَلَيۡهَا مَا ٱكۡتَسَبَتۡۗ رَبَّنَا لَا تُؤَاخِذۡنَآ إِن نَّسِينَآ أَوۡ أَخۡطَأۡنَاۚ رَبَّنَا وَلَا تَحۡمِلۡ عَلَيۡنَآ إِصۡرٗا كَمَا حَمَلۡتَهُۥ عَلَى ٱلَّذِينَ مِن قَبۡلِنَاۚ رَبَّنَا وَلَا تُحَمِّلۡنَا مَا لَا طَاقَةَ لَنَا بِهِۦۖ وَٱعۡفُ عَنَّا وَٱغۡفِرۡ لَنَا وَٱرۡحَمۡنَآۚ أَنتَ مَوۡلَىٰنَا فَٱنصُرۡنَا عَلَى ٱلۡقَوۡمِ ٱلۡكَٰفِرِينَ ۝٢٨٦`,
+    transliteration: 'Lā yukallifullāhu nafsan illā wus‘ahā, lahā مَا kasabat wa ‘alaihā maktasabat, Rabbanā lā tu’ākhidhnā in nasīnā aw akhṭa’nā, Rabbanā wa lā taḥmil ‘alainā iṣran kamā ḥamaltahū ‘alalladhīna min qablinā, Rabbanā wa lā tuḥammilnā مَا lā ṭāqata lanā bih, wa‘fu ‘annā, waghfir lanā, warḥamnā, Anta mawlānā fanṣurnā ‘alal-qawmil-kāfirīn.',
     translation: 'Allah tidak membebani seseorang melainkan apa yang terdaya olehnya. Ia mendapat pahala atas kebaikan yang diusahakannya, dan ia menanggung dosa atas kejahatan yang dilakukannya. "Wahai Tuhan kami! Janganlah Engkau hukum kami jika kami lupa atau kami tersalah. Wahai Tuhan kami! Janganlah Engkau bebankan kepada kami bebanan yang berat sebagaimana yang telah Engkau bebankan kepada orang-orang terdahulu sebelum kami. Wahai Tuhan kami! Janganlah Engkau pikulkan kepada kami apa yang kami tidak terdaya memikulnya. Dan maafkanlah kami, ampunkanlah kami, dan rahmatilah kami. Engkaulah Penolong kami, maka tolonglah kami mencapai kemenangan terhadap kaum yang kafir".',
     targetCount: 1,
     note: 'Ayat ke-286 Surah Al-Baqarah (pelengkap 3 ayat terakhir). Dibaca 1 kali.',
@@ -148,7 +153,7 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-ali-imran-18',
     order: 12,
     title: 'Membaca Ayat Ke-18 Surah Ali ‘Imran',
-    arabic: 'شَهِدَ ٱللَّهُ أَنَّهُۥ لَآ إِلَٰهَ إِلَّا هُوَ وَٱلۡمَلَٰٓئِكَةُ وَأُوْلُواْ ٱلۡعِلۡمِ قَآئِمَۢا بِٱلۡقِسۡطِۚ لَآ إِلَٰهَ إِلَّا هُوَ ٱلۡعَزِيزُ ٱلۡحَكِيمُ ۝١٨',
+    arabic: `شَهِدَ ٱللَّهُ أَنَّهُۥ لَآ إِلَٰهَ إِلَّا هُوَ وَٱلۡمَلَٰٓئِكَةُ وَأُوْلُواْ ٱلۡعِلۡمِ قَآئِمَۢا بِٱلۡقِسۡطِۚ لَآ إِلَٰهَ إِلَّا هُوَ ٱلۡعَزِيزُ ٱلۡحَكِيمُ ۝١٨`,
     transliteration: 'Syahidallāhu annahū lā ilāha illā Huwa wal-malā’ikatu wa ulul-‘ilmi qā’imam-bil-qisṭ, lā ilāha illā Huwal-‘Azīzul-Ḥakīm.',
     translation: 'Allah menegaskan bahawasanya tiada Tuhan yang berhak disembah melainkan Dia, Yang mentadbirkan seluruh alam dengan keadilan; dan para malaikat serta orang-orang yang berilmu mengakui demikian; tiada Tuhan melainkan Dia, Yang Maha Kuasa, lagi Maha Bijaksana.',
     targetCount: 1,
@@ -160,7 +165,7 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-ali-imran-19',
     order: 13,
     title: 'Membaca Ayat Ke-19 Surah Ali ‘Imran (Sebahagian)',
-    arabic: 'إِنَّ ٱلدِّينَ عِندَ ٱللَّهِ ٱلۡإِسۡلَٰمُۗ',
+    arabic: `إِنَّ ٱلدِّينَ عِندَ ٱللَّهِ ٱلۡإِسۡلَٰمُۗ`,
     transliteration: 'Innad-dīna ‘indallāhil-Islām.',
     translation: 'Sesungguhnya agama yang benar dan diredai di sisi Allah ialah Islam.',
     targetCount: 1,
@@ -172,7 +177,7 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-ali-imran-26',
     order: 14,
     title: 'Membaca Ayat Ke-26 Surah Ali ‘Imran',
-    arabic: 'قُلِ ٱللَّهُمَّ مَٰلِكَ ٱلۡمُلۡكِ تُؤۡتِي ٱلۡمُلۡكَ مَن تَشَآءُ وَتَنزِعُ ٱلۡمُلۡكَ مِمَّن تَشَآءُ وَتُعِزُّ مَن تَشَآءُ وَتُذِلُّ مَن تَشَآءُۖ بِيَدِكَ ٱلۡخَيۡرُۖ إِنَّكَ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٦',
+    arabic: `قُلِ ٱللَّهُمَّ مَٰلِكَ ٱلۡمُلۡكِ تُؤۡتِي ٱلۡمُلۡكَ مَن تَشَآءُ وَتَنزِعُ ٱلۡمُلۡكَ مِمَّن تَشَآءُ وَتُعِزُّ مَن تَشَآءُ وَتُذِلُّ مَن تَشَآءُۖ بِيَدِكَ ٱلۡخَيۡرُۖ إِنَّكَ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٦`,
     transliteration: 'Qulillāhumma Mālikal-mulki tu’til-mulka man tasyā’u wa tanzi‘ul-mulka mimman tasyā’u wa tu‘izzu man tasyā’u wa tudhillu man tasyā’, biyadikal-khair, innaka ‘alā kulli syai’in qadīr.',
     translation: 'Katakanlah: "Wahai Tuhan Pemilik kerajaan! Engkau berikan kerajaan kepada sesiapa yang Engkau kehendaki, dan Engkau cabut kerajaan daripada sesiapa yang Engkau kehendaki. Engkau muliakan sesiapa yang Engkau kehendaki, dan Engkau hinakan sesiapa yang Engkau kehendaki. Di tangan kekuasaan-Mulah segala kebaikan. Sesungguhnya Engkau Maha Kuasa atas segala sesuatu".',
     targetCount: 1,
@@ -184,7 +189,7 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-ali-imran-27',
     order: 15,
     title: 'Membaca Ayat Ke-27 Surah Ali ‘Imran',
-    arabic: 'تُولِجُ ٱلَّيۡلَ فِي ٱلنَّهَارِ وَتُولِجُ ٱلنَّهَارَ فِي ٱلَّيۡلِۖ وَتُخۡرِجُ ٱلۡحَيَّ مِنَ ٱلۡمَيِّتِ وَتُخۡرِجُ ٱلۡمَيِّتَ مِنَ ٱلۡحَيِّۖ وَتَرۡزُقُ مَن تَشَآءُ بِغَيۡرِ حِسَابٖ ۝٢٧',
+    arabic: `تُولِجُ ٱلَّيۡلَ فِي ٱلنَّهَارِ وَتُولِجُ ٱلنَّهَارَ فِي ٱلَّيۡلِۖ وَتُخۡرِجُ ٱلۡحَيَّ مِنَ ٱلۡمَيِّتِ وَتُخۡرِجُ ٱلۡمَيِّتَ مِنَ ٱلۡحَيِّۖ وَتَرۡزُقُ مَن تَشَآءُ بِغَيۡرِ حِسَابٖ ۝٢٧`,
     transliteration: 'Tūlijul-laila fin-nahāri wa tūlijun-nahāra fil-laili wa tukhrijul-ḥayya minal-mayyiti wa tukhrijul-mayyita minal-ḥayyi wa tarzuqu man tasyā’u bighairi ḥisāb.',
     translation: 'Engkau memasukkan malam ke dalam siang dan Engkau memasukkan siang ke dalam malam. Engkau mengeluarkan yang hidup daripada yang mati, dan Engkau mengeluarkan yang mati daripada yang hidup. Dan Engkau memberi rezeki kepada sesiapa yang Engkau kehendaki tanpa hitungan.',
     targetCount: 1,
@@ -196,9 +201,15 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-al-ikhlas',
     order: 16,
     title: 'Membaca Surah Al-Ikhlas',
-    arabic: 'قُلۡ هُوَ ٱللَّهُ أَحَدٌ ۝١ ٱللَّهُ ٱلصَّمَدُ ۝٢ لَمۡ يَلِدۡ وَلَمۡ يُولَدۡ ۝٣ وَلَمۡ يَكُن لَّهُۥ كُفُوًا أَحَدُۢ ۝٤',
+    arabic: `قُلۡ هُوَ ٱللَّهُ أَحَدٌ ۝١
+ٱللَّهُ ٱلصَّمَدُ ۝٢
+لَمۡ يَلِدۡ وَلَمۡ يُولَدۡ ۝٣
+وَلَمۡ يَكُن لَّهُۥ كُفُوًا أَحَدُۢ ۝٤`,
     transliteration: 'Qul Huwallāhu Aḥad. Allāhuṣ-Ṣamad. Lam yalid wa lam yūlad. Wa lam yakul-lahū kufuwan aḥad.',
-    translation: 'Katakanlah: "(Tuhanku) ialah Allah Yang Maha Esa. Allah tumpuan sekalian makhluk untuk memohon sebarang hajat. Dia tidak beranak dan tidak pula diperanakkan. Dan tidak ada sesiapapun yang setara dengan-Nya".',
+    translation: `(1) Katakanlah: "(Tuhanku) ialah Allah Yang Maha Esa.
+(2) Allah tumpuan sekalian makhluk untuk memohon sebarang hajat.
+(3) Dia tidak beranak dan tidak pula diperanakkan.
+(4) Dan tidak ada sesiapapun yang setara dengan-Nya".`,
     targetCount: 3,
     note: 'Dibaca sebanyak 3 kali (atau 1 kali).',
     audioUrl: '/audio/al_ikhlas.mp3',
@@ -208,9 +219,17 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-al-falaq',
     order: 17,
     title: 'Membaca Surah Al-Falaq',
-    arabic: 'قُلۡ أَعُوذُ بِرَبِّ ٱلۡفَلَقِ ۝١ مِن شَرِّ مَا خَلَقَ ۝٢ وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝٣ وَمِن شَرِّ ٱلنَّفَّٰثَٰتِ فِي ٱلۡعُقَدِ ۝٤ وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ۝٥',
-    transliteration: 'Qul a‘ūdhu bi-Rabbil-falaq. Min syarri mā khalaq. Wa min syarri ghāsiqin idhā waqab. Wa min syarrin-naffāthāti fil-‘uqad. Wa min syarri ḥāsidin idhā ḥasad.',
-    translation: 'Katakanlah: "Aku berlindung kepada Tuhan yang menciptakan fajar subuh, dari kejahatan makhluk-makhluk yang Dia ciptakan, dari bahaya kegelapan apabila telah masuk, dari kejahatan wanita-wanita penyihir yang menghembus pada simpulan tali, serta dari kejahatan orang yang dengki apabila dia melakukan dengkinya".',
+    arabic: `قُلۡ أَعُوذُ بِرَبِّ ٱلۡفَلَقِ ۝١
+مِن شَرِّ مَا خَلَقَ ۝٢
+وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝٣
+وَمِن شَرِّ ٱلنَّفَّٰثَٰتِ فِي ٱلۡعُقَدِ ۝٤
+وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ۝٥`,
+    transliteration: 'Qul a‘ūdhu bi-Rabbil-falaq. Min syarri مَا khalaq. Wa min syarri ghāsiqin idhā waqab. Wa min syarrin-naffāthāti fil-‘uqad. Wa min syarri ḥāsidin idhā ḥasad.',
+    translation: `(1) Katakanlah: "Aku berlindung kepada Tuhan yang menciptakan fajar subuh,
+(2) Dari kejahatan makhluk-makhluk yang Dia ciptakan,
+(3) Dari bahaya kegelapan apabila telah masuk,
+(4) Dari kejahatan wanita-wanita penyihir yang menghembus pada simpulan tali,
+(5) Serta dari kejahatan orang yang dengki apabila dia melakukan dengkinya".`,
     targetCount: 3,
     note: 'Dibaca sebanyak 3 kali (atau 1 kali).',
     audioUrl: '/audio/al_falaq.mp3',
@@ -220,15 +239,25 @@ export const WIRID_LIST: WiridItem[] = [
     id: 'wirid-an-nas',
     order: 18,
     title: 'Membaca Surah An-Nas',
-    arabic: 'قُلۡ أَعُوذُ بِرَبِّ ٱلنَّاسِ ۝١ مَلِكِ ٱلنَّاسِ ۝٢ إِلَٰهِ ٱلنَّاسِ ۝٣ مِن شَرِّ ٱلۡوَسۡوَاسِ ٱلۡخَنَّاسِ ۝٤ ٱلَّذِي يُوَسۡوِسُ فِي صُدُورِ ٱلنَّاسِ ۝٥ مِنَ ٱلۡجِنَّةِ وَٱلنَّاسِ ۝٦',
+    arabic: `قُلۡ أَعُوذُ بِرَبِّ ٱلنَّاسِ ۝١
+مَلِكِ ٱلنَّاسِ ۝٢
+إِلَٰهِ ٱلنَّاسِ ۝٣
+مِن شَرِّ ٱلۡوَسۡوَاسِ ٱلۡخَنَّاسِ ۝٤
+ٱلَّذِي يُوَسۡوِسُ فِي صُدُورِ ٱلنَّاسِ ۝٥
+مِنَ ٱلۡجِنَّةِ وَٱلنَّاسِ ۝٦`,
     transliteration: 'Qul a‘ūdhu bi-Rabbin-nās. Malikin-nās. Ilāhin-nās. Min syarril-waswāsil-khannās. Alladhī yuwaswisu fī ṣudūrin-nās. Minal-jinnati wan-nās.',
-    translation: 'Katakanlah: "Aku berlindung kepada Pemelihara sekalian manusia, Raja sekalian manusia, Tuhan sekalian manusia, dari kejahatan pembisik penghasut yang berundur, yang membisikkan kejahatan ke dalam dada manusia, iaitu daripada kalangan jin dan manusia".',
+    translation: `(1) Katakanlah: "Aku berlindung kepada Pemelihara sekalian manusia,
+(2) Raja sekalian manusia,
+(3) Tuhan sekalian manusia,
+(4) Dari kejahatan pembisik penghasut yang berundur,
+(5) Yang membisikkan kejahatan ke dalam dada manusia,
+(6) Iaitu daripada kalangan jin dan manusia".`,
     targetCount: 3,
     note: 'Dibaca sebanyak 3 kali (atau 1 kali).',
     audioUrl: '/audio/an_nas.mp3',
     fadilat: 'Kubu kebal daripada bisikan waswas syaitan jin dan manusia di dalam dada, disunnahkan dibaca bersama Al-Falaq selepas solat fardhu (HR Abu Daud 1523).',
   },
-    {
+  {
     id: 'wirid-fatihah-ulangan',
     order: 19,
     title: 'Membaca Surah Al-Fatihah (Ulangan)',
@@ -238,15 +267,20 @@ export const WIRID_LIST: WiridItem[] = [
 مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤
 إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
 ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦
-صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيۡهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيۡهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧`,
+صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيْهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيْهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧`,
     transliteration: 'Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.',
-    translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani. Segala puji tertentu bagi Allah, Tuhan sekalian alam. Yang Maha Pemurah, lagi Maha Mengasihani. Yang Menguasai hari Pembalasan. Engkaulah yang kami sembah dan kepada Engkaulah kami memohon pertolongan. Tunjukilah kami jalan yang lurus. Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.',
+    translation: `(1) Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+(2) Segala puji tertentu bagi Allah, Tuhan sekalian alam.
+(3) Yang Maha Pemurah, lagi Maha Mengasihani.
+(4) Yang Menguasai hari Pembalasan.
+(5) Engkaulah yang kami sembah dan kepada Engkaulah kami memohon pertolongan.
+(6) Tunjukilah kami jalan yang lurus.
+(7) Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.`,
     targetCount: 1,
     note: 'Bacaan Al-Fatihah penutup rangkaian ayat sebelum beralih ke tasbih/tahmid/takbir. Dibaca 1 kali.',
     audioUrl: '/audio/al_fatihah.mp3',
     fadilat: 'Menjadi wasilah tawassul doa dan pembuka keberkatan sebelum memulakan zikir tasbih 33 kali mengikut tertib ulama nusantara.',
   },
-
   {
     id: 'wirid-tasbih-pembuka',
     order: 20,
@@ -280,6 +314,7 @@ export const WIRID_LIST: WiridItem[] = [
     translation: 'Maha Suci Allah, aku bertasbih memuji-Nya kekal sentiasa selama-lamanya — segala puji bagi Allah.',
     targetCount: 1,
     note: 'Lafaz pengantar sebelum memulakan tahmid 33 kali.',
+    audioUrl: '',
     fadilat: 'Menyambung tasbih dengan pujian tahmid abadi yang dicintai Allah SWT.',
   },
   {
@@ -432,7 +467,7 @@ export const DUA_COLLECTION: DuaItem[] = [
     category: 'harian',
     title: 'Doa Menaiki Kenderaan / Memulakan Perjalanan',
     arabic: 'سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ، وَإِنَّا إِلَى رَبِّنَا لَمُنْقَلِبُونَ',
-    transliteration: 'Subḥānal-ladhī sakh-khara lanā hādhā wa mā kunnā lahū muqrinīn, wa innā ilā Rabbinā lamunqalibūn.',
+    transliteration: 'Subḥānal-ladhī sakh-khara lanā hādhā wa مَا kunnā lahū muqrinīn, wa innā ilā Rabbinā lamunqalibūn.',
     translation: 'Maha Suci Tuhan yang telah memudahkan kenderaan ini untuk kami, sedang kami sebelum itu tidak berkuasa menguasainya. Dan sesungguhnya kami hanya kepada Tuhan kamilah akan kembali.',
     reference: 'Surah Az-Zukhruf: 13-14',
   },
@@ -459,7 +494,7 @@ export const DUA_COLLECTION: DuaItem[] = [
     category: 'pagi_petang',
     title: 'Sayyidul Istighfar (Penghulu Istighfar)',
     arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ',
-    transliteration: 'Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri mā ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta.',
+    transliteration: 'Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri مَا ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta.',
     translation: 'Ya Allah, Engkaulah Tuhanku, tiada Tuhan selain Engkau. Engkau telah menciptakanku dan aku adalah hamba-Mu. Aku berpegang pada janji dan taat setia kepada-Mu sekadar kemampuanku. Aku berlindung kepada-Mu daripada kejahatan yang telah aku lakukan. Aku mengakui segala nikmat-Mu kepadaku dan aku mengakui dosaku, maka ampunkanlah dosaku sesungguhnya tiada yang mengampunkan dosa melainkan Engkau.',
     reference: 'HR Al-Bukhari (No. 6306, Sahih)',
   },
@@ -547,7 +582,7 @@ export const TASBIH_LIST: TasbihPreset[] = [
     id: 'sayyidul-istighfar',
     name: '8. Sayyidul Istighfar (Penghulu Istighfar)',
     arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ',
-    transliteration: 'Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri mā ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta',
+    transliteration: 'Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri مَا ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta',
     translation: 'Ya Allah, Engkaulah Tuhanku, tiada Tuhan selain Engkau. Engkau telah menciptakanku dan aku adalah hamba-Mu. Aku berpegang pada janji dan taat setia kepada-Mu sekadar kemampuanku. Aku berlindung kepada-Mu daripada kejahatan yang telah aku lakukan. Aku mengakui segala nikmat-Mu kepadaku dan aku mengakui dosaku, maka ampunkanlah dosaku sesungguhnya tiada yang mengampunkan dosa melainkan Engkau.',
     defaultTarget: 3,
     fadilat: 'Barangsiapa membacanya pada waktu siang atau malam dengan penuh keyakinan lalu meninggal dunia pada hari tersebut, dia tergolong dalam kalangan ahli syurga (HR Al-Bukhari 6306).',
