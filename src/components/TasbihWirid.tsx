@@ -210,22 +210,22 @@ export const TasbihWirid: React.FC = () => {
 
   const fontStyles = {
     normal: {
-      arabic: 'text-lg sm:text-xl leading-relaxed',
+      arabic: 'text-lg sm:text-xl leading-relaxed whitespace-pre-line',
       rumi: 'text-xs sm:text-sm',
       translation: 'text-xs sm:text-sm',
     },
     large: {
-      arabic: 'text-xl sm:text-2xl leading-loose',
+      arabic: 'text-xl sm:text-2xl leading-loose whitespace-pre-line',
       rumi: 'text-sm sm:text-base',
       translation: 'text-sm sm:text-base',
     },
     xlarge: {
-      arabic: 'text-2xl sm:text-3xl leading-loose',
+      arabic: 'text-2xl sm:text-3xl leading-loose whitespace-pre-line',
       rumi: 'text-base sm:text-lg',
       translation: 'text-base sm:text-lg',
     },
     '4xl': {
-      arabic: 'text-3xl sm:text-4xl leading-loose',
+      arabic: 'text-3xl sm:text-4xl leading-loose whitespace-pre-line',
       rumi: 'text-lg sm:text-xl',
       translation: 'text-lg sm:text-xl',
     },
@@ -294,7 +294,7 @@ export const TasbihWirid: React.FC = () => {
                 className="flex items-center gap-2 flex-wrap self-end md:self-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* 1. Pelaras Saiz Teks (Macam di bahagian wirid) */}
+                {/* 1. Pelaras Saiz Teks */}
                 <div className="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
                   <span className="text-[10px] text-slate-400 px-1 font-medium">Saiz:</span>
                   {(['normal', 'large', 'xlarge', '4xl'] as const).map((s) => (
@@ -364,12 +364,20 @@ export const TasbihWirid: React.FC = () => {
               <ChevronDown className="w-4 h-4 text-emerald-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
 
-            {/* Kad Bacaan Zikir Semasa (Menggunakan fontStyles Dinamik) */}
+            {/* Kad Bacaan Zikir Semasa */}
             <div className="pt-2 text-center space-y-2">
-              <ArabicQuranText
-                text={activeTasbih.arabic}
-                className={`font-arabic text-emerald-300 font-bold block text-center transition-all duration-150 ${fontStyles.arabic}`}
-              />
+              <div className="space-y-1">
+                {activeTasbih.arabic
+                  .split('\n')
+                  .filter((line) => line.trim().length > 0)
+                  .map((line, idx) => (
+                    <ArabicQuranText
+                      key={idx}
+                      text={line}
+                      className={`font-arabic text-emerald-300 font-bold block text-center transition-all duration-150 ${fontStyles.arabic}`}
+                    />
+                  ))}
+              </div>
               <p className={`text-slate-300 italic font-medium transition-all duration-150 ${fontStyles.rumi}`}>
                 &quot;{activeTasbih.transliteration}&quot;
               </p>
@@ -604,12 +612,20 @@ export const TasbihWirid: React.FC = () => {
                     </span>
                   </div>
 
-                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText */}
+                  {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText (Dipetakan Baris demi Baris) */}
                   {showArabic && (
-                    <ArabicQuranText
-                      text={item.arabic}
-                      className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}
-                    />
+                    <div className="space-y-2 text-right">
+                      {item.arabic
+                        .split('\n')
+                        .filter((line) => line.trim().length > 0)
+                        .map((line, idx) => (
+                          <ArabicQuranText
+                            key={idx}
+                            text={line}
+                            className={`font-arabic text-right text-emerald-200 block transition-all duration-150 ${fontStyles.arabic}`}
+                          />
+                        ))}
+                    </div>
                   )}
 
                   {/* 2. Teks Rumi */}
