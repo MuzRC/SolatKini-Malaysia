@@ -107,6 +107,16 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         if (!isTest && scheduledTime > 0 && prayerKey != null) {
             rescheduleForTomorrow(context, prayerKey, prayerName, voice, scheduledTime);
         }
+
+        // 5. PENYELAMAT NOTIFIKASI: Kemas kini notifikasi kekal dan widget ke waktu solat seterusnya secara berdikari
+        if (!isTest) {
+            try {
+                SolatWidgetPlugin.refreshPersistentNotification(context);
+                Log.i(TAG, "[Native Background] Notifikasi tetap & widget berjaya dikemas kini selepas waktu " + prayerName);
+            } catch (Exception e) {
+                Log.e(TAG, "Ralat mengemas kini notifikasi SolatWidget dari receiver: " + e.getMessage());
+            }
+        }
     }
 
     private void rescheduleForTomorrow(Context context, String prayerKey, String prayerName, String voice, long previousTimestamp) {
@@ -160,7 +170,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 }
             }
 
-            // Kemas kini rekod dalam SharedPreferences
+            // Kemas kini rekod dalam SharedPreferences secara serta-merta (guna commit agar data sedia dibaca)
             updateStoredAlarmJson(context, prayerKey, nextTimestamp);
         } catch (Exception ex) {
             Log.e(TAG, "Ralat semasa menjadualkan semula waktu solat esok: " + ex.getMessage());
@@ -181,7 +191,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                     break;
                 }
             }
-            prefs.edit().putString(AzanAlarmPlugin.KEY_STORED_ALARMS, list.toString()).apply();
+            prefs.edit().putString(AzanAlarmPlugin.KEY_STORED_ALARMS, list.toString()).commit();
         } catch (Exception e) {
             Log.w(TAG, "Gagal mengemas kini SharedPreferences JSON: " + e.getMessage());
         }
