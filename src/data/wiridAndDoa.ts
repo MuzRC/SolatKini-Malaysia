@@ -65,11 +65,17 @@ export const WIRID_LIST: WiridItem[] = [
     audioUrl: '/audio/taawuz.mp3',
     fadilat: 'Perintah langsung daripada Allah SWT untuk membina benteng rohani daripada gangguan dan waswas syaitan sebelum membaca Kalam-Nya (Surah An-Nahl: 98).',
   },
-  {
+    {
     id: 'wirid-fatihah',
     order: 6,
     title: 'Membaca Surah Al-Fatihah',
-    arabic: 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝١ ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ ۝٢ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝٣ مَٰلِكِ يَوْمِ ٱلدِّينِ ۝٤ إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ ۝٥ ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ ۝٦ صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ ۝٧',
+    arabic: `بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝١
+ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ ۝٢
+ٱلرَّحْمَٰنِ ٱلرَّحِيمِ ۝٣
+مَٰلِكِ يَوْمِ ٱلدِّينِ ۝٤
+إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
+ٱهْدِنَا ٱلصِّرَٰطَ ٱلْمُسْتَقِيمَ ۝٦
+صِرَٰطَ ٱلَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ ٱلْمَغْضُوبِ عَلَيْهِمْ وَلَا ٱلضَّآلِّينَ ۝٧`,
     transliteration: 'Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.',
     translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani. Segala puji tertentu bagi Allah, Tuhan sekalian alam. Yang Maha Pemurah, lagi Maha Mengasihani. Yang Menguasai hari Pembalasan. Engkaulah sahaja yang kami sembah dan kepada Engkaulah kami memohon pertolongan. Tunjukilah kami jalan yang lurus. Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.',
     targetCount: 1,
@@ -77,6 +83,7 @@ export const WIRID_LIST: WiridItem[] = [
     audioUrl: '/audio/al_fatihah.mp3',
     fadilat: 'Surah paling agung dalam Al-Quran (As-Sab’ul Mathani), mengandungi munajat langsung antara hamba dengan Allah dan menjadi penawar (syifa’) segala penyakit hati (HR Al-Bukhari 4474).',
   },
+
   {
     id: 'wirid-baqarah-163',
     order: 7,
@@ -221,11 +228,17 @@ export const WIRID_LIST: WiridItem[] = [
     audioUrl: '/audio/an_nas.mp3',
     fadilat: 'Kubu kebal daripada bisikan waswas syaitan jin dan manusia di dalam dada, disunnahkan dibaca bersama Al-Falaq selepas solat fardhu (HR Abu Daud 1523).',
   },
-  {
+    {
     id: 'wirid-fatihah-ulangan',
     order: 19,
     title: 'Membaca Surah Al-Fatihah (Ulangan)',
-    arabic: 'بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝١ ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِينَ ۝٢ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝٣ مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤ إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥ ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦ صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيۡهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيۡهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧',
+    arabic: `بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝١
+ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِينَ ۝٢
+ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝٣
+مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤
+إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
+ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦
+صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيۡهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيۡهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧`,
     transliteration: 'Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.',
     translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani. Segala puji tertentu bagi Allah, Tuhan sekalian alam. Yang Maha Pemurah, lagi Maha Mengasihani. Yang Menguasai hari Pembalasan. Engkaulah yang kami sembah dan kepada Engkaulah kami memohon pertolongan. Tunjukilah kami jalan yang lurus. Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.',
     targetCount: 1,
@@ -233,6 +246,7 @@ export const WIRID_LIST: WiridItem[] = [
     audioUrl: '/audio/al_fatihah.mp3',
     fadilat: 'Menjadi wasilah tawassul doa dan pembuka keberkatan sebelum memulakan zikir tasbih 33 kali mengikut tertib ulama nusantara.',
   },
+
   {
     id: 'wirid-tasbih-pembuka',
     order: 20,
