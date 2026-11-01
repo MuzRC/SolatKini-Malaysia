@@ -376,7 +376,7 @@ export const DUA_COLLECTION: DuaItem[] = [
     id: 'dua-selepas-solat',
     category: 'selepas_solat',
     title: 'Doa Lengkap Selepas Solat Fardhu',
-    arabic: 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+    arabic: `بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
 الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ، وَالصَّلَاةُ وَالسَّلَامُ عَلَى أَشْرَفِ الْأَنْبِيَاءِ وَالْمُرْسَلِينَ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ أَجْمَعِينَ.
 اللَّهُمَّ تَقَبَّلْ مِنَّا صَلَاتَنَا وَدُعَاءَنَا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ، وَتُبْ عَلَيْنَا إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ.
 اللَّهُمَّ اجْعَلْ دِينَنَا دِينَ النَّبِيِّ مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَإِسْلَامَنَا إِسْلَامَ الْمُسْلِمِينَ، وَإِيمَانَنَا إِيمَانَ الْمُؤْمِنِينَ، وَصَلَاتَنَا صَلَاةَ الْخَاشِعِينَ،
@@ -384,8 +384,8 @@ export const DUA_COLLECTION: DuaItem[] = [
 وَحَيَاتَنَا حَيَاةَ الْعُلَمَاءِ، وَمَوْتَنَا بِمَوْتِ الشُّهَدَاءِ، وَأَدْخِلْنَا الْجَنَّةَ مَعَ الْأَنْبِيَاءِ عَلَيْهِمُ الصَّلَاةُ وَالسَّلَامُ.
 رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ،
 وَصَلَّى اللَّهُ عَلَى خَيْرِ خَلْقِهِ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ وَسَلَّمَ،
-سُبْحَانَ رَبِّكَ رَبِّ الْعِزَّةِ عَمَّا يَصِفُونَ، وَسَلَامٌ عَلَى الْمُرْسَلِينَ، وَالْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ',
-    transliteration: 'Bismillāhir-rahmānir-rahīm.
+سُبْحَانَ رَبِّكَ رَبِّ الْعِزَّةِ عَمَّا يَصِفُونَ، وَسَلَامٌ عَلَى الْمُرْسَلِينَ، وَالْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ`,
+    transliteration: `Bismillāhir-rahmānir-rahīm.
 
 Alhamdulillāhi rabbil-'ālamīn, was-solātu was-salāmu 'alā asyrofil-anbiyā-i wal-mursalīn, sayyidinā Muhammadin wa-'alā ālihī wa-sahbihī ajma'īn.
 
@@ -401,8 +401,8 @@ Rabbanā ātinā fid-dunyā hasanatan wa fil-ākhirati hasanatan wa qinā 'azāb
 
 Wa sallallāhu 'alā khairi khalqihī sayyidinā Muhammadin wa 'alā ālihī wa sahbihī wa sallam.
 
-Subhāna rabbika rabbil-'izzati 'ammā yasifūn, wa salāmun 'alal-mursalīn, wal-hamdulillāhi rabbil-'ālamīn.',
-    translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+Subhāna rabbika rabbil-'izzati 'ammā yasifūn, wa salāmun 'alal-mursalīn, wal-hamdulillāhi rabbil-'ālamīn.`,
+    translation: `Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
 
 Segala puji bagi Allah, Tuhan sekalian alam. Selawat dan salam ke atas semulia-mulia para nabi dan rasul, junjungan kami Nabi Muhammad, serta ke atas seluruh keluarga dan para sahabat baginda.
 
@@ -418,7 +418,7 @@ Wahai Tuhan kami, berikanlah kepada kami kebaikan di dunia dan kebaikan di akhir
 
 Semoga Allah melimpahkan rahmat ke atas sebaik-baik makhluk-Nya, junjungan kami Nabi Muhammad, serta ke atas keluarga dan para sahabat baginda, dan kurniakanlah kesejahteraan.
 
-Maha Suci Tuhanmu, Tuhan yang memiliki keagungan dan kemuliaan daripada apa yang mereka sifatkan. Dan salam sejahtera ke atas para rasul, serta segala puji bagi Allah, Tuhan sekalian alam.',
+Maha Suci Tuhanmu, Tuhan yang memiliki keagungan dan kemuliaan daripada apa yang mereka sifatkan. Dan salam sejahtera ke atas para rasul, serta segala puji bagi Allah, Tuhan sekalian alam.`,
     reference: 'Amalan Doa Masyhur Ulama Nusantara',
   },
   {
