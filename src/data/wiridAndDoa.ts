@@ -376,9 +376,49 @@ export const DUA_COLLECTION: DuaItem[] = [
     id: 'dua-selepas-solat',
     category: 'selepas_solat',
     title: 'Doa Lengkap Selepas Solat Fardhu',
-    arabic: 'الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ، حَمْدًا يُوَافِي نِعَمَهُ وَيُكَافِئُ مَزِيدَهُ، يَا رَبَّنَا لَكَ الْحَمْدُ كَمَا يَنْبَغِي لِجَلَالِ وَجْهِكَ وَلِعَظِيمِ سُلْطَانِكَ. اللَّهُمَّ صَلِّ وَسَلِّمْ عَلَى سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ أَجْمَعِينَ. اللَّهُمَّ إِنَّا نَسْأَلُكَ سَلَامَةً فِي الدِّينِ، وَعَافِيَةً فِي الْجَسَدِ، وَزِيَادَةً فِي الْعِلْمِ، وَبَرَكَةً فِي الرِّزْقِ، وَتَوْبَةً قَبْلَ الْمَوْتِ، وَرَحْمَةً عِنْدَ الْمَوْتِ، وَمَغْفِرَةً بَعْدَ الْمَوْتِ.',
-    transliteration: 'Al-Ḥamdu lillāhi Rabbil-‘ālamīn, ḥamday-yuwāfī ni‘amahū wa yukāfi’u mazīdah. Yā Rabbanā lakal-ḥamdu kamā yambaghī lijalāli wajhika wa li‘aẓīmi sulṭānik. Allāhumma ṣalli wa sallim ‘alā sayyidinā Muḥammadiw-wa ‘alā ālihī wa ṣaḥbihī ajma‘īn. Allāhumma innā nas’aluka salāmatan fid-dīn, wa ‘āfiyatan fil-jasad, wa ziyādatan fil-‘ilm, wa barakatan fir-rizq, wa tawbatan qablal-mawt, wa raḥmatan ‘indal-mawt, wa maghfiratam-ba‘dal-mawt.',
-    translation: 'Segala puji bagi Allah Tuhan sekalian alam, pujian yang menepati segala nikmat-Nya dan mencukupi tambahannya. Wahai Tuhan kami, bagi-Mu segala kepujian sebagaimana layaknya bagi keagungan Zat-Mu dan kebesaran kekuasaan-Mu. Ya Allah limpahkanlah rahmat dan salam ke atas junjungan kami Nabi Muhammad dan ke atas keluarga serta para sahabat baginda sekalian. Ya Allah kami memohon kepada-Mu keselamatan dalam agama, kesihatan tubuh badan, pertambahan ilmu, keberkatan rezeki, taubat sebelum mati, rahmat ketika mati, dan keampunan selepas mati.',
+    arabic: 'بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ، وَالصَّلَاةُ وَالسَّلَامُ عَلَى أَشْرَفِ الْأَنْبِيَاءِ وَالْمُرْسَلِينَ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ أَجْمَعِينَ.
+اللَّهُمَّ تَقَبَّلْ مِنَّا صَلَاتَنَا وَدُعَاءَنَا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ، وَتُبْ عَلَيْنَا إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ.
+اللَّهُمَّ اجْعَلْ دِينَنَا دِينَ النَّبِيِّ مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَإِسْلَامَنَا إِسْلَامَ الْمُسْلِمِينَ، وَإِيمَانَنَا إِيمَانَ الْمُؤْمِنِينَ، وَصَلَاتَنَا صَلَاةَ الْخَاشِعِينَ،
+وَأَعْمَالَنَا أَعْمَالَ الصَّالِحِينَ، وَنِيَّتَنَا نِيَّةَ الْمُخْلِصِينَ، وَذُنُوبَنَا يَا اللَّهُ ذُنُوبَ الْمُسْتَغْفِرِينَ.
+وَحَيَاتَنَا حَيَاةَ الْعُلَمَاءِ، وَمَوْتَنَا بِمَوْتِ الشُّهَدَاءِ، وَأَدْخِلْنَا الْجَنَّةَ مَعَ الْأَنْبِيَاءِ عَلَيْهِمُ الصَّلَاةُ وَالسَّلَامُ.
+رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ،
+وَصَلَّى اللَّهُ عَلَى خَيْرِ خَلْقِهِ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ وَسَلَّمَ،
+سُبْحَانَ رَبِّكَ رَبِّ الْعِزَّةِ عَمَّا يَصِفُونَ، وَسَلَامٌ عَلَى الْمُرْسَلِينَ، وَالْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ',
+    transliteration: 'Bismillāhir-rahmānir-rahīm.
+
+Alhamdulillāhi rabbil-'ālamīn, was-solātu was-salāmu 'alā asyrofil-anbiyā-i wal-mursalīn, sayyidinā Muhammadin wa-'alā ālihī wa-sahbihī ajma'īn.
+
+Allāhumma taqabbal minnā solātanā wa-du'ā-anā, innaka antas-samī'ul-'alīm, wa tub 'alainā, innaka antat-tawwābur-rahīm.
+
+Allāhummaj'al dīnanā dīnan-nabiyyi Muhammadin sallallāhu 'alaihi wa sallam, wa islāmanā islāmal-muslimīn, wa īmānanā īmānal-mu'minīn, wa solātanā solātal-khāsyi'īn.
+
+Wa a'mālanā a'mālas-solihīn, wa niyyatanā niyyatal-mukhlisīn, wa zunūbanā yā Allāhu zunūbal-mustaghfirīn.
+
+Wa hayātanā hayātal-'ulamā', wa mautanā bi-mautisy-syuhadā', wa adkhilnal-jannata ma'al-anbiyā-i 'alaihimus-solātu was-salām.
+
+Rabbanā ātinā fid-dunyā hasanatan wa fil-ākhirati hasanatan wa qinā 'azāban-nār.
+
+Wa sallallāhu 'alā khairi khalqihī sayyidinā Muhammadin wa 'alā ālihī wa sahbihī wa sallam.
+
+Subhāna rabbika rabbil-'izzati 'ammā yasifūn, wa salāmun 'alal-mursalīn, wal-hamdulillāhi rabbil-'ālamīn.',
+    translation: 'Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+
+Segala puji bagi Allah, Tuhan sekalian alam. Selawat dan salam ke atas semulia-mulia para nabi dan rasul, junjungan kami Nabi Muhammad, serta ke atas seluruh keluarga dan para sahabat baginda.
+
+Ya Allah, terimalah daripada kami solat kami dan doa kami, sesungguhnya Engkau Maha Mendengar lagi Maha Mengetahui. Dan terimalah taubat kami, sesungguhnya Engkau Maha Penerima Taubat lagi Maha Mengasihani.
+
+Ya Allah, jadikanlah pegangan agama kami seperti agama Nabi Muhammad SAW, keislaman kami seperti Islam orang-orang yang berserah diri (muslimin), keimanan kami seperti iman orang-orang yang beriman (mukminin), dan solat kami seperti solat orang-orang yang khusyuk.
+
+Dan amalan kami seperti amalan orang-orang soleh, niat kami seperti niat orang-orang yang ikhlas, serta jadikanlah dosa-dosa kami ya Allah, seperti dosa orang-orang yang sentiasa memohon keampunan.
+
+Dan jadikanlah kehidupan kami seperti kehidupan para ulama, kematian kami seperti kematian para syuhada, dan masukkanlah kami ke dalam syurga bersama para nabi, ke atas mereka selawat dan salam.
+
+Wahai Tuhan kami, berikanlah kepada kami kebaikan di dunia dan kebaikan di akhirat, dan peliharalah kami daripada azab api neraka.
+
+Semoga Allah melimpahkan rahmat ke atas sebaik-baik makhluk-Nya, junjungan kami Nabi Muhammad, serta ke atas keluarga dan para sahabat baginda, dan kurniakanlah kesejahteraan.
+
+Maha Suci Tuhanmu, Tuhan yang memiliki keagungan dan kemuliaan daripada apa yang mereka sifatkan. Dan salam sejahtera ke atas para rasul, serta segala puji bagi Allah, Tuhan sekalian alam.',
     reference: 'Amalan Doa Masyhur Ulama Nusantara',
   },
   {
@@ -488,15 +528,6 @@ export const DUA_COLLECTION: DuaItem[] = [
     transliteration: 'Allāhumma innī a‘ūdhu bika minal-hammi wal-ḥazan, wa a‘ūdhu bika minal-‘ajzi wal-kasal, wa a‘ūdhu bika minal-jubni wal-bukhl, wa a‘ūdhu bika min ghalabatid-daini wa qahrir-rijāl.',
     translation: 'Ya Allah, aku berlindung kepada-Mu daripada kegelisahan dan kesedihan, daripada kelemahan dan kemalasan, daripada sifat pengecut dan bakhil, serta daripada bebanan hutang dan penindasan orang.',
     reference: 'HR Abu Daud (No. 1555, Sahih)',
-  },
-  {
-    id: 'dua-pagi-sayyidul-istighfar',
-    category: 'pagi_petang',
-    title: 'Sayyidul Istighfar (Penghulu Istighfar)',
-    arabic: 'اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ',
-    transliteration: 'Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri مَا ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta.',
-    translation: 'Ya Allah, Engkaulah Tuhanku, tiada Tuhan selain Engkau. Engkau telah menciptakanku dan aku adalah hamba-Mu. Aku berpegang pada janji dan taat setia kepada-Mu sekadar kemampuanku. Aku berlindung kepada-Mu daripada kejahatan yang telah aku lakukan. Aku mengakui segala nikmat-Mu kepadaku dan aku mengakui dosaku, maka ampunkanlah dosaku sesungguhnya tiada yang mengampunkan dosa melainkan Engkau.',
-    reference: 'HR Al-Bukhari (No. 6306, Sahih)',
   },
 ];
 
