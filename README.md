@@ -25,16 +25,3 @@ Aplikasi waktu solat moden, penentu arah kiblat berketepatan tinggi, dan peringa
 | **Audio & Storan** | IndexedDB Luar Talian, Web Audio API, Android AlarmManager |
 
 ---
-
-## Pemasangan & Pembangunan
-
-### Keperluan
-* Node.js (v18 ke atas)
-* Android Studio & Android SDK (API 26+)
-
-### Langkah Persediaan
-1. Klon repositori ini:
-   ```bash
-   git clone [https://github.com/MuzRC/SolatKini.git](https://github.com/MuzRC/SolatKini.git)
-   cd SolatKini
-   
