@@ -5,6 +5,7 @@ import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -29,12 +30,19 @@ public class MainActivity extends BridgeActivity {
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
+        // KUNCI PENTING: Paksa butang volume tepi telefon kawal saluran ALARM bila app dibuka
+        setVolumeControlStream(AudioManager.STREAM_ALARM);
+
         handleAzanIntent(getIntent());
     }
 
     @Override
     public void onResume() {
         super.onResume();
+
+        // Pastikan setiap kali skrin kembali aktif, kawalan suara kekal pada saluran ALARM
+        setVolumeControlStream(AudioManager.STREAM_ALARM);
+
         if (!permissionRequested) {
             permissionRequested = true;
             new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -65,6 +73,7 @@ public class MainActivity extends BridgeActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         configureWakeAndLockScreen();
+        setVolumeControlStream(AudioManager.STREAM_ALARM);
         handleAzanIntent(intent);
     }
 
