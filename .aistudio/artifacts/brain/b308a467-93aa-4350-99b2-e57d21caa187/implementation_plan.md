@@ -1,25 +1,21 @@
-# Pelan Pelaksanaan: Carta Kemajuan Puasa Visual (Recharts)
+# Pelan Pembaikan: Penyelarasan Audio Azan pada Saluran Penggera (STREAM_ALARM)
 
-Carta kemajuan visual untuk penjejakan puasa telah berjaya diintegrasikan ke dalam komponen `FastingTracker` menggunakan pustaka **Recharts**.
+## 1. Analisis Punca Masalah (Selesai)
+- [x] Punca audio dilaungkan pada saluran media (STREAM_MUSIC) dikenal pasti daripada ketiadaan penetapan `STREAM_ALARM` dan penggunaan `CONTENT_TYPE_SONIFICATION` tanpa `FLAG_AUDIBILITY_ENFORCED`.
+- [x] Pengasingan saluran audio webview HTML5 agar tidak bertindih dengan audio perkhidmatan natif Android.
 
-## 1. Pemasangan Pustaka
-- [x] Pemasangan pakej rasmi `recharts` ke dalam projek (`package.json`).
+## 2. Pelaksanaan Perubahan Kod (Selesai)
+- [x] **`AzanAudioService.java`**:
+  - Konfigurasi `AudioAttributes` rasmi dengan `.setUsage(AudioAttributes.USAGE_ALARM)`, `.setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)`, dan `.setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)`.
+  - Panggilan `mediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM)` dipulihkan bagi keserasian penuh pemacu audio HAL (Samsung, Xiaomi, Vivo, Oppo).
+  - Peningkatan automatik aras kelantangan saluran penggera `STREAM_ALARM` ke 80% had maksimum sekiranya kelantangan semasa berada di bawah tahap tersebut.
+  - Tuntutan fokus audio sistem eksklusif `AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE` pada saluran penggera.
+- [x] **`audioNotificationService.ts`**:
+  - Menyemak `nativeAlarmService.getIsNative()` di mana bagi peranti Android Native, audio dikendalikan sepenuhnya oleh `AzanAudioService` (saluran penggera) bagi mengelakkan audio HTML5 berbunyi pada saluran media.
+- [x] **`AzanAlarmReceiver.java`**:
+  - Memastikan servis berjalan di latar belakang dengan selamat tanpa memaksa pembukaan skrin aktiviti.
 
-## 2. Reka Bentuk & Ciri-Ciri Carta Kemajuan
-- [x] **Tab Dwimod Pilihan**:
-  - **Puasa Ramadan**: Analisis fasa 30 hari Ramadan (Fasa Rahmat, Maghfirah, dan Pelepasan Api Neraka).
-  - **Puasa Sunat & Qadha**: Analisis kemajuan puasa sunat (Isnin/Khamis, Ayyamul Bidh/Hari Putih, Puasa Ganti Qadha, dan Sunat-sunat Lain).
-- [x] **Carta Visual Recharts**:
-  - **Mingguan Ramadan (BarChart)**: Perbandingan Hari Selesai vs Sasaran Hari mengikut 4 minggu Ramadan.
-  - **Gelang Donut Ramadan (PieChart)**: Peratusan kadar kejayaan puasa keseluruhan dengan penunjuk baki hari.
-  - **Kategori Puasa Sunat (BarChart)**: Visualisasi perbandingan Selesai vs Sasaran bagi Isnin & Khamis, Ayyamul Bidh, Qadha, dan Sunat Lain.
-  - **Taburan Puasa Sunat (PieChart)**: Pembahagian pecahan jenis puasa sunat yang disempurnakan.
-- [x] **Interaktiviti & Ketahanan Data**:
-  - Grid interaktif 30 petak hari Ramadan (boleh klik untuk tanda/nyah-tanda).
-  - Butang pantas `+` dan `-` untuk log amalan puasa sunat dengan animasi perubahan carta masa nyata.
-  - Penyelarasan terus dengan rekod Puasa Ganti (Qada').
-  - Penyimpanan automatik setempat (`localStorage`).
-
-## 3. Verifikasi & Kualiti Kod
-- [x] Tiada sebarang ralat sintaks atau TypeScript (`tsc --noEmit` bersih).
-- [x] Kompilasi projek berjaya (`compile_applet` lulus).
+## 3. Ujian & Pengesahan
+- [x] `compile_applet` berjaya tanpa sebarang ralat.
+- [x] `lint_applet` (`tsc --noEmit`) lulus bersih.
+- [x] Binaan web produksi (`npm run build`) siap dibina dengan lancar.

@@ -186,23 +186,38 @@ public class AzanAudioService extends Service {
         try {
             mediaPlayer = new MediaPlayer();
 
-            // Saluran Alarm Rasmi Android
+            // Saluran Alarm Rasmi Android (STREAM_ALARM)
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                 .build();
             mediaPlayer.setAudioAttributes(audioAttributes);
+            mediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
 
-            // Tuntut fokus audio sistem
+            // Semak dan naikkan aras kelantangan penggera telefon (STREAM_ALARM) secara automatik
             AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
             if (audioManager != null) {
+                try {
+                    int currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
+                    int maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM);
+                    int targetVol = (int) Math.round(maxVol * 0.80);
+                    if (currentVol < targetVol) {
+                        audioManager.setStreamVolume(AudioManager.STREAM_ALARM, targetVol, 0);
+                        Log.i(TAG, "Kelantangan penggera STREAM_ALARM dinaikkan ke: " + targetVol + "/" + maxVol);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "Gagal melaraskan kelantangan STREAM_ALARM", e);
+                }
+
+                // Tuntut fokus audio sistem eksklusif untuk penggera
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    AudioFocusRequest focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    AudioFocusRequest focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
                         .setAudioAttributes(audioAttributes)
                         .build();
                     audioManager.requestAudioFocus(focusRequest);
                 } else {
-                    audioManager.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                    audioManager.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE);
                 }
             }
 

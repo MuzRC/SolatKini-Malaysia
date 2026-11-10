@@ -1,5 +1,6 @@
 import { AzanAudioOption, AzanVoice, PrayerKey } from '../types/prayer';
 import { audioStorageService } from './audioStorageService';
+import { nativeAlarmService } from './nativeAlarmService';
 
 export interface ExtendedAzanAudioOption extends AzanAudioOption {
   audioUrl: string;
@@ -179,13 +180,16 @@ class AudioNotificationService {
     // 1. Notify listeners (Open full-screen modal)
     this.onAzanTriggerCallbacks.forEach((cb) => cb(prayerKey, prayerName, resolvedVoice));
 
-    // 2. Play Audio (100% Real Vocal Azan MP3)
-    this.playAzan(resolvedVoice);
+    // 2. Play Audio: Jika di peranti Android Native, serahkan kepada AzanAudioService (STREAM_ALARM)
+    if (nativeAlarmService.getIsNative()) {
+      nativeAlarmService.testAlarm(prayerName, resolvedVoice, 0);
+    } else {
+      // Pelayar web: mainkan audio HTML5
+      this.playAzan(resolvedVoice);
+      this.sendNotification(prayerName);
+    }
 
-    // 3. Send Web Notification with vibration
-    this.sendNotification(prayerName);
-
-    // 4. Haptic vibration
+    // 3. Haptic vibration
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([600, 300, 600, 300, 1000]);
     }
