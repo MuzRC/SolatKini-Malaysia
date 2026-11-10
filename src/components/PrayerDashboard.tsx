@@ -4,27 +4,21 @@ import {
   Bell,
   BellOff,
   Volume2,
-  Play,
-  Square,
-  Sparkles,
-  Info,
   Calendar,
   Clock,
   ChevronDown,
   Navigation,
-  CheckCircle2,
   Sliders,
   X,
   Moon,
   SunMedium,
-  Download,
-  HardDrive,
-  Trash2,
   Check,
   RefreshCw,
   WifiOff,
   AlertTriangle,
-  Settings
+  Settings,
+  Info,
+  Sparkles
 } from 'lucide-react';
 import {
   DayPrayerTimes,
@@ -35,7 +29,7 @@ import {
   FardPrayerKey,
   FARD_PRAYERS_ORDER
 } from '../types/prayer';
-import { JAKIM_ZONES, findNearestZone } from '../data/jakimZones';
+import { findNearestZone } from '../data/jakimZones';
 import {
   determineNextPrayer,
   PRAYER_LABELS,
@@ -44,11 +38,16 @@ import {
   getFastingCountdown,
 } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
-import { AZAN_OPTIONS, audioNotificationService, ExtendedAzanAudioOption } from '../services/audioNotificationService';
-import { audioStorageService } from '../services/audioStorageService';
+import { AZAN_OPTIONS } from '../services/audioNotificationService';
 import { getHijriDate, getFastingRecommendation } from '../utils/hijriCalendar';
 import { widgetService } from '../services/widgetService';
 import { nativeAlarmService } from '../services/nativeAlarmService';
+
+// Komponen pecahan modular
+import { ZoneSelectModal } from './ZoneSelectModal';
+import { DndGuideModal } from './DndGuideModal';
+import { AudioSettingsModal } from './AudioSettingsModal';
+import { DailyFardChecklist } from './DailyFardChecklist';
 
 const getLocalDateString = (d: Date = new Date()): string => {
   const year = d.getFullYear();
@@ -90,11 +89,13 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const [nextPrayerInfo, setNextPrayerInfo] = useState<NextPrayerInfo>(() =>
     determineNextPrayer(prayerTimes, new Date())
   );
+
+  // Status modal popup
   const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
   const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState(false);
   const [isDndGuideOpen, setIsDndGuideOpen] = useState(false);
-  const [zoneSearchQuery, setZoneSearchQuery] = useState('');
-  const [selectedStateFilter, setSelectedStateFilter] = useState<string>('Semua');
+
+  // Status sensor & sistem peranti
   const [isLocating, setIsLocating] = useState(false);
   const [locationError, setLocationError] = useState<{ message: string; isDenied: boolean } | null>(null);
   const [notificationsGranted, setNotificationsGranted] = useState<boolean>(true);
@@ -204,154 +205,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return defaultSettings;
   });
 
-  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
-  const [cachedVoiceIds, setCachedVoiceIds] = useState<string[]>([]);
-  const [downloadingVoiceId, setDownloadingVoiceId] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [audioToast, setAudioToast] = useState<string | null>(null);
-  const [activeDeviceVoice, setActiveDeviceVoice] = useState<string | null>(() => {
-    return audioStorageService.getActiveDeviceVoice();
-  });
-
-  useEffect(() => {
-    audioStorageService.getAllCachedVoiceIds().then((ids) => {
-      setCachedVoiceIds(ids);
-    });
-    const devVoice = audioStorageService.getActiveDeviceVoice();
-    if (devVoice) setActiveDeviceVoice(devVoice);
-  }, [isAudioSettingsOpen]);
-
-  const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
-    audioNotificationService.stopAudio();
-    setIsPlayingPreview(false);
-
-    audioStorageService.setActiveDeviceVoice(opt.id);
-    setActiveDeviceVoice(opt.id);
-    setSelectedVoice(opt.id);
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_azan_voice', opt.id);
-      localStorage.setItem('solatkini_active_device_voice', opt.id);
-    }
-
-    try {
-      if (typeof nativeAlarmService.setActiveVoice === 'function') {
-        nativeAlarmService.setActiveVoice(opt.id);
-      }
-    } catch (e) {
-      console.warn('Gagal tetapkan active voice native:', e);
-    }
-
-    setNotificationSettings((prev) => {
-      const updated: AppNotificationSettings = {
-        ...prev,
-        preferences: {
-          ...prev.preferences,
-          subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          zohor: { ...(prev.preferences?.zohor || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          asar: { ...(prev.preferences?.asar || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          maghrib: { ...(prev.preferences?.maghrib || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-          isyak: { ...(prev.preferences?.isyak || {}), voice: opt.id as AzanVoice, enabled: prev.preferences?.isyak?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
-        },
-      };
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('solatkini_notif_settings', JSON.stringify(updated));
-      }
-      return updated;
-    });
-
-    setAudioToast(`Berjaya! ${opt.title} ditetapkan untuk solat harian.`);
-    setTimeout(() => setAudioToast(null), 3500);
-
-    if (!cachedVoiceIds.includes(opt.id) && opt.audioUrl) {
-      setDownloadingVoiceId(opt.id);
-      setDownloadProgress(0);
-      try {
-        await audioStorageService.downloadAndCacheAzan(
-          opt.id,
-          opt.audioUrl,
-          opt.filename,
-          false,
-          (p) => setDownloadProgress(p),
-          opt.fallbackUrl
-        );
-        setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
-      } catch (err) {
-        console.warn('Pra-simpanan audio latar belakang gagal:', err);
-      } finally {
-        setDownloadingVoiceId(null);
-      }
-    }
-  };
-
-  const handleDownloadFile = async (opt: ExtendedAzanAudioOption) => {
-    try {
-      setDownloadingVoiceId(opt.id);
-      setDownloadProgress(0);
-      await audioStorageService.downloadAndCacheAzan(
-        opt.id,
-        opt.audioUrl,
-        opt.filename,
-        true,
-        (p) => setDownloadProgress(p),
-        opt.fallbackUrl
-      );
-      setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
-      setAudioToast(`Fail ${opt.filename} berjaya dimuat turun ke telefon dan disimpan ke memori luar talian!`);
-      setTimeout(() => setAudioToast(null), 4000);
-    } catch (err: any) {
-      setAudioToast(`Ralat muat turun: ${err.message || 'Sila cuba sebentar lagi'}`);
-      setTimeout(() => setAudioToast(null), 4000);
-    } finally {
-      setDownloadingVoiceId(null);
-    }
-  };
-
-  const handleToggleOfflineCache = async (opt: ExtendedAzanAudioOption) => {
-    const isCached = cachedVoiceIds.includes(opt.id);
-    if (isCached) {
-      await audioStorageService.removeAudioBlob(opt.id);
-      setCachedVoiceIds((prev) => prev.filter((id) => id !== opt.id));
-      setAudioToast(`Audio ${opt.title} dikeluarkan dari memori luar talian.`);
-      setTimeout(() => setAudioToast(null), 3000);
-    } else {
-      try {
-        setDownloadingVoiceId(opt.id);
-        setDownloadProgress(0);
-        await audioStorageService.downloadAndCacheAzan(
-          opt.id,
-          opt.audioUrl,
-          opt.filename,
-          false,
-          (p) => setDownloadProgress(p),
-          opt.fallbackUrl
-        );
-        setCachedVoiceIds((prev) => [...prev, opt.id]);
-        setAudioToast(`Audio ${opt.title} berjaya disimpan ke memori luar talian.`);
-        setTimeout(() => setAudioToast(null), 3000);
-      } catch (err: any) {
-        setAudioToast(`Ralat muat turun: ${err.message || 'Sila cuba lagi'}`);
-        setTimeout(() => setAudioToast(null), 3000);
-      } finally {
-        setDownloadingVoiceId(null);
-      }
-    }
-  };
-
-  const handleClearAllAudioCache = async () => {
-    try {
-      audioNotificationService.stopAudio();
-      setIsPlayingPreview(false);
-      await audioStorageService.clearAllAudioCache();
-      setCachedVoiceIds([]);
-      setAudioToast('Memori cache berjaya dikosongkan! Vokal azan MP3 rasmi sedia dimainkan secara lancar.');
-      setTimeout(() => setAudioToast(null), 4000);
-    } catch (err: any) {
-      setAudioToast(`Ralat mengosongkan cache: ${err?.message || 'Sila cuba lagi'}`);
-      setTimeout(() => setAudioToast(null), 4000);
-    }
-  };
-
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
@@ -367,7 +220,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone]);
 
-  // Sinkronisasi automatik ke AlarmManager Android saat data solat atau tetapan berubah
+  // Penjadualan automatik ke Android AlarmManager
   useEffect(() => {
     if (prayerTimes && prayerTimes.times) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
@@ -436,12 +289,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         localStorage.setItem('solatkini_fasting_date', today);
         localStorage.setItem('solatkini_fasting_active', next ? 'true' : 'false');
       }
-      setAudioToast(
-        next
-          ? 'Mod Berpuasa diaktifkan untuk hari ini. Penjejak waktu berbuka sedia dipaparkan.'
-          : 'Mod Berpuasa dinyahaktifkan.'
-      );
-      setTimeout(() => setAudioToast(null), 3000);
       return next;
     });
   };
@@ -456,18 +303,10 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem(`solatkini_prayer_checklist_${prayerTimes.date}`);
-        if (saved) {
-          return JSON.parse(saved);
-        }
+        if (saved) return JSON.parse(saved);
       } catch {}
     }
-    return {
-      subuh: false,
-      zohor: false,
-      asar: false,
-      maghrib: false,
-      isyak: false,
-    };
+    return { subuh: false, zohor: false, asar: false, maghrib: false, isyak: false };
   });
 
   useEffect(() => {
@@ -477,13 +316,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         if (saved) {
           setPrayerChecklist(JSON.parse(saved));
         } else {
-          setPrayerChecklist({
-            subuh: false,
-            zohor: false,
-            asar: false,
-            maghrib: false,
-            isyak: false,
-          });
+          setPrayerChecklist({ subuh: false, zohor: false, asar: false, maghrib: false, isyak: false });
         }
       } catch {}
     }
@@ -491,16 +324,10 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
 
   const handleTogglePrayerDone = (fardKey: FardPrayerKey) => {
     setPrayerChecklist((prev) => {
-      const updated = {
-        ...prev,
-        [fardKey]: !prev[fardKey],
-      };
+      const updated = { ...prev, [fardKey]: !prev[fardKey] };
       if (typeof window !== 'undefined') {
         try {
-          localStorage.setItem(
-            `solatkini_prayer_checklist_${prayerTimes.date}`,
-            JSON.stringify(updated)
-          );
+          localStorage.setItem(`solatkini_prayer_checklist_${prayerTimes.date}`, JSON.stringify(updated));
         } catch {}
       }
       return updated;
@@ -514,28 +341,15 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   };
 
   const handleResetChecklist = () => {
-    const initial = {
-      subuh: false,
-      zohor: false,
-      asar: false,
-      maghrib: false,
-      isyak: false,
-    };
+    const initial = { subuh: false, zohor: false, asar: false, maghrib: false, isyak: false };
     setPrayerChecklist(initial);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(`solatkini_prayer_checklist_${prayerTimes.date}`);
     }
   };
 
-  const completedFardCount = FARD_PRAYERS_ORDER.filter((k) => prayerChecklist[k]).length;
-  const fardPercentage = Math.round((completedFardCount / 5) * 100);
-
   const handleVoiceSelect = async (voice: AzanVoice) => {
-    audioNotificationService.stopAudio();
-    setIsPlayingPreview(false);
     setSelectedVoice(voice);
-    setActiveDeviceVoice(voice);
-    audioStorageService.setActiveDeviceVoice(voice);
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_azan_voice', voice);
       localStorage.setItem('solatkini_active_device_voice', voice);
@@ -596,10 +410,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         ...prev,
         preferences: {
           ...prev.preferences,
-          [key]: {
-            ...currentPref,
-            enabled: !currentPref.enabled,
-          },
+          [key]: { ...currentPref, enabled: !currentPref.enabled },
         },
       };
       if (typeof window !== 'undefined') {
@@ -609,20 +420,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     });
   };
 
-  const handlePlayPreview = (voice: AzanVoice) => {
-    audioNotificationService.unlockAudio();
-    if (isPlayingPreview && selectedVoice === voice) {
-      audioNotificationService.stopAudio();
-      setIsPlayingPreview(false);
-    } else {
-      audioNotificationService.stopAudio();
-      setSelectedVoice(voice);
-      setIsPlayingPreview(true);
-      audioNotificationService.playAzan(voice, () => setIsPlayingPreview(false));
-    }
-  };
-
-  // Pengesanan GPS dengan pengendalian ralat menyeluruh
+  // Pengesanan GPS dengan pengendalian ralat selamat
   const handleDetectGPS = () => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
       setLocationError({
@@ -673,19 +471,9 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     );
   };
 
-  const states = ['Semua', ...Array.from(new Set(JAKIM_ZONES.map((z) => z.state)))];
-
-  const filteredZones = JAKIM_ZONES.filter((zone) => {
-    const matchesState = selectedStateFilter === 'Semua' || zone.state === selectedStateFilter;
-    const matchesQuery =
-      zone.code.toLowerCase().includes(zoneSearchQuery.toLowerCase()) ||
-      zone.daerah.toLowerCase().includes(zoneSearchQuery.toLowerCase()) ||
-      zone.state.toLowerCase().includes(zoneSearchQuery.toLowerCase());
-    return matchesState && matchesQuery;
-  });
-
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-10">
+    <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
+      {/* 1. Header & Kawalan Zon */}
       <div className="glass-panel rounded-3xl p-5 sm:p-6 shadow-xl border border-white/5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -713,6 +501,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                 </span>
               )}
             </div>
+
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2">
               SolatKini Malaysia
             </h1>
@@ -800,6 +589,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         )}
       </div>
 
+      {/* 2. Amaran Jam Telefon Automatik Dimatikan */}
       {!isAutoTimeEnabled && (
         <div className="rounded-2xl p-4 bg-gradient-to-r from-rose-950/80 via-amber-950/70 to-[#1f0f0a] border border-rose-500/50 text-left space-y-2.5 shadow-xl animate-in fade-in duration-300">
           <div className="flex items-center justify-between gap-2">
@@ -841,6 +631,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
       )}
 
+      {/* 3. Amaran Kebenaran Notifikasi Belum Aktif */}
       {!notificationsGranted && (
         <div className="rounded-2xl p-4 bg-gradient-to-r from-amber-950/70 to-[#1e1408] border border-amber-500/50 text-left space-y-2.5 shadow-xl animate-in fade-in duration-300">
           <div className="flex items-center justify-between gap-2">
@@ -880,18 +671,10 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               Buka Tetapan Telefon (App Info)
             </button>
           </div>
-          <div className="text-[11px] text-amber-200/90 bg-black/40 p-3 rounded-xl border border-amber-500/30 mt-1 leading-relaxed">
-            <strong>Panduan Suis Kelabu (Android 13/14 Sideload):</strong> Jika suis notifikasi dimalapkan (greyed out) dalam Tetapan Telefon:
-            <ol className="list-decimal list-inside mt-1 space-y-0.5 text-slate-300">
-              <li>Tekan butang <strong className="text-amber-300">&quot;Buka Tetapan Telefon (App Info)&quot;</strong> di atas.</li>
-              <li>Tekan <strong>ikon 3 titik di sudut atas kanan</strong> halaman tersebut.</li>
-              <li>Pilih <strong>&quot;Benarkan tetapan terhad&quot; (Allow restricted settings)</strong> dan masukkan PIN / cap jari telefon anda.</li>
-              <li>Suis notifikasi kini aktif dan sedia dihidupkan.</li>
-            </ol>
-          </div>
         </div>
       )}
 
+      {/* 4. Kad Hero Waktu Solat Seterusnya & Pembilang Detik */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e241c] via-[#091712] to-[#060c0a] border border-emerald-500/20 p-6 sm:p-8 shadow-2xl">
         <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-10 -left-10 w-60 h-60 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
@@ -984,91 +767,16 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
       </div>
 
-      <div className="rounded-3xl bg-gradient-to-br from-[#0a1612] via-[#0e2119] to-[#08120e] border border-emerald-500/30 p-5 sm:p-6 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                <CheckCircle2 className="w-4 h-4" />
-              </span>
-              <h3 className="text-base sm:text-lg font-bold text-white">
-                Checklist Solat Fardu Harian
-              </h3>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-400/40 text-emerald-300 font-semibold font-mono shadow-sm">
-                {completedFardCount}/5 Selesai ({fardPercentage}%)
-              </span>
-            </div>
-            <p className="text-xs text-slate-300">
-              Tandakan 5 solat fardu yang telah disempurnakan hari ini ({currentTime.toLocaleDateString('ms-MY', { weekday: 'long', day: 'numeric', month: 'short' })}).
-            </p>
-          </div>
+      {/* 5. Komponen Checklist Solat Fardu Harian */}
+      <DailyFardChecklist
+        prayerTimes={prayerTimes}
+        prayerChecklist={prayerChecklist}
+        onTogglePrayerDone={handleTogglePrayerDone}
+        onResetChecklist={handleResetChecklist}
+        currentTime={currentTime}
+      />
 
-          {completedFardCount > 0 && (
-            <button
-              onClick={handleResetChecklist}
-              className="text-xs text-slate-400 hover:text-red-400 transition self-start sm:self-center px-2.5 py-1 rounded-xl border border-slate-800 hover:border-red-900/50 bg-slate-900/60 cursor-pointer"
-            >
-              Set Semula
-            </button>
-          )}
-        </div>
-
-        <div className="w-full bg-slate-950/80 rounded-full h-2.5 overflow-hidden border border-emerald-950">
-          <div
-            className="h-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-400 rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${fardPercentage}%` }}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
-          {FARD_PRAYERS_ORDER.map((fardKey) => {
-            const isDone = prayerChecklist[fardKey];
-            const prayerName = PRAYER_LABELS[fardKey];
-            const prayerTime = formatDisplayTime(prayerTimes.times[fardKey]);
-
-            return (
-              <button
-                key={fardKey}
-                onClick={() => handleTogglePrayerDone(fardKey)}
-                className={`p-3 rounded-2xl border text-left transition flex items-center justify-between gap-2 active:scale-95 cursor-pointer ${
-                  isDone
-                    ? 'bg-emerald-950/70 border-emerald-400/60 text-white shadow-md shadow-emerald-950/40 ring-1 ring-emerald-500/30'
-                    : 'bg-slate-900/50 border-slate-800/80 hover:border-slate-700 text-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="text-xs font-bold flex items-center gap-1.5">
-                    {prayerName}
-                  </div>
-                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                    {prayerTime}
-                  </div>
-                </div>
-
-                <div
-                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition ${
-                    isDone
-                      ? 'bg-emerald-500 text-slate-950 font-black'
-                      : 'border-2 border-slate-600 text-transparent'
-                  }`}
-                >
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {completedFardCount === 5 && (
-          <div className="p-3.5 rounded-2xl bg-emerald-900/40 border border-emerald-400/40 flex items-center gap-3 text-xs text-emerald-200 animate-in fade-in-50 duration-300">
-            <Sparkles className="w-5 h-5 text-amber-300 shrink-0" />
-            <span>
-              <strong>Alhamdulillah!</strong> Anda telah menyempurnakan kesemua 5 waktu solat fardu hari ini. Semoga setiap sujud dan doa diterima oleh Allah SWT.
-            </span>
-          </div>
-        )}
-      </div>
-
+      {/* 6. Grid Jadual Waktu Solat Hari Ini */}
       <div>
         <div className="flex items-center justify-between mb-3 px-1">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1196,471 +904,30 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
       </div>
 
-      {isZoneModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-xl max-h-[85vh] rounded-3xl bg-[#0f1a16] border border-emerald-500/20 p-6 flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h3 className="text-xl font-bold text-white">Pilih Zon Waktu Solat JAKIM</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Merangkumi seluruh negeri di Semenanjung, Sabah & Sarawak
-                </p>
-              </div>
-              <button
-                onClick={() => setIsZoneModalOpen(false)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* 7. Modal Pemilih Zon Solat JAKIM */}
+      <ZoneSelectModal
+        isOpen={isZoneModalOpen}
+        onClose={() => setIsZoneModalOpen(false)}
+        currentZone={currentZone}
+        onZoneChange={onZoneChange}
+      />
 
-            <div className="pt-4 space-y-3">
-              <input
-                type="text"
-                placeholder="Cari daerah, negeri, atau kod (cth: Shah Alam, SGR01)..."
-                value={zoneSearchQuery}
-                onChange={(e) => setZoneSearchQuery(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
-              />
+      {/* 8. Modal Pilihan Suara Muadzin & Audio Azan */}
+      <AudioSettingsModal
+        isOpen={isAudioSettingsOpen}
+        onClose={() => setIsAudioSettingsOpen(false)}
+        selectedVoice={selectedVoice}
+        onVoiceSelect={handleVoiceSelect}
+        nextPrayerKey={nextPrayerInfo.nextKey}
+        nextPrayerLabel={nextPrayerInfo.nextLabel}
+        onTriggerTestAlarm={onTriggerTestAlarm}
+      />
 
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs scrollbar-none">
-                {states.map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setSelectedStateFilter(st)}
-                    className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition cursor-pointer ${
-                      selectedStateFilter === st
-                        ? 'bg-emerald-600 text-white font-semibold'
-                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto mt-2 space-y-2 pr-1">
-              {filteredZones.map((z) => {
-                const isSelected = z.code === currentZone.code;
-                return (
-                  <button
-                    key={z.code}
-                    onClick={() => {
-                      onZoneChange(z);
-                      setIsZoneModalOpen(false);
-                    }}
-                    className={`w-full p-3.5 rounded-xl text-left flex items-start justify-between transition cursor-pointer ${
-                      isSelected
-                        ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-200'
-                        : 'bg-slate-900/50 hover:bg-slate-800/60 border border-slate-800 text-slate-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/40 font-bold">
-                          {z.code}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-400">{z.state}</span>
-                      </div>
-                      <p className="text-sm font-medium text-white mt-1.5 leading-snug">
-                        {z.daerah}
-                      </p>
-                    </div>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-1" />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isAudioSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-3xl bg-[#0f1a16] border border-emerald-500/20 p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div>
-                <h3 className="text-xl font-bold text-white">Pilihan Audio Azan</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Pilih alunan muadzin kegemaran anda untuk laungan azan solat harian
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  audioNotificationService.stopAudio();
-                  setIsPlayingPreview(false);
-                  setIsAudioSettingsOpen(false);
-                }}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {audioToast && (
-              <div className="mt-3 p-3 rounded-xl bg-emerald-900/80 border border-emerald-400 text-xs text-white flex items-center justify-between">
-                <span>{audioToast}</span>
-                <button onClick={() => setAudioToast(null)} className="text-slate-300 hover:text-white cursor-pointer">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
-
-            <div className="mt-4 space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
-                <span>Pilihan di bawah digunakan untuk Zohor, Asar, Maghrib & Isyak. Waktu Subuh kekal automatik menggunakan alunan Azan Subuh khas.</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-[#0e241c] border border-emerald-500/40 shadow-lg flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
-                    <Volume2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">
-                      Azan Harian Semasa
-                    </span>
-                    <h4 className="text-sm font-extrabold text-white">
-                      {AZAN_OPTIONS.find((v) => v.id === (activeDeviceVoice || selectedVoice))?.title || 'Azan Rasmi JAKIM'}
-                    </h4>
-                    <p className="text-[11px] text-slate-300">
-                      Digunakan pada waktu Zohor, Asar, Maghrib & Isyak
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    const voiceToTest = (activeDeviceVoice || selectedVoice) as AzanVoice;
-                    handlePlayPreview(voiceToTest);
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shrink-0 shadow-md transition active:scale-95 cursor-pointer"
-                >
-                  {isPlayingPreview ? 'Henti' : 'Uji Bunyi'}
-                </button>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#0c1813] to-[#08120e] border border-emerald-500/30 text-left space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">
-                      Sistem Penggera Azan Asli (Android AlarmManager)
-                    </h4>
-                  </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30">
-                    TargetSDK 33+
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Dikuasakan oleh perkakasan <code className="text-emerald-300 font-mono">AlarmManager.setAlarmClock</code> dan saluran audio <code className="text-emerald-300 font-mono">STREAM_ALARM</code> bagi menjamin laungan azan berkumandang tepat pada waktunya dan berupaya melepasi mod senyap serta skrin kunci.
-                </p>
-                <div className="pt-1 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={async () => {
-                      const prayerKey = nextPrayerInfo.nextKey || 'subuh';
-                      const prayerName = nextPrayerInfo.nextLabel || 'Subuh';
-                      const testVoice = (prayerKey === 'subuh' ? 'subuh_special' : selectedVoice) as AzanVoice;
-                      const res = await nativeAlarmService.testAlarm(prayerName, testVoice, 3);
-                      if (res) {
-                        setAudioToast('Penggera azan asli dijadualkan! Kunci skrin telefon anda sekarang untuk menguji.');
-                      } else {
-                        onTriggerTestAlarm(prayerKey, prayerName, testVoice);
-                        setAudioToast('Ujian azan dimulakan.');
-                      }
-                      setTimeout(() => setAudioToast(null), 5000);
-                    }}
-                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-emerald-950/40 cursor-pointer"
-                  >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    Uji Penggera Asli Telefon (3 Saat)
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await nativeAlarmService.openNotificationSettings();
-                    }}
-                    className="px-3 py-2 rounded-xl bg-emerald-950/80 hover:bg-emerald-900/80 text-emerald-300 text-xs font-semibold border border-emerald-500/40 transition cursor-pointer"
-                  >
-                    Tetapan Notifikasi Telefon
-                  </button>
-                  <button
-                    onClick={async () => {
-                      await nativeAlarmService.openExactAlarmSettings();
-                    }}
-                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition cursor-pointer"
-                  >
-                    Tetapan Penggera Tepat
-                  </button>
-                </div>
-              </div>
-
-              {AZAN_OPTIONS.map((opt) => {
-                const isCurrent = opt.id === selectedVoice;
-                const isDeviceActive = (activeDeviceVoice || selectedVoice) === opt.id;
-                const isCached = cachedVoiceIds.includes(opt.id);
-                const isDownloading = downloadingVoiceId === opt.id;
-
-                return (
-                  <div
-                    key={opt.id}
-                    onClick={() => handleVoiceSelect(opt.id)}
-                    className={`p-4 rounded-2xl cursor-pointer border transition flex flex-col gap-3 ${
-                      isDeviceActive
-                        ? 'bg-emerald-950/70 border-emerald-400/60 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-400/40'
-                        : isCurrent
-                        ? 'bg-emerald-950/50 border-emerald-500/40'
-                        : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800/50'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-sm font-bold text-white">{opt.title}</h4>
-                          {isDeviceActive && (
-                            <span className="text-[10px] bg-emerald-500 text-slate-950 px-2 py-0.5 rounded-full font-black tracking-wide flex items-center gap-1 shadow-sm">
-                              <CheckCircle2 className="w-3 h-3 fill-slate-950 text-emerald-500" />
-                              AZAN HARIAN AKTIF
-                            </span>
-                          )}
-                          {isCached ? (
-                            <span className="text-[10px] bg-emerald-900/50 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                              <Check className="w-3 h-3 text-emerald-400" /> Tersimpan di Memori
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300">
-                              Vokal Asli MP3
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-emerald-400 mt-0.5 font-medium">{opt.reciter}</p>
-                        <p className="text-[11px] text-slate-400 mt-1">{opt.description}</p>
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePlayPreview(opt.id);
-                        }}
-                        className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition shadow-md shadow-emerald-950/40 cursor-pointer"
-                        title={isPlayingPreview && selectedVoice === opt.id ? 'Henti Pratonton' : 'Dengar Alunan Azan'}
-                      >
-                        {isPlayingPreview && selectedVoice === opt.id ? (
-                          <Square className="w-4 h-4 fill-white" />
-                        ) : (
-                          <Play className="w-4 h-4 fill-white" />
-                        )}
-                      </button>
-                    </div>
-
-                    {isDownloading && (
-                      <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                        <div
-                          className="bg-emerald-400 h-full rounded-full transition-all duration-200"
-                          style={{ width: `${downloadProgress}%` }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 flex-wrap text-xs">
-                      {isDeviceActive ? (
-                        <div className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1">
-                          <Check className="w-3.5 h-3.5" /> Digunakan untuk Zohor, Asar, Maghrib & Isyak
-                        </div>
-                      ) : (
-                        <button
-                          disabled={isDownloading}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSetAsDeviceVoice(opt);
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition active:scale-95 shadow-sm cursor-pointer"
-                        >
-                          <Volume2 className="w-3.5 h-3.5" />
-                          <span>Guna Untuk Azan Harian</span>
-                        </button>
-                      )}
-
-                      <div className="flex items-center gap-1.5 ml-auto">
-                        <button
-                          disabled={isDownloading}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleOfflineCache(opt);
-                          }}
-                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium transition cursor-pointer ${
-                            isCached
-                              ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-red-400'
-                              : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50'
-                          }`}
-                          title={isCached ? 'Padam dari memori telefon' : 'Simpan ke memori untuk luar talian'}
-                        >
-                          <HardDrive className="w-3 h-3" />
-                          <span>{isCached ? 'Padam Memori' : 'Simpan'}</span>
-                        </button>
-
-                        <button
-                          disabled={isDownloading}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDownloadFile(opt);
-                          }}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium border border-slate-700 transition active:scale-95 cursor-pointer"
-                          title={`Muat turun fail ${opt.filename} ke memori telefon`}
-                        >
-                          <Download className="w-3 h-3 text-emerald-400" />
-                          <span>Muat Turun .MP3</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                    Muat Naik Fail Audio Azan Sendiri
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Pilih fail .mp3 atau .wav dari peranti anda untuk dijadikan azan solat harian
-                  </p>
-                </div>
-                <label className="cursor-pointer px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold text-center border border-slate-700 shrink-0 transition active:scale-95">
-                  <span>Pilih Fail Audio</span>
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        const url = URL.createObjectURL(file);
-                        audioNotificationService.setCustomAudio(url);
-                        audioNotificationService.playAzan(selectedVoice, () => setIsPlayingPreview(false));
-                        setIsPlayingPreview(true);
-                      }
-                    }}
-                  />
-                </label>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h4 className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                    <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-                    Kosongkan & Segarkan Cache Audio
-                  </h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Gunakan butang ini jika audio senyap atau tersekat untuk menetapkan semula ke fail MP3 vokal rasmi
-                  </p>
-                </div>
-                <button
-                  onClick={handleClearAllAudioCache}
-                  className="px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold shrink-0 transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
-                  title="Kosongkan memori audio IndexedDB lama"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Kosongkan Cache</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
-              <div className="text-[11px] text-slate-400">
-                Tekan mana-mana laungan azan untuk mendengar alunan
-              </div>
-              <button
-                onClick={() => {
-                  audioNotificationService.stopAudio();
-                  setIsPlayingPreview(false);
-                  setIsAudioSettingsOpen(false);
-                }}
-                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition cursor-pointer"
-              >
-                Selesai
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isDndGuideOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="relative w-full max-w-lg rounded-3xl bg-[#0f1a16] border border-amber-500/30 p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Info className="w-5 h-5 text-amber-400" />
-                <h3 className="text-lg font-bold text-white">Panduan Bypass Silent & DND</h3>
-              </div>
-              <button
-                onClick={() => setIsDndGuideOpen(false)}
-                className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
-              <p>
-                Pelayar web moden dan sistem operasi mempunyai had keselamatan privasi perkakasan. Untuk memastikan azan sentiasa berbunyi walaupun telefon anda dalam mod Jangan Ganggu (Do Not Disturb) atau Senyap:
-              </p>
-
-              <div className="space-y-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                    1
-                  </span>
-                  <div>
-                    <strong className="text-white">Aplikasi Android (APK) Siap Pasang:</strong>
-                    <p className="text-slate-400 text-xs mt-0.5">
-                      Aplikasi SolatKini berjalan sebagai aplikasi native penuh pada telefon anda untuk keizinan penggera audio dan sokongan widget skrin utama.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                    2
-                  </span>
-                  <div>
-                    <strong className="text-white">Untuk Pengguna Android:</strong>
-                    <p className="text-slate-400 text-xs mt-0.5">
-                      Buka <em>Settings &gt; Apps &gt; SolatKini &gt; Notifications</em>. Pilih kategori Penggera dan aktifkan <strong>&quot;Override Do Not Disturb&quot;</strong>.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                    3
-                  </span>
-                  <div>
-                    <strong className="text-white">Untuk Pengguna iOS / iPhone:</strong>
-                    <p className="text-slate-400 text-xs mt-0.5">
-                      Buka <em>Settings &gt; Focus &gt; Do Not Disturb</em>. Di bawah <em>Allowed Apps</em>, tambahkan SolatKini sebagai aplikasi berkecuali.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-emerald-400 text-xs">
-                Aplikasi ini dilengkapi penggera enjin Web Audio bervolum tinggi yang akan melancarkan modal azan automatik apabila waktu solat tiba.
-              </p>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setIsDndGuideOpen(false)}
-                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm cursor-pointer"
-              >
-                Faham & Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 9. Modal Panduan Melepasi Mod Senyap (DND) */}
+      <DndGuideModal
+        isOpen={isDndGuideOpen}
+        onClose={() => setIsDndGuideOpen(false)}
+      />
     </div>
   );
 };
