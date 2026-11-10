@@ -18,7 +18,6 @@ Aplikasi waktu solat moden, penentu arah kiblat berketepatan tinggi, dan peringa
 
 | Komponen | Spesifikasi |
 | :--- | :--- |
-| **Versi** | v2.5.0 |
 | **Sokongan OS** | Android 8.0 hingga Android 15 |
 | **Frontend** | React 19, TypeScript, Tailwind CSS, Lucide React |
 | **Native Bridge** | Capacitor Android Native Bridge |
