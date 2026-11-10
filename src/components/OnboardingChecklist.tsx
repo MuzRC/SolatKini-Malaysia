@@ -7,11 +7,10 @@ import {
   ChevronRight,
   BatteryCharging,
   Zap,
-  ExternalLink,
-  AlertTriangle,
-  X,
   Settings,
+  X,
   RefreshCw,
+  AlertTriangle,
   Info
 } from 'lucide-react';
 import { nativeAlarmService } from '../services/nativeAlarmService';
@@ -28,7 +27,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
   const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // State untuk mengawal popup modal bagi setiap kebenaran
+  // Kawalan popup modal sekiranya dialog izin disekat Android
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [modalFeedback, setModalFeedback] = useState<string | null>(null);
 
@@ -49,35 +48,37 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
   }, []);
 
   const checkPermissions = async () => {
-    // 1. Semak Notifikasi
+    // 1. Semakan Notifikasi Asli
     try {
       if (nativeAlarmService && typeof nativeAlarmService.checkPermissions === 'function') {
         const status = await nativeAlarmService.checkPermissions();
         if (status && status.notificationsGranted) {
           setNotifGranted(true);
+        } else {
+          setNotifGranted(false);
         }
       } else if (typeof window !== 'undefined' && 'Notification' in window) {
-        if (Notification.permission === 'granted') {
-          setNotifGranted(true);
-        }
+        setNotifGranted(Notification.permission === 'granted');
       }
     } catch (e) {
       console.warn('Semakan notifikasi diabaikan:', e);
     }
 
-    // 2. Semak GPS Lokasi
+    // 2. Semakan Geolokasi GPS
     try {
       if (typeof navigator !== 'undefined' && navigator.permissions) {
         const locStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
         if (locStatus && locStatus.state === 'granted') {
           setLocationGranted(true);
+        } else {
+          setLocationGranted(false);
         }
       }
     } catch {
-      // Abaikan jika WebView tidak menyokong permissions.query
+      // WebView sesetengah telefon tidak menyokong permissions.query
     }
 
-    // 3. Semak Bateri
+    // 3. Semakan Bateri
     try {
       if (nativeAlarmService && typeof nativeAlarmService.isBatteryOptimized === 'function') {
         const isIgnored = await nativeAlarmService.isBatteryOptimized();
@@ -90,7 +91,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     }
   };
 
-  // 1. Tindakan Kebenaran Notifikasi
+  // Minta Kebenaran Notifikasi
   const handleRequestNotification = async () => {
     setModalFeedback(null);
     try {
@@ -106,45 +107,48 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         setNotifGranted(true);
         setActiveModal(null);
       } else {
-        // Jika sistem Android tidak membuka popup (kerana pernah ditolak), buka popup modal panduan
+        // Jika sistem Android tidak memaparkan dialog izin kerana pernah ditolak
         setActiveModal('notif');
-        setModalFeedback('Kebenaran belum aktif. Sila tekan butang "Buka Tetapan Telefon" di bawah.');
+        setModalFeedback('Kebenaran notifikasi belum aktif. Sila tekan butang "Buka Tetapan Telefon" di bawah.');
       }
     } catch {
       setActiveModal('notif');
     }
   };
 
-  // 2. Tindakan Kebenaran Lokasi GPS
+  // Minta Kebenaran Lokasi GPS (Tanpa Hijau Palsu)
   const handleRequestLocation = () => {
     setModalFeedback(null);
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => {
+          // Hanya tandakan aktif bila pengguna BENAR-BENAR tekan Benarkan
           setLocationGranted(true);
           setActiveModal(null);
         },
         (err) => {
           console.warn('GPS ditolak atau gagal dikesan:', err.message);
-          // Buka popup modal paksa supaya pengguna ada jalan keluar ke tetapan
+          setLocationGranted(false);
           setActiveModal('location');
+
           if (err.code === 1) {
-            setModalFeedback('Akses lokasi telah disekat oleh Android (Pernah Ditolak). Sila tekan butang di bawah untuk membuka Tetapan Telefon dan hidupkan suis Lokasi.');
+            setModalFeedback('Akses lokasi telah disekat oleh Android (Pernah Ditolak). Sila buka Tetapan Telefon untuk membenarkan kebenaran Lokasi.');
           } else if (err.code === 2) {
-            setModalFeedback('Isyarat GPS mati. Sila hidupkan ikon Lokasi di bar tetapan pantas telefon anda.');
+            setModalFeedback('Isyarat GPS dimatikan. Sila hidupkan suis Lokasi di bar tetapan pantas atas telefon anda.');
           } else {
             setModalFeedback('Masa carian GPS tamat. Sila cuba lagi atau pilih zon solat secara manual.');
           }
         },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
       );
     } else {
+      setLocationGranted(false);
       setActiveModal('location');
       setModalFeedback('Peranti ini tidak menyokong fungsi geolokasi web.');
     }
   };
 
-  // 3. Tindakan Kebenaran Bateri & Autostart
+  // Minta Pengecualian Bateri
   const handleRequestBattery = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.requestIgnoreBatteryOptimization === 'function') {
@@ -156,6 +160,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     setBatteryIgnored(true);
   };
 
+  // Buka Autostart
   const handleOpenAutostart = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.openAutostartSettings === 'function') {
@@ -168,7 +173,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     }
   };
 
-  // Selesai onboarding: simpan zon & teruskan
+  // Selesai onboarding: simpan zon & teruskan ke Dashboard
   const handleFinish = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     if (isSubmitting) return;
@@ -177,8 +182,8 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     try {
       if (typeof window !== 'undefined') {
         localStorage.setItem('solatkini_onboarding_completed', 'true');
-        if (!localStorage.getItem('solatkini_selected_zone')) {
-          localStorage.setItem('solatkini_selected_zone', 'SBH07'); // Default Beaufort / Sabah
+        if (!localStorage.getItem('solatkini_active_zone')) {
+          localStorage.setItem('solatkini_active_zone', 'SBH07'); // Default Beaufort / Sabah
         }
       }
     } catch (err) {
@@ -347,13 +352,13 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                 {batteryIgnored && (
                   <div className="flex items-center gap-1.5 text-emerald-400 shrink-0 text-xs font-bold pt-1">
                     <CheckCircle2 className="w-5 h-5 fill-emerald-500/20" />
-                    <span className="text-xs">Bebas Sekatan</span>
+                    <span>Bebas Sekatan</span>
                   </div>
                 )}
               </div>
 
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Pengguna <strong>Xiaomi, Vivo, Oppo, Realme atau Samsung</strong> wajib mematikan sekatan bateri agar telefon tidak membekukan azan semasa skrin ditutup.
+                Pengguna <strong>Xiaomi, Vivo, Oppo, Realme atau Samsung</strong> wajib mematikan sekatan bateri agar peranti tidak membekukan azan semasa skrin ditutup[cite: 11, 15].
               </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -415,7 +420,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Sistem Android 13 ke atas memerlukan kebenaran notifikasi bagi membolehkan laungan azan dan peringatan waktu solat berbunyi pada skrin kunci telefon anda.
+              Sistem Android memerlukan kebenaran notifikasi bagi membolehkan laungan azan dan penggera waktu solat berbunyi pada telefon anda[cite: 12].
             </p>
 
             {modalFeedback && (
@@ -477,7 +482,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Kebenaran lokasi diperlukan untuk memadankan zon waktu solat rasmi JAKIM secara automatik. Jika dialog izin pernah ditolak sebelum ini, sistem Android akan menyekat popup automatik.
+              Kebenaran lokasi diperlukan untuk memadankan zon solat rasmi JAKIM secara automatik[cite: 11]. Sekiranya popup izin disekat Android kerana pernah ditolak sebelum ini, sila hidupkan kebenaran secara manual di Tetapan Telefon[cite: 25, 28].
             </p>
 
             {modalFeedback && (
@@ -490,7 +495,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 space-y-1">
               <strong>Langkah membenarkan di telefon:</strong>
               <ol className="list-decimal list-inside space-y-0.5 text-slate-400">
-                <li>Tekan butang hijau <strong>&quot;Buka Tetapan Aplikasi&quot;</strong> di bawah.</li>
+                <li>Tekan butang hijau <strong>&quot;Buka Tetapan Aplikasi Telefon&quot;</strong> di bawah.</li>
                 <li>Pilih <strong>Permissions (Keizinan) &gt; Location (Lokasi)</strong>.</li>
                 <li>Tandakan <strong>&quot;Allow only while using the app&quot;</strong>.</li>
               </ol>
@@ -512,7 +517,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               <button
                 type="button"
                 onClick={() => {
-                  // Pilihan sandaran: pengguna tetap boleh guna aplikasi secara manual
+                  // Pilihan sandaran: pengguna tetap boleh guna aplikasi secara manual tanpa terkunci
                   setLocationGranted(true);
                   setActiveModal(null);
                 }}
@@ -548,7 +553,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Untuk mengelakkan sistem operasi peranti membekukan azan bila telefon dikunci atau skrin terpadam, sila aktifkan kedua-dua kebenaran ini:
+              Untuk mengelakkan sistem operasi peranti membekukan azan bila telefon dikunci atau skrin terpadam, sila aktifkan kedua-dua kebenaran ini[cite: 11, 15]:
             </p>
 
             <div className="space-y-2.5 pt-1">
@@ -558,14 +563,14 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                   {batteryIgnored && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Membenarkan penggera azan tepat beroperasi tanpa had penjimat bateri.
+                  Membenarkan penggera azan tepat beroperasi tanpa sekatan mod jimat bateri[cite: 8, 19].
                 </p>
                 <button
                   type="button"
                   onClick={async () => {
                     await handleRequestBattery();
                   }}
-                  className="w-full py-2 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                  className="w-full py-2 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
                 >
                   <Zap className="w-3.5 h-3.5" />
                   <span>{batteryIgnored ? 'Sekatan Bateri Dinyahaktifkan' : 'Tekan untuk Nyahaktif Bateri'}</span>
@@ -577,16 +582,16 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                   <span>2. Kebenaran Autostart (Xiaomi/Vivo/Oppo/Realme)</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
-                  Membolehkan aplikasi menjadualkan semula azan selepas telefon dimatikan atau dihidupkan semula.
+                  Membolehkan aplikasi menjadualkan semula azan selepas telefon dimatikan atau dihidupkan semula[cite: 15].
                 </p>
                 <button
                   type="button"
                   onClick={async () => {
                     await handleOpenAutostart();
                   }}
-                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <Settings className="w-3.5 h-3.5 text-slate-400" />
                   <span>Buka Menu Autostart Telefon</span>
                 </button>
               </div>
@@ -599,7 +604,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                   setBatteryIgnored(true);
                   setActiveModal(null);
                 }}
-                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow-md"
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow-md cursor-pointer"
               >
                 Selesai & Tutup
               </button>
