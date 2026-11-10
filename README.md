@@ -1,4 +1,4 @@
-# SolatKini Malaysia (v2.5.0)
+# SolatKini Malaysia
 
 Aplikasi waktu solat moden, penentu arah kiblat berketepatan tinggi, dan peringatan azan luar talian berteraskan piawaian data rasmi Jabatan Kemajuan Islam Malaysia (JAKIM). Dibina dengan mengutamakan privasi, sifar iklan, dan penjimatan bateri optimum.
 
