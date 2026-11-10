@@ -59,32 +59,6 @@ jobs:
         run: |
           npm install --legacy-peer-deps
 
-      # 5.1. Mampatkan Audio Azan Automatik (FFmpeg)
-      - name: 5.1. Mampatkan Audio Azan Secara Automatik
-        run: |
-          echo "=============================================="
-          echo "Memulakan pemampatan audio azan di GitHub Actions..."
-          echo "=============================================="
-          
-          if [ -d "public/audio" ]; then
-            find public/audio -type f -name "*.mp3" | while read -r FILE; do
-              BEFORE_SIZE=$(stat -c%s "$FILE")
-              
-              # Mampatkan ke Mono 64kbps 44.1kHz
-              ffmpeg -y -v error -i "$FILE" -ac 1 -b:a 64k -ar 44100 "${FILE}.tmp.mp3"
-              
-              if [ -f "${FILE}.tmp.mp3" ]; then
-                mv "${FILE}.tmp.mp3" "$FILE"
-                AFTER_SIZE=$(stat -c%s "$FILE")
-                SAVED=$(( (BEFORE_SIZE - AFTER_SIZE) * 100 / BEFORE_SIZE ))
-                echo "✅ $FILE: Saiz asal $BEFORE_SIZE bytes ➔ $AFTER_SIZE bytes (Jimat ${SAVED}%)"
-              fi
-            done
-            echo "Semua audio dalam public/audio berjaya dimampatkan!"
-          else
-            echo "Folder public/audio tiada dikesan, langkau langkah ini."
-          fi
-          
       # 6. Build Web Assets (Vite akan bungkus fail audio yang sudah kurus)
       - name: 6. Build Web Assets (Vite)
         run: npm run build
