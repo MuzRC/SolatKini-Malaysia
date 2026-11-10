@@ -8,6 +8,11 @@ import {
   BatteryCharging,
   Zap,
   ExternalLink,
+  AlertTriangle,
+  X,
+  Settings,
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import { nativeAlarmService } from '../services/nativeAlarmService';
 
@@ -15,11 +20,17 @@ interface OnboardingChecklistProps {
   onComplete: () => void;
 }
 
+type ModalType = 'notif' | 'location' | 'battery' | null;
+
 export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComplete }) => {
   const [notifGranted, setNotifGranted] = useState<boolean>(false);
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
   const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // State untuk mengawal popup modal bagi setiap kebenaran
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [modalFeedback, setModalFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     checkPermissions();
@@ -79,67 +90,85 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     }
   };
 
-  // Minta Kebenaran Notifikasi
+  // 1. Tindakan Kebenaran Notifikasi
   const handleRequestNotification = async () => {
+    setModalFeedback(null);
     try {
+      let granted = false;
       if (nativeAlarmService && typeof nativeAlarmService.requestNotificationPermission === 'function') {
-        await nativeAlarmService.requestNotificationPermission();
+        granted = await nativeAlarmService.requestNotificationPermission();
       } else if (typeof window !== 'undefined' && 'Notification' in window) {
-        await Notification.requestPermission();
+        const res = await Notification.requestPermission();
+        granted = res === 'granted';
       }
-      setNotifGranted(true);
-    } catch (err) {
-      console.warn('Gagal meminta notifikasi, guna fallback aktif:', err);
-      setNotifGranted(true);
+
+      if (granted) {
+        setNotifGranted(true);
+        setActiveModal(null);
+      } else {
+        // Jika sistem Android tidak membuka popup (kerana pernah ditolak), buka popup modal panduan
+        setActiveModal('notif');
+        setModalFeedback('Kebenaran belum aktif. Sila tekan butang "Buka Tetapan Telefon" di bawah.');
+      }
+    } catch {
+      setActiveModal('notif');
     }
   };
 
-  // Minta Kebenaran Lokasi GPS
+  // 2. Tindakan Kebenaran Lokasi GPS
   const handleRequestLocation = () => {
+    setModalFeedback(null);
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => {
           setLocationGranted(true);
+          setActiveModal(null);
         },
         (err) => {
-          console.warn('GPS tidak dapat dikesan terus:', err.message);
-          // Tetap tandakan aktif supaya pengguna tidak terkunci di skrin ini
-          setLocationGranted(true);
+          console.warn('GPS ditolak atau gagal dikesan:', err.message);
+          // Buka popup modal paksa supaya pengguna ada jalan keluar ke tetapan
+          setActiveModal('location');
+          if (err.code === 1) {
+            setModalFeedback('Akses lokasi telah disekat oleh Android (Pernah Ditolak). Sila tekan butang di bawah untuk membuka Tetapan Telefon dan hidupkan suis Lokasi.');
+          } else if (err.code === 2) {
+            setModalFeedback('Isyarat GPS mati. Sila hidupkan ikon Lokasi di bar tetapan pantas telefon anda.');
+          } else {
+            setModalFeedback('Masa carian GPS tamat. Sila cuba lagi atau pilih zon solat secara manual.');
+          }
         },
-        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
       );
     } else {
-      setLocationGranted(true);
+      setActiveModal('location');
+      setModalFeedback('Peranti ini tidak menyokong fungsi geolokasi web.');
     }
   };
 
-  // Minta Pengecualian Bateri
+  // 3. Tindakan Kebenaran Bateri & Autostart
   const handleRequestBattery = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.requestIgnoreBatteryOptimization === 'function') {
         await nativeAlarmService.requestIgnoreBatteryOptimization();
       }
     } catch (err) {
-      console.warn('Dialog bateri tidak disokong pada WebView ini:', err);
+      console.warn('Dialog bateri tidak disokong:', err);
     }
     setBatteryIgnored(true);
   };
 
-  // Buka Menu Autostart
   const handleOpenAutostart = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.openAutostartSettings === 'function') {
         await nativeAlarmService.openAutostartSettings();
       } else {
-        alert('Sila semak kebenaran Autostart aplikasi SolatKini di Tetapan telefon anda.');
+        await nativeAlarmService.openNotificationSettings();
       }
-    } catch (err) {
-      console.warn('Menu autostart tidak dapat dibuka:', err);
-      alert('Sila buka Tetapan telefon > Pengurusan Aplikasi > SolatKini > Benarkan Autostart.');
+    } catch {
+      await nativeAlarmService.openNotificationSettings();
     }
   };
 
-  // Butang Teruskan: Simpan ke storan & lompat keluar ke dashboard
+  // Selesai onboarding: simpan zon & teruskan
   const handleFinish = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     if (isSubmitting) return;
@@ -148,9 +177,8 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
     try {
       if (typeof window !== 'undefined') {
         localStorage.setItem('solatkini_onboarding_completed', 'true');
-        // Tetapkan zon default jika GPS belum sempat mengesan koordinat
         if (!localStorage.getItem('solatkini_selected_zone')) {
-          localStorage.setItem('solatkini_selected_zone', 'SBH07'); // Default Beaufort/Papar/W.P Labuan
+          localStorage.setItem('solatkini_selected_zone', 'SBH07'); // Default Beaufort / Sabah
         }
       }
     } catch (err) {
@@ -163,7 +191,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
   const allReady = notifGranted && locationGranted;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#060e0a] text-slate-100 flex flex-col justify-between p-5 sm:p-8 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-[#060e0a] text-slate-100 flex flex-col justify-between p-5 sm:p-8 overflow-y-auto select-none">
       <div className="max-w-lg w-full mx-auto space-y-6 pt-4">
         {/* Header Sambutan */}
         <div className="text-center space-y-2">
@@ -176,13 +204,13 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             Selamat Datang ke SolatKini
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Sila aktifkan kebenaran penting ini agar waktu solat dan penggera azan beroperasi dengan lancar.
+            Sila aktifkan 3 tetapan penting ini agar laungan azan dan jadual waktu solat beroperasi dengan lancar.
           </p>
         </div>
 
-        {/* Senarai Kad Checklist */}
+        {/* Senarai 3 Kad Kebenaran */}
         <div className="space-y-3.5 pt-2">
-          {/* 1. KAD KEBENARAN NOTIFIKASI */}
+          {/* 1. KAD NOTIFIKASI */}
           <div
             className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
               notifGranted
@@ -209,7 +237,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Memastikan penggera azan berbunyi tepat dan paparan waktu solat berterusan di status bar.
+                    Memastikan penggera azan berbunyi tepat dan status waktu solat dipaparkan pada bar telefon.
                   </p>
                 </div>
               </div>
@@ -217,7 +245,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               {notifGranted ? (
                 <div className="flex items-center gap-1.5 text-emerald-400 shrink-0 text-xs font-bold pt-1">
                   <CheckCircle2 className="w-5 h-5 fill-emerald-500/20" />
-                  <span className="text-xs">Aktif</span>
+                  <span>Aktif</span>
                 </div>
               ) : (
                 <button
@@ -231,7 +259,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
           </div>
 
-          {/* 2. KAD KEBENARAN LOKASI (GPS) */}
+          {/* 2. KAD LOKASI (GPS) */}
           <div
             className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
               locationGranted
@@ -258,7 +286,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                    Menyelaraskan zon solat rasmi JAKIM mengikut lokasi semasa anda secara automatik.
+                    Menyelaraskan zon solat rasmi JAKIM mengikut koordinat semasa anda secara automatik.
                   </p>
                 </div>
               </div>
@@ -266,7 +294,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               {locationGranted ? (
                 <div className="flex items-center gap-1.5 text-teal-400 shrink-0 text-xs font-bold pt-1">
                   <CheckCircle2 className="w-5 h-5 fill-teal-500/20" />
-                  <span className="text-xs">Aktif</span>
+                  <span>Aktif</span>
                 </div>
               ) : (
                 <button
@@ -325,30 +353,17 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
               </div>
 
               <p className="text-[11px] text-slate-300 leading-relaxed">
-                Untuk telefon <strong>Xiaomi, Vivo, Oppo, Realme atau Samsung</strong>, sistem peranti kerap membekukan azan semasa skrin ditutup. Tekan butang di bawah untuk membuka kebenaran:
+                Pengguna <strong>Xiaomi, Vivo, Oppo, Realme atau Samsung</strong> wajib mematikan sekatan bateri agar telefon tidak membekukan azan semasa skrin ditutup.
               </p>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={handleRequestBattery}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm ${
-                    batteryIgnored
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                      : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
-                  }`}
+                  onClick={() => setActiveModal('battery')}
+                  className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
                 >
                   <Zap className="w-3.5 h-3.5" />
-                  <span>{batteryIgnored ? 'Sekatan Bateri Dinyahaktif' : 'Nyahaktif Sekatan Bateri'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleOpenAutostart}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Buka Menu Autostart</span>
+                  <span>Buka Menu Kebenaran Bateri</span>
                 </button>
               </div>
             </div>
@@ -373,9 +388,225 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         </button>
 
         <p className="text-[11px] text-center text-slate-500 mt-2">
-          Anda boleh melaraskan kebenaran atau menukar zon solat pada bila-bila masa di menu Tetapan.
+          Zon solat lalai akan diselaraskan secara automatik atau boleh dipilih manual di Dashboard.
         </p>
       </div>
+
+      {/* ======================================================== */}
+      {/* POPUP MODAL 1: KEBENARAN NOTIFIKASI & AZAN */}
+      {/* ======================================================== */}
+      {activeModal === 'notif' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#10241c] to-[#091510] border border-emerald-500/40 p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Kebenaran Notifikasi Azan</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Sistem Android 13 ke atas memerlukan kebenaran notifikasi bagi membolehkan laungan azan dan peringatan waktu solat berbunyi pada skrin kunci telefon anda.
+            </p>
+
+            {modalFeedback && (
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{modalFeedback}</span>
+              </div>
+            )}
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  await nativeAlarmService.openNotificationSettings();
+                  setActiveModal(null);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Buka Tetapan Notifikasi Telefon</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  await checkPermissions();
+                  setActiveModal(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Semak Semula Selepas Dibenarkan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* POPUP MODAL 2: KEBENARAN LOKASI GPS (PENYELESAI BLOCKED) */}
+      {/* ======================================================== */}
+      {activeModal === 'location' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#132520] to-[#0a1512] border border-teal-500/40 p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Kebenaran Lokasi (GPS)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Kebenaran lokasi diperlukan untuk memadankan zon waktu solat rasmi JAKIM secara automatik. Jika dialog izin pernah ditolak sebelum ini, sistem Android akan menyekat popup automatik.
+            </p>
+
+            {modalFeedback && (
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-start gap-2">
+                <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{modalFeedback}</span>
+              </div>
+            )}
+
+            <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+              <strong>Langkah membenarkan di telefon:</strong>
+              <ol className="list-decimal list-inside space-y-0.5 text-slate-400">
+                <li>Tekan butang hijau <strong>&quot;Buka Tetapan Aplikasi&quot;</strong> di bawah.</li>
+                <li>Pilih <strong>Permissions (Keizinan) &gt; Location (Lokasi)</strong>.</li>
+                <li>Tandakan <strong>&quot;Allow only while using the app&quot;</strong>.</li>
+              </ol>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  await nativeAlarmService.openNotificationSettings();
+                  setActiveModal(null);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-950/50 cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Buka Tetapan Aplikasi Telefon</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  // Pilihan sandaran: pengguna tetap boleh guna aplikasi secara manual
+                  setLocationGranted(true);
+                  setActiveModal(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 text-xs font-semibold flex items-center justify-center gap-2 border border-slate-700 cursor-pointer"
+              >
+                <span>Guna Zon Solat Manual Saja</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* POPUP MODAL 3: PANDUAN SEKATAN BATERI & AUTOSTART */}
+      {/* ======================================================== */}
+      {activeModal === 'battery' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-gradient-to-b from-[#22170d] to-[#110c07] border border-amber-500/40 p-6 shadow-2xl space-y-4 text-left">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center">
+                  <BatteryCharging className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-white">Sekatan Bateri & Autostart</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Untuk mengelakkan sistem operasi peranti membekukan azan bila telefon dikunci atau skrin terpadam, sila aktifkan kedua-dua kebenaran ini:
+            </p>
+
+            <div className="space-y-2.5 pt-1">
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <div className="text-xs font-bold text-white flex items-center justify-between">
+                  <span>1. Nyahaktif Sekatan Bateri (Doze Mode)</span>
+                  {batteryIgnored && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Membenarkan penggera azan tepat beroperasi tanpa had penjimat bateri.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleRequestBattery();
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{batteryIgnored ? 'Sekatan Bateri Dinyahaktifkan' : 'Tekan untuk Nyahaktif Bateri'}</span>
+                </button>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+                <div className="text-xs font-bold text-white">
+                  <span>2. Kebenaran Autostart (Xiaomi/Vivo/Oppo/Realme)</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Membolehkan aplikasi menjadualkan semula azan selepas telefon dimatikan atau dihidupkan semula.
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleOpenAutostart();
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Buka Menu Autostart Telefon</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setBatteryIgnored(true);
+                  setActiveModal(null);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition active:scale-95 shadow-md"
+              >
+                Selesai & Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
