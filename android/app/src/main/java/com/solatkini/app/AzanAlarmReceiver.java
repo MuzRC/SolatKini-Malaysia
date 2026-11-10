@@ -41,6 +41,10 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             serviceIntent.putExtra("prayer_name", prayerName);
             serviceIntent.putExtra("prayer_key", prayerKey);
             serviceIntent.putExtra("voice", voice);
+            if (intent != null) {
+                serviceIntent.putExtra("is_test", intent.getBooleanExtra("is_test", false));
+                serviceIntent.putExtra("auto_stop_seconds", intent.getIntExtra("auto_stop_seconds", 0));
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(serviceIntent);

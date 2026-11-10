@@ -15,7 +15,9 @@ import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
@@ -32,6 +34,9 @@ public class AzanAudioService extends Service {
 
     private MediaPlayer mediaPlayer;
     private PowerManager.WakeLock wakeLock;
+
+    private final Handler autoStopHandler = new Handler(Looper.getMainLooper());
+    private Runnable autoStopRunnable = null;
 
     private static long sLastAzanTimestamp = 0;
     private static String sLastPrayerKey = "";
@@ -59,25 +64,49 @@ public class AzanAudioService extends Service {
         String prayerName = intent.getStringExtra("prayer_name");
         String prayerKey = intent.getStringExtra("prayer_key");
         String voice = intent.getStringExtra("voice");
+        boolean isTest = intent.getBooleanExtra("is_test", false);
+        int autoStopSeconds = intent.getIntExtra("auto_stop_seconds", 0);
+        if (isTest && autoStopSeconds <= 0) {
+            autoStopSeconds = 20; // 20 saat henti automatik untuk ujian audio azan
+        }
 
         long now = System.currentTimeMillis();
-        if (prayerKey != null && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
+        if (!isTest && prayerKey != null && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
             Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu.");
             return START_NOT_STICKY;
         }
 
-        sLastAzanTimestamp = now;
-        sLastPrayerKey = prayerKey != null ? prayerKey : "";
+        if (!isTest) {
+            sLastAzanTimestamp = now;
+            sLastPrayerKey = prayerKey != null ? prayerKey : "";
+        }
 
         if (voice == null || voice.isEmpty()) {
             SharedPreferences prefs = getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
             voice = prefs.getString("selected_azan_voice", "jakim");
         }
 
-        if (prayerName == null) prayerName = "Solat";
+        if (prayerName == null) prayerName = isTest ? "Ujian Azan" : "Solat";
         if (voice == null || voice.isEmpty()) voice = "jakim";
 
-        Log.i(TAG, "Menerima permintaan azan untuk: " + prayerName + " (Suara: " + voice + ")");
+        Log.i(TAG, "Menerima permintaan azan untuk: " + prayerName + " (Suara: " + voice + ", Ujian: " + isTest + ", AutoStop: " + autoStopSeconds + "s)");
+
+        // Batalkan pemasa henti automatik lama jika wujud
+        if (autoStopRunnable != null) {
+            autoStopHandler.removeCallbacks(autoStopRunnable);
+            autoStopRunnable = null;
+        }
+
+        // Tetapkan pemasa henti automatik (cth: 20 saat untuk ujian azan)
+        if (autoStopSeconds > 0) {
+            final int sec = autoStopSeconds;
+            autoStopRunnable = () -> {
+                Log.i(TAG, "Pemasa henti automatik ujian azan tamat (" + sec + " saat). Menghentikan audio.");
+                stopAzan();
+                stopSelf();
+            };
+            autoStopHandler.postDelayed(autoStopRunnable, autoStopSeconds * 1000L);
+        }
 
         acquireWakeLock();
 
@@ -335,6 +364,11 @@ public class AzanAudioService extends Service {
     }
 
     private void stopAzan() {
+        if (autoStopRunnable != null) {
+            autoStopHandler.removeCallbacks(autoStopRunnable);
+            autoStopRunnable = null;
+        }
+
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {

@@ -313,38 +313,58 @@ public class AzanAlarmPlugin extends Plugin {
             String prayerName = call.getString("prayerName", "Ujian Azan");
             String prayerKey = call.getString("prayerKey", "subuh");
             String voice = call.getString("voice", "jakim");
-            int delaySeconds = call.getInt("delaySeconds", 2);
+            int delaySeconds = call.getInt("delaySeconds", 0);
+            int autoStopSeconds = call.getInt("autoStopSeconds", 20);
 
-            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-            Intent intent = new Intent(context, AzanAlarmReceiver.class);
-            intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
-            intent.putExtra("prayer_key", prayerKey);
-            intent.putExtra("prayer_name", prayerName);
-            intent.putExtra("voice", voice);
+            if (delaySeconds <= 0) {
+                // Main serta-merta pada saluran STREAM_ALARM tanpa perlu menunggu AlarmManager
+                Intent serviceIntent = new Intent(context, AzanAudioService.class);
+                serviceIntent.setAction(AzanAudioService.ACTION_PLAY_AZAN);
+                serviceIntent.putExtra("prayer_key", prayerKey);
+                serviceIntent.putExtra("prayer_name", prayerName);
+                serviceIntent.putExtra("voice", voice);
+                serviceIntent.putExtra("is_test", true);
+                serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                context,
-                9999,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-
-            Intent showIntent = new Intent(context, MainActivity.class);
-            showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            PendingIntent showPendingIntent = PendingIntent.getActivity(
-                context,
-                19999,
-                showIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
-
-            long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
-            if (alarmManager != null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent);
-                    alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent);
                 } else {
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    context.startService(serviceIntent);
+                }
+            } else {
+                AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+                Intent intent = new Intent(context, AzanAlarmReceiver.class);
+                intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
+                intent.putExtra("prayer_key", prayerKey);
+                intent.putExtra("prayer_name", prayerName);
+                intent.putExtra("voice", voice);
+                intent.putExtra("is_test", true);
+                intent.putExtra("auto_stop_seconds", autoStopSeconds);
+
+                PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    9999,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                Intent showIntent = new Intent(context, MainActivity.class);
+                showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                PendingIntent showPendingIntent = PendingIntent.getActivity(
+                    context,
+                    19999,
+                    showIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
+                if (alarmManager != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent);
+                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                    }
                 }
             }
 
@@ -354,6 +374,7 @@ public class AzanAlarmPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("success", true);
             ret.put("delaySeconds", delaySeconds);
+            ret.put("autoStopSeconds", autoStopSeconds);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Gagal menguji penggera azan: " + e.getMessage(), e);

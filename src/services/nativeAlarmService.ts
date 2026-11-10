@@ -31,7 +31,13 @@ export interface AzanAlarmPluginInterface {
   setActiveAzanVoice(options: { voice: string }): Promise<{ success: boolean; voice: string }>;
   schedulePrayerAlarms(options: { alarms: NativeAlarmItem[] }): Promise<{ success: boolean; scheduledCount: number }>;
   cancelAllAlarms(): Promise<{ success: boolean }>;
-  testAlarmNow(options: { prayerName: string; prayerKey: string; voice: string; delaySeconds: number }): Promise<{ success: boolean }>;
+  testAlarmNow(options: {
+    prayerName: string;
+    prayerKey: string;
+    voice: string;
+    delaySeconds: number;
+    autoStopSeconds?: number;
+  }): Promise<{ success: boolean }>;
   stopAzanAudio(): Promise<{ success: boolean }>;
   isBatteryOptimized(): Promise<BatteryStatusResult>;
   requestIgnoreBatteryOptimization(): Promise<{ opened: boolean }>;
@@ -262,7 +268,8 @@ class NativeAlarmService {
   public async testAlarm(
     prayerName: string = 'Zohor',
     voice: AzanVoice = 'jakim',
-    delaySeconds: number = 2
+    delaySeconds: number = 0,
+    autoStopSeconds: number = 20
   ): Promise<boolean> {
     if (!this.isNative) {
       return false;
@@ -273,6 +280,7 @@ class NativeAlarmService {
         prayerKey: 'test',
         voice,
         delaySeconds,
+        autoStopSeconds,
       });
       return !!res.success;
     } catch {

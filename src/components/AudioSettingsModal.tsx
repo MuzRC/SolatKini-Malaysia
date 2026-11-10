@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Volume2,
   Play,
@@ -44,6 +44,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
   const [activeDeviceVoice, setActiveDeviceVoice] = useState<string | null>(() => {
     return audioStorageService.getActiveDeviceVoice();
   });
+  const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,24 +56,41 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
     }
   }, [isOpen]);
 
+  const handleStopAll = () => {
+    audioNotificationService.stopAudio();
+    nativeAlarmService.stopNativeAzan();
+    setIsPlayingPreview(false);
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleClose = () => {
-    audioNotificationService.stopAudio();
-    setIsPlayingPreview(false);
+    handleStopAll();
     onClose();
   };
 
   const handlePlayPreview = (voice: AzanVoice) => {
-    audioNotificationService.unlockAudio();
     if (isPlayingPreview && selectedVoice === voice) {
-      audioNotificationService.stopAudio();
-      setIsPlayingPreview(false);
+      handleStopAll();
     } else {
-      audioNotificationService.stopAudio();
+      handleStopAll();
       onVoiceSelect(voice);
       setIsPlayingPreview(true);
-      audioNotificationService.playAzan(voice, () => setIsPlayingPreview(false));
+
+      if (nativeAlarmService.getIsNative()) {
+        // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM (henti automatik 20 saat)
+        nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 20);
+        previewTimerRef.current = setTimeout(() => {
+          setIsPlayingPreview(false);
+        }, 20000);
+      } else {
+        audioNotificationService.unlockAudio();
+        audioNotificationService.playAzan(voice, () => setIsPlayingPreview(false));
+      }
     }
   };
 
