@@ -1,5 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { Moon, Check, Plus, Minus, Calendar, Sparkles, Copy } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Moon,
+  Check,
+  Plus,
+  Minus,
+  Calendar,
+  Sparkles,
+  Copy,
+  BarChart3,
+  TrendingUp,
+  Award,
+  Flame,
+  RotateCcw,
+} from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
 import { getFastingCountdown } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
@@ -10,6 +36,38 @@ interface FastingTrackerProps {
   prayerTimes: DayPrayerTimes;
   currentZone: JakimZone;
 }
+
+// Custom Tooltip untuk Recharts dengan tema gelap SolatKini
+const CustomChartTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number; color?: string; fill?: string }>;
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 backdrop-blur-md border border-emerald-500/40 p-3 rounded-xl shadow-2xl text-xs space-y-1">
+        <p className="font-bold text-emerald-300 border-b border-slate-800 pb-1 mb-1">{label}</p>
+        {payload.map((entry, idx) => (
+          <div key={`item-${idx}`} className="flex items-center justify-between gap-3 text-slate-200">
+            <span className="flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full"
+                style={{ backgroundColor: entry.color || entry.fill || '#10b981' }}
+              />
+              <span>{entry.name}:</span>
+            </span>
+            <span className="font-mono font-bold text-white">{entry.value} Hari</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, currentZone }) => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
@@ -22,6 +80,14 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const hijri = getHijriDate(currentTime);
+  const recommendation = getFastingRecommendation(currentTime, hijri);
+
+  // Tab pilihan paparan carta: 'ramadan' | 'sunnah'
+  const [chartTab, setChartTab] = useState<'ramadan' | 'sunnah'>(() => {
+    return hijri.isRamadan ? 'ramadan' : 'sunnah';
+  });
 
   // Simpanan data puasa ganti
   const [completedGantiCount, setCompletedGantiCount] = useState<number>(() => {
@@ -38,8 +104,96 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     return 7;
   });
 
-  const hijri = getHijriDate(currentTime);
-  const recommendation = getFastingRecommendation(currentTime, hijri);
+  // Data Puasa Sunat (Isnin/Khamis, Ayyamul Bidh, 6 Syawal/Lain)
+  const [sunnahData, setSunnahData] = useState<{
+    isninKhamisCompleted: number;
+    isninKhamisTarget: number;
+    ayyamulBidhCompleted: number;
+    ayyamulBidhTarget: number;
+    otherSunnahCompleted: number;
+    otherSunnahTarget: number;
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_sunnah_fasts_v1');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    return {
+      isninKhamisCompleted: 4,
+      isninKhamisTarget: 8,
+      ayyamulBidhCompleted: 2,
+      ayyamulBidhTarget: 3,
+      otherSunnahCompleted: 1,
+      otherSunnahTarget: 6,
+    };
+  });
+
+  // Data Puasa Ramadan (senarai nombor hari 1 hingga 30 yang telah berpuasa)
+  const [ramadanCompletedDays, setRamadanCompletedDays] = useState<number[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_ramadan_completed_days');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch {}
+      }
+    }
+    // Default data sampel awal
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  });
+
+  // Simpan data sunnah bila berubah
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_sunnah_fasts_v1', JSON.stringify(sunnahData));
+    }
+  }, [sunnahData]);
+
+  // Simpan data Ramadan bila berubah
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_ramadan_completed_days', JSON.stringify(ramadanCompletedDays));
+    }
+  }, [ramadanCompletedDays]);
+
+  const toggleRamadanDay = (dayNum: number) => {
+    setRamadanCompletedDays((prev) => {
+      const exists = prev.includes(dayNum);
+      if (exists) {
+        return prev.filter((d) => d !== dayNum);
+      } else {
+        return [...prev, dayNum].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const markAllPastRamadanDays = () => {
+    const currentDay = hijri.isRamadan ? Math.min(30, Math.max(1, hijri.day)) : 30;
+    const allDays: number[] = [];
+    for (let i = 1; i <= currentDay; i++) {
+      allDays.push(i);
+    }
+    setRamadanCompletedDays(allDays);
+  };
+
+  const resetRamadanDays = () => {
+    if (window.confirm('Tetapkan semula semua rekod puasa Ramadan kepada 0 hari?')) {
+      setRamadanCompletedDays([]);
+    }
+  };
+
+  const updateSunnahCount = (
+    key: 'isninKhamisCompleted' | 'ayyamulBidhCompleted' | 'otherSunnahCompleted',
+    delta: number
+  ) => {
+    setSunnahData((prev) => ({
+      ...prev,
+      [key]: Math.max(0, prev[key] + delta),
+    }));
+  };
 
   const [isUserFastingToday, setIsUserFastingToday] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -108,6 +262,82 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   };
 
   const doaBerbuka = (DUA_COLLECTION || []).filter((d) => d.category === 'puasa');
+
+  // Data carta Ramadan untuk Recharts
+  const ramadanChartData = useMemo(() => {
+    const w1 = ramadanCompletedDays.filter((d) => d >= 1 && d <= 7).length;
+    const w2 = ramadanCompletedDays.filter((d) => d >= 8 && d <= 14).length;
+    const w3 = ramadanCompletedDays.filter((d) => d >= 15 && d <= 21).length;
+    const w4 = ramadanCompletedDays.filter((d) => d >= 22 && d <= 30).length;
+
+    return [
+      { name: 'Minggu 1 (H1-7)', Selesai: w1, Sasaran: 7 },
+      { name: 'Minggu 2 (H8-14)', Selesai: w2, Sasaran: 7 },
+      { name: 'Minggu 3 (H15-21)', Selesai: w3, Sasaran: 7 },
+      { name: 'Minggu 4 (H22-30)', Selesai: w4, Sasaran: 9 },
+    ];
+  }, [ramadanCompletedDays]);
+
+  const ramadanPieData = useMemo(() => {
+    const done = ramadanCompletedDays.length;
+    const remaining = Math.max(0, 30 - done);
+    return [
+      { name: 'Selesai', value: done, color: '#10b981' },
+      { name: 'Baki', value: remaining, color: '#334155' },
+    ];
+  }, [ramadanCompletedDays]);
+
+  // Data carta Sunnah & Qadha untuk Recharts
+  const sunnahChartData = useMemo(() => {
+    return [
+      {
+        name: 'Isnin & Khamis',
+        Selesai: sunnahData.isninKhamisCompleted,
+        Sasaran: sunnahData.isninKhamisTarget,
+      },
+      {
+        name: 'Ayyamul Bidh',
+        Selesai: sunnahData.ayyamulBidhCompleted,
+        Sasaran: sunnahData.ayyamulBidhTarget,
+      },
+      {
+        name: "Puasa Qada'",
+        Selesai: completedGantiCount,
+        Sasaran: targetGantiCount,
+      },
+      {
+        name: 'Sunat Lain',
+        Selesai: sunnahData.otherSunnahCompleted,
+        Sasaran: sunnahData.otherSunnahTarget,
+      },
+    ];
+  }, [sunnahData, completedGantiCount, targetGantiCount]);
+
+  const sunnahPieData = useMemo(() => {
+    const data = [
+      { name: 'Isnin & Khamis', value: sunnahData.isninKhamisCompleted, color: '#10b981' },
+      { name: 'Ayyamul Bidh', value: sunnahData.ayyamulBidhCompleted, color: '#38bdf8' },
+      { name: "Puasa Qada'", value: completedGantiCount, color: '#f59e0b' },
+      { name: 'Sunat Lain', value: sunnahData.otherSunnahCompleted, color: '#a855f7' },
+    ].filter((item) => item.value > 0);
+
+    if (data.length === 0) {
+      return [{ name: 'Belum Ada Rekod', value: 1, color: '#334155' }];
+    }
+    return data;
+  }, [sunnahData, completedGantiCount]);
+
+  const ramadanPercentage = Math.round((ramadanCompletedDays.length / 30) * 100);
+  const totalSunnahCompleted =
+    sunnahData.isninKhamisCompleted +
+    sunnahData.ayyamulBidhCompleted +
+    completedGantiCount +
+    sunnahData.otherSunnahCompleted;
+  const totalSunnahTarget =
+    sunnahData.isninKhamisTarget +
+    sunnahData.ayyamulBidhTarget +
+    targetGantiCount +
+    sunnahData.otherSunnahTarget;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
@@ -205,6 +435,547 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 className="h-full bg-gradient-to-r from-emerald-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-500"
                 style={{ width: `${fastingCountdown.percentage}%` }}
               />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* CARTA KEMAJUAN & RINGKASAN PUASA (RECHARTS) */}
+      <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl relative overflow-hidden">
+        {/* Header Seksyen Carta & Tab Penukar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div>
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold mb-1.5">
+              <BarChart3 className="w-3.5 h-3.5" />
+              Carta Kemajuan Visual
+            </div>
+            <h3 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              Ringkasan Kemajuan Puasa
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Visualisasi hari puasa yang telah diselesaikan bagi Ramadan dan Puasa Sunat
+            </p>
+          </div>
+
+          {/* Tab Switcher */}
+          <div className="flex items-center bg-slate-900/90 p-1 rounded-2xl border border-slate-800 shrink-0">
+            <button
+              onClick={() => setChartTab('ramadan')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                chartTab === 'ramadan'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Moon className="w-3.5 h-3.5" />
+              <span>Puasa Ramadan</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
+                {ramadanCompletedDays.length}/30
+              </span>
+            </button>
+            <button
+              onClick={() => setChartTab('sunnah')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                chartTab === 'sunnah'
+                  ? 'bg-amber-600 text-white shadow-md shadow-amber-950/40'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Puasa Sunat & Qadha</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
+                {totalSunnahCompleted} Hari
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* KANDUNGAN TAB 1: PUASA RAMADAN */}
+        {chartTab === 'ramadan' && (
+          <div className="mt-5 space-y-6">
+            {/* Ringkasan Kad Statistik Ramadan */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Selesai Berpuasa</span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono mt-0.5">
+                  {ramadanCompletedDays.length}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">/ 30 Hari</span>
+                </div>
+                <div className="text-[10px] text-emerald-400/80 mt-0.5 flex items-center gap-1">
+                  <Check className="w-3 h-3" /> Rekod disahkan
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Baki Hari</span>
+                <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono mt-0.5">
+                  {Math.max(0, 30 - ramadanCompletedDays.length)}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">Hari</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Hingga 1 Syawal</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Kadar Kejayaan</span>
+                <div className="text-xl sm:text-2xl font-black text-white font-mono mt-0.5">
+                  {ramadanPercentage}%
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-emerald-400" />
+                  Sasaran 100%
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Fasa Semasa</span>
+                <div className="text-sm font-bold text-amber-300 truncate mt-1">
+                  {ramadanCompletedDays.length <= 10
+                    ? '10 Malam Rahmat'
+                    : ramadanCompletedDays.length <= 20
+                    ? '10 Malam Keampunan'
+                    : '10 Malam Pembebasan'}
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">
+                  {ramadanCompletedDays.length <= 10
+                    ? 'Fasa 1: Hari 1-10'
+                    : ramadanCompletedDays.length <= 20
+                    ? 'Fasa 2: Hari 11-20'
+                    : 'Fasa 3: Hari 21-30'}
+                </div>
+              </div>
+            </div>
+
+            {/* Carta Recharts: Bar Chart Mingguan + Donut Ring Peratusan */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+              {/* Carta Bar Kemajuan Mengikut 4 Fasa / Minggu */}
+              <div className="lg:col-span-2 p-4 rounded-2xl bg-slate-900/50 border border-slate-800 min-w-0 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                    Pencapaian Mingguan Ramadan
+                  </span>
+                  <span className="text-[10px] text-slate-400">Sasaran vs Selesai</span>
+                </div>
+                <div className="w-full h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={ramadanChartData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#64748b"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#64748b"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        tickLine={false}
+                        domain={[0, 10]}
+                      />
+                      <Tooltip content={<CustomChartTooltip />} />
+                      <Legend
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }}
+                        iconType="circle"
+                      />
+                      <Bar
+                        dataKey="Selesai"
+                        fill="#10b981"
+                        radius={[6, 6, 0, 0]}
+                        name="Hari Selesai"
+                      />
+                      <Bar
+                        dataKey="Sasaran"
+                        fill="#475569"
+                        radius={[6, 6, 0, 0]}
+                        name="Sasaran Hari"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Carta Gelang Donut (Recharts PieChart) */}
+              <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 min-w-0 flex flex-col justify-between items-center text-center">
+                <div className="w-full flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-200">Kadar Keseluruhan</span>
+                  <span className="text-[10px] font-mono text-emerald-400">
+                    {ramadanCompletedDays.length}/30
+                  </span>
+                </div>
+
+                <div className="relative w-full h-44 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip content={<CustomChartTooltip />} />
+                      <Pie
+                        data={ramadanPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={68}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {ramadanPieData.map((entry, index) => (
+                          <Cell key={`ramadan-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Teks di tengah gelang donut */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xl font-black text-white font-mono leading-none">
+                      {ramadanPercentage}%
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">
+                      Selesai
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full flex items-center justify-around text-[11px] pt-1 border-t border-slate-800/80">
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                    <span>Selesai ({ramadanCompletedDays.length})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-slate-400">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                    <span>Baki ({Math.max(0, 30 - ramadanCompletedDays.length)})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid Interaktif 30 Hari Puasa Ramadan */}
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                <div>
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                    Kalendar Semakan Harian Ramadan (30 Hari)
+                  </span>
+                  <p className="text-[11px] text-slate-400">
+                    Ketik mana-mana nombor hari untuk menandakan puasa selesai atau belum
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={markAllPastRamadanDays}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-[11px] font-medium transition cursor-pointer"
+                  >
+                    Tanda Semua Sebelum Ini
+                  </button>
+                  {ramadanCompletedDays.length > 0 && (
+                    <button
+                      onClick={resetRamadanDays}
+                      className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 transition cursor-pointer"
+                      title="Tetapkan Semula Rekod Ramadan"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid 30 Petak Hari */}
+              <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-15 gap-1.5">
+                {Array.from({ length: 30 }, (_, i) => i + 1).map((dayNum) => {
+                  const isDone = ramadanCompletedDays.includes(dayNum);
+                  return (
+                    <button
+                      key={`day-${dayNum}`}
+                      onClick={() => toggleRamadanDay(dayNum)}
+                      className={`h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono font-bold transition active:scale-90 cursor-pointer ${
+                        isDone
+                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/50'
+                          : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200 border border-slate-700/50'
+                      }`}
+                      title={`Hari ke-${dayNum} Ramadan - ${isDone ? 'Selesai' : 'Belum Selesai'}`}
+                    >
+                      <span>{dayNum}</span>
+                      {isDone && <Check className="w-2.5 h-2.5 text-emerald-200 -mt-0.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* KANDUNGAN TAB 2: PUASA SUNAT & QADHA */}
+        {chartTab === 'sunnah' && (
+          <div className="mt-5 space-y-6">
+            {/* Ringkasan Kad Statistik Puasa Sunat & Qadha */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Isnin & Khamis</span>
+                <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono mt-0.5">
+                  {sunnahData.isninKhamisCompleted}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">
+                    / {sunnahData.isninKhamisTarget} Hari
+                  </span>
+                </div>
+                <div className="text-[10px] text-emerald-400/80 mt-0.5">Amalan Mingguan</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Ayyamul Bidh</span>
+                <div className="text-xl sm:text-2xl font-black text-sky-400 font-mono mt-0.5">
+                  {sunnahData.ayyamulBidhCompleted}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">
+                    / {sunnahData.ayyamulBidhTarget} Hari
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">13, 14, 15 Bulan Hijri</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Puasa Qada&apos;</span>
+                <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono mt-0.5">
+                  {completedGantiCount}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">
+                    / {targetGantiCount} Hari
+                  </span>
+                </div>
+                <div className="text-[10px] text-amber-300/80 mt-0.5">Kewajipan Ganti</div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-medium">Sunat-Sunat Lain</span>
+                <div className="text-xl sm:text-2xl font-black text-purple-400 font-mono mt-0.5">
+                  {sunnahData.otherSunnahCompleted}{' '}
+                  <span className="text-xs text-slate-400 font-sans font-normal">
+                    / {sunnahData.otherSunnahTarget} Hari
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">6 Syawal / Asyura / dsb</div>
+              </div>
+            </div>
+
+            {/* Carta Recharts: Bar Chart Kategori + Donut Ring Pembahagian */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+              {/* Carta Bar Kategori Puasa Sunat */}
+              <div className="lg:col-span-2 p-4 rounded-2xl bg-slate-900/50 border border-slate-800 min-w-0 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                    Pencapaian Mengikut Kategori Puasa
+                  </span>
+                  <span className="text-[10px] text-slate-400">Selesai vs Sasaran</span>
+                </div>
+                <div className="w-full h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={sunnahChartData}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#64748b"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        stroke="#64748b"
+                        tick={{ fill: '#94a3b8', fontSize: 11 }}
+                        tickLine={false}
+                      />
+                      <Tooltip content={<CustomChartTooltip />} />
+                      <Legend
+                        wrapperStyle={{ fontSize: '11px', paddingTop: '6px' }}
+                        iconType="circle"
+                      />
+                      <Bar
+                        dataKey="Selesai"
+                        fill="#10b981"
+                        radius={[6, 6, 0, 0]}
+                        name="Hari Selesai"
+                      />
+                      <Bar
+                        dataKey="Sasaran"
+                        fill="#f59e0b"
+                        radius={[6, 6, 0, 0]}
+                        name="Sasaran Hari"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Donut Ring Taburan Puasa Sunat */}
+              <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 min-w-0 flex flex-col justify-between items-center text-center">
+                <div className="w-full flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold text-slate-200">Taburan Jenis Puasa</span>
+                  <span className="text-[10px] font-mono text-amber-300">
+                    {totalSunnahCompleted} Hari
+                  </span>
+                </div>
+
+                <div className="relative w-full h-44 flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip content={<CustomChartTooltip />} />
+                      <Pie
+                        data={sunnahPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={68}
+                        paddingAngle={3}
+                        dataKey="value"
+                      >
+                        {sunnahPieData.map((entry, index) => (
+                          <Cell key={`sunnah-cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xl font-black text-amber-300 font-mono leading-none">
+                      {totalSunnahCompleted}
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">
+                      Hari Selesai
+                    </span>
+                  </div>
+                </div>
+
+                <div className="w-full grid grid-cols-2 gap-1 text-[10px] pt-1 border-t border-slate-800/80 text-left">
+                  <div className="flex items-center gap-1.5 text-emerald-300 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Isnin/Khamis ({sunnahData.isninKhamisCompleted})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sky-300 truncate">
+                    <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+                    <span>Hari Putih ({sunnahData.ayyamulBidhCompleted})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-amber-300 truncate">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                    <span>Qada&apos; ({completedGantiCount})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-purple-300 truncate">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                    <span>Lain-lain ({sunnahData.otherSunnahCompleted})</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Kawalan Log Pantas Puasa Sunat */}
+            <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5 mb-3">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                Catat & Kemas Kini Rekod Puasa Sunat
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Isnin & Khamis */}
+                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-200">Isnin & Khamis</div>
+                    <div className="text-lg font-mono font-bold text-emerald-400">
+                      {sunnahData.isninKhamisCompleted} / {sunnahData.isninKhamisTarget}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => updateSunnahCount('isninKhamisCompleted', -1)}
+                      className="w-7 h-7 rounded-lg bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => updateSunnahCount('isninKhamisCompleted', 1)}
+                      className="w-7 h-7 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center text-xs cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ayyamul Bidh */}
+                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-200">Ayyamul Bidh</div>
+                    <div className="text-lg font-mono font-bold text-sky-400">
+                      {sunnahData.ayyamulBidhCompleted} / {sunnahData.ayyamulBidhTarget}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => updateSunnahCount('ayyamulBidhCompleted', -1)}
+                      className="w-7 h-7 rounded-lg bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => updateSunnahCount('ayyamulBidhCompleted', 1)}
+                      className="w-7 h-7 rounded-lg bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center text-xs cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Puasa Qada' (diselaraskan terus dengan completedGantiCount) */}
+                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-200">Puasa Qada&apos;</div>
+                    <div className="text-lg font-mono font-bold text-amber-300">
+                      {completedGantiCount} / {targetGantiCount}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const newVal = Math.max(0, completedGantiCount - 1);
+                        setCompletedGantiCount(newVal);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('solatkini_ganti_completed', String(newVal));
+                        }
+                      }}
+                      className="w-7 h-7 rounded-lg bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={handleToggleCompletedDay}
+                      className="w-7 h-7 rounded-lg bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center text-xs cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sunat Lain */}
+                <div className="p-3 rounded-xl bg-slate-800/50 border border-slate-700/60 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-200">Sunat Lain</div>
+                    <div className="text-lg font-mono font-bold text-purple-400">
+                      {sunnahData.otherSunnahCompleted} / {sunnahData.otherSunnahTarget}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => updateSunnahCount('otherSunnahCompleted', -1)}
+                      className="w-7 h-7 rounded-lg bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() => updateSunnahCount('otherSunnahCompleted', 1)}
+                      className="w-7 h-7 rounded-lg bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center text-xs cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

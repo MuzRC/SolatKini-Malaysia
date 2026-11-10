@@ -46,7 +46,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
     AZAN_OPTIONS.find(
       (v) =>
         v.id === effectiveVoice ||
-        (effectiveVoice === 'subuh_special' && (v.id === 'subuh' || (v.id as string) === 'subuh_special'))
+        (effectiveVoice === 'subuh_special' && ((v.id as string) === 'subuh' || v.id === 'subuh_special'))
     ) || {
       id: effectiveVoice,
       title: effectiveVoice === 'subuh_special' ? 'Azan Subuh (Khas)' : 'Azan Rasmi SolatKini',
