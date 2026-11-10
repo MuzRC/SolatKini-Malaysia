@@ -3,7 +3,6 @@ name: Build SolatKini Release APK
 on:
   workflow_dispatch:
 
-# Kebenaran wajib untuk cipta Tag dan GitHub Release automatik
 permissions:
   contents: write
 
@@ -13,19 +12,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Ambil keseluruhan sejarah commit (fetch-depth: 0 wajib untuk kira commit)
+      # 1. Checkout repo dengan sejarah commit penuh
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Kira Versi (Tukar Commit 203 -> 2.0.3) & Jana Release Notes
+      # 2. Kira Versi (cth: 208 -> 2.0.8) & Jana Release Notes
       - name: 2. Kira Versi & Sediakan Release Notes
         id: versioning
         run: |
           TOTAL_COMMITS=$(git rev-list --count HEAD)
           
-          # Tukar nombor commit 3-digit ke format SemVer X.Y.Z (cth: 203 -> 2.0.3)
           if [ "$TOTAL_COMMITS" -ge 100 ]; then
             APP_VERSION=$(echo "$TOTAL_COMMITS" | sed 's/\(.\)\(.\)\(.*\)/\1.\2.\3/')
           else
@@ -34,9 +32,8 @@ jobs:
           
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION_CODE=$TOTAL_COMMITS" >> $GITHUB_ENV
-          echo "Versi APK: v$APP_VERSION (Build Code: $TOTAL_COMMITS)"
+          echo "Versi APK Dijana: v$APP_VERSION (Build Code: $TOTAL_COMMITS)"
 
-          # Cipta fail nota pembaharuan automatik daripada 10 commit terakhir
           echo "### 📱 SolatKini Malaysia v${APP_VERSION}" > release_notes.md
           echo "Binaan automatik untuk commit build #${TOTAL_COMMITS}." >> release_notes.md
           echo "" >> release_notes.md
@@ -44,24 +41,29 @@ jobs:
           git log -10 --pretty=format:"* %s (%h)" >> release_notes.md
           echo "" >> release_notes.md
 
-      - name: 3. Setup Node.js 20
+      # 3. Setup Node.js 22 (Capacitor 7 ke atas wajibkan Node >=22.0.0)
+      - name: 3. Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
+      # 4. Setup Java JDK 21
       - name: 4. Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
+      # 5. Pasang dependensi
       - name: 5. Pasang Dependensi Projek
         run: |
           npm install --legacy-peer-deps
 
+      # 6. Build Web Assets
       - name: 6. Build Web Assets (Vite)
         run: npm run build
 
+      # 7. Sediakan Platform Android Capacitor
       - name: 7. Sediakan Platform Android Capacitor
         run: |
           if [ ! -d "android" ]; then
@@ -69,7 +71,7 @@ jobs:
           fi
           npx cap sync android
 
-      # 8. Suntik versi baharu (2.0.3 & 203) terus ke android/app/build.gradle
+      # 8. Suntik versi ke build.gradle
       - name: 8. Kemas Kini Versi dalam Gradle
         run: |
           GRADLE_FILE="android/app/build.gradle"
@@ -79,7 +81,7 @@ jobs:
             sed -i "s/versionName \".*\"/versionName \"$APP_VERSION\"/g" "$GRADLE_FILE"
           fi
 
-      # 9. Padam adaptive icon XML bawaan Capacitor & salin pek ikon baharu
+      # 9. Buang adaptive icon lama dan salin pek ikon SolatKini
       - name: 9. Salin Ikon Aplikasi Baharu
         run: |
           rm -rf android/app/src/main/res/mipmap-anydpi-v26
@@ -91,37 +93,34 @@ jobs:
             cp -r res/* android/app/src/main/res/
           fi
 
+      # 10. Beri kebenaran gradlew
       - name: 10. Beri Kebenaran Gradlew
         run: |
           cd android
           chmod +x gradlew
 
+      # 11. Compile Release APK
       - name: 11. Compile Release APK
         run: |
           cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 12. Zipalign & Tandatangan (Sign) APK Guna Android SDK Rasmi
+      # 12. Zipalign & Tandatangan APK
       - name: 12. Zipalign & Sign APK
         run: |
           APK_DIR="android/app/build/outputs/apk/release"
           
-          # Nyahkod fail Keystore dari Secret GitHub
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
 
-          # Ambil Android SDK Build-Tools terkini dalam sistem runner
           BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
           echo "Build-Tools Digunakan: $BUILD_TOOLS"
 
           UNSIGNED_APK=$(find $APK_DIR -name "*unsigned.apk" -o -name "*-release.apk" | head -n 1)
 
-          # Laksana Zipalign 4-byte
           $BUILD_TOOLS/zipalign -v -p 4 "$UNSIGNED_APK" "$APK_DIR/aligned.apk"
 
-          # Namakan fail mengikut format versi rasmi
           FINAL_APK_NAME="SolatKini-v${APP_VERSION}-signed.apk"
 
-          # Tandatangan APK guna apksigner
           $BUILD_TOOLS/apksigner sign --ks release.keystore \
             --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
             --ks-pass pass:"${{ secrets.STORE_PASSWORD }}" \
@@ -129,13 +128,12 @@ jobs:
             --out "$APK_DIR/$FINAL_APK_NAME" \
             "$APK_DIR/aligned.apk"
 
-          # Sahkan ketepatan sijil APK
           $BUILD_TOOLS/apksigner verify --verbose "$APK_DIR/$FINAL_APK_NAME"
 
           echo "SIGNED_APK_PATH=$APK_DIR/$FINAL_APK_NAME" >> $GITHUB_ENV
           rm -f release.keystore "$APK_DIR/aligned.apk"
 
-      # 13. Muat Naik ke Halaman GitHub Releases (Siap Tag & Nota Pembaharuan)
+      # 13. Muat Naik ke GitHub Releases
       - name: 13. Cipta GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -146,7 +144,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 14. Simpanan Tambahan dalam Actions Artifacts
+      # 14. Simpan ke Actions Artifacts
       - name: 14. Simpan ke Artifacts
         uses: actions/upload-artifact@v4
         with:
