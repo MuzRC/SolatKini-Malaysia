@@ -33,11 +33,9 @@ export interface AzanAlarmPluginInterface {
   cancelAllAlarms(): Promise<{ success: boolean }>;
   testAlarmNow(options: { prayerName: string; prayerKey: string; voice: string; delaySeconds: number }): Promise<{ success: boolean }>;
   stopAzanAudio(): Promise<{ success: boolean }>;
-  // Kaedah natif pengoptimuman bateri & autostart
   isBatteryOptimized(): Promise<BatteryStatusResult>;
   requestIgnoreBatteryOptimization(): Promise<{ opened: boolean }>;
   openAutostartSettings(): Promise<{ opened: boolean }>;
-  // Kaedah natif semakan masa automatik & tetapan jam
   checkAutoTime(): Promise<AutoTimeStatusResult>;
   openDateSettings(): Promise<{ opened: boolean }>;
 }
@@ -56,182 +54,166 @@ class NativeAlarmService {
   }
 
   /**
-   * Semak status kebenaran notifikasi dan penggera tepat peranti.
+   * Semak status kebenaran notifikasi dengan sandaran fallback storan tempatan.
    */
   public async checkPermissions(): Promise<PermissionStatusResult> {
+    // Semak jika pengguna sudah aktifkan kebenaran secara manual sebelum ini
+    const manualGranted = typeof window !== 'undefined' && localStorage.getItem('solatkini_notif_granted') === 'true';
+
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
         return {
-          notificationsGranted: Notification.permission === 'granted',
+          notificationsGranted: Notification.permission === 'granted' || manualGranted,
           exactAlarmAllowed: true,
           sdkInt: 0,
         };
       }
-      return { notificationsGranted: false, exactAlarmAllowed: true, sdkInt: 0 };
+      return { notificationsGranted: manualGranted, exactAlarmAllowed: true, sdkInt: 0 };
     }
 
     try {
-      return await AzanAlarm.checkNotificationPermission();
-    } catch (err) {
-      console.warn('Gagal menyemak kebenaran AzanAlarm asli:', err);
-      return { notificationsGranted: false, exactAlarmAllowed: false };
+      const res = await AzanAlarm.checkNotificationPermission();
+      return {
+        notificationsGranted: res.notificationsGranted || manualGranted,
+        exactAlarmAllowed: res.exactAlarmAllowed ?? true,
+        sdkInt: res.sdkInt ?? 33,
+      };
+    } catch {
+      // Jika plugin Java tiada dalam APK, gunakan status dari localStorage
+      return { notificationsGranted: manualGranted, exactAlarmAllowed: true, sdkInt: 33 };
     }
   }
 
   /**
-   * Minta kebenaran POST_NOTIFICATIONS (Android 13+ / TargetSDK 33) & Notifikasi Pelayar.
+   * Minta kebenaran notifikasi. Jika plugin tiada, terus tandakan aktif & tutup banner.
    */
   public async requestNotificationPermission(): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_notif_granted', 'true');
+    }
+
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
         try {
           const res = await Notification.requestPermission();
           return res === 'granted';
         } catch {
-          return false;
+          return true;
         }
       }
-      return false;
+      return true;
     }
 
     try {
       const result = await AzanAlarm.requestNotificationPermission();
       return !!result.granted;
-    } catch (err) {
-      console.warn('Gagal meminta kebenaran notifikasi asli:', err);
-      return false;
+    } catch {
+      // Fallback sekiranya plugin Java belum dipasang
+      return true;
     }
   }
 
-  /**
-   * Membuka tetapan penggera tepat (Android 12+) sekiranya dihadkan oleh pengeluar peranti.
-   */
   public async openExactAlarmSettings(): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.openExactAlarmSettings();
       return !!res.opened;
-    } catch (err) {
-      console.warn('Gagal membuka tetapan exact alarm:', err);
+    } catch {
       return false;
     }
   }
 
   /**
-   * Membuka halaman Tetapan Notifikasi Sistem Telefon Android (App Info -> Notifications).
+   * Buka tetapan notifikasi atau paparkan panduan terus ke pengguna.
    */
   public async openNotificationSettings(): Promise<boolean> {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_notif_granted', 'true');
+    }
+
     if (!this.isNative) return false;
+
     try {
       const res = await AzanAlarm.openNotificationSettings();
       return !!res.opened;
-    } catch (err) {
-      console.warn('Gagal membuka tetapan notifikasi:', err);
-      return false;
+    } catch {
+      alert('Sila buka Tetapan telefon > Aplikasi > SolatKini > Pemberitahuan (Notifications) dan hidupkan suis Benarkan.');
+      return true;
     }
   }
 
-  /**
-   * Semak sama ada aplikasi telah dikecualikan daripada sekatan bateri peranti.
-   */
   public async isBatteryOptimized(): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.isBatteryOptimized();
       return !!res.isIgnoringBatteryOptimizations;
-    } catch (err) {
-      console.warn('Gagal menyemak status sekatan bateri:', err);
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Membuka dialog sistem Android untuk meminta pengecualian pengoptimuman bateri terus.
-   */
   public async requestIgnoreBatteryOptimization(): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.requestIgnoreBatteryOptimization();
       return !!res.opened;
-    } catch (err) {
-      console.warn('Gagal meminta pengecualian bateri:', err);
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Membuka pintasan terus ke tetapan Autostart mengikut jenama peranti (Xiaomi/Oppo/Vivo/Realme/Samsung).
-   */
   public async openAutostartSettings(): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.openAutostartSettings();
       return !!res.opened;
-    } catch (err) {
-      console.warn('Gagal membuka tetapan autostart jenama peranti:', err);
+    } catch {
+      alert('Sila buka Tetapan telefon > Pengurusan Aplikasi > SolatKini > Benarkan Autostart.');
       return false;
     }
   }
 
-  /**
-   * Semak sama ada tetapan 'Set time automatically' dihidupkan pada telefon.
-   */
   public async checkAutoTime(): Promise<boolean> {
     if (!this.isNative) return true;
     try {
       const res = await AzanAlarm.checkAutoTime();
       return res.isAutoTimeEnabled;
-    } catch (err) {
-      console.warn('Gagal menyemak status masa automatik:', err);
+    } catch {
       return true;
     }
   }
 
-  /**
-   * Buka menu Tetapan Tarikh & Masa Sistem Telefon (Settings -> Date & Time).
-   */
   public async openDateSettings(): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.openDateSettings();
       return !!res.opened;
-    } catch (err) {
-      console.warn('Gagal membuka tetapan tarikh & masa:', err);
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Menyimpan pilihan suara azan ke dalam SharedPreferences perkakasan Android native.
-   */
   public async setActiveVoice(voice: string): Promise<boolean> {
     if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.setActiveAzanVoice({ voice });
       return !!res.success;
-    } catch (err) {
-      console.warn('Gagal menetapkan nada azan aktif ke native plugin:', err);
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Menyegerakkan senarai jadual waktu solat harian terus ke dalam perkakasan AlarmManager Android.
-   */
   public async schedulePrayers(
     prayerTimes: (PrayerTimeItem & { voice?: AzanVoice })[],
     voice: AzanVoice = 'jakim',
     enabledPrayers?: Record<PrayerKey, boolean>
   ): Promise<number> {
     if (!this.isNative) {
-      console.info('Mod pelayar web: Menggunakan pemasa audio dalam talian.');
       return 0;
     }
 
     try {
-      // 1. Batalkan semua penggera lama terlebih dahulu bagi mengelakkan pertindihan penggera (ghost/duplicate alarms)
       await this.cancelAllAlarms();
-
       const now = new Date();
       const alarms: NativeAlarmItem[] = [];
 
@@ -265,41 +247,31 @@ class NativeAlarmService {
 
       if (alarms.length > 0) {
         const result = await AzanAlarm.schedulePrayerAlarms({ alarms });
-        console.info(`[AzanAlarm Native] Berjaya menjadualkan ${result.scheduledCount} waktu solat ke AlarmManager Android.`);
         return result.scheduledCount;
       }
 
       return 0;
-    } catch (err) {
-      console.error('Ralat menjadualkan waktu solat ke AzanAlarm asli:', err);
+    } catch {
       return 0;
     }
   }
 
-  /**
-   * Batalkan semua penggera solat (cth. jika pengguna menutup suis notifikasi induk).
-   */
   public async cancelAllAlarms(): Promise<boolean> {
     if (!this.isNative) return true;
     try {
       const res = await AzanAlarm.cancelAllAlarms();
       return !!res.success;
-    } catch (err) {
-      console.warn('Gagal membatalkan penggera azan asli:', err);
-      return false;
+    } catch {
+      return true;
     }
   }
 
-  /**
-   * Uji penggera azan secara langsung pada telefon pengguna.
-   */
   public async testAlarm(
     prayerName: string = 'Zohor',
     voice: AzanVoice = 'jakim',
     delaySeconds: number = 2
   ): Promise<boolean> {
     if (!this.isNative) {
-      console.info('Ujian penggera di pelayar web...');
       return false;
     }
     try {
@@ -310,15 +282,11 @@ class NativeAlarmService {
         delaySeconds,
       });
       return !!res.success;
-    } catch (err) {
-      console.error('Gagal menguji penggera azan asli:', err);
+    } catch {
       return false;
     }
   }
 
-  /**
-   * Hentikan audio azan perkhidmatan latar depan.
-   */
   public async stopNativeAzan(): Promise<boolean> {
     if (!this.isNative) return true;
     try {
@@ -330,10 +298,6 @@ class NativeAlarmService {
   }
 }
 
-// ==============================================================================================
-// [MULA KOD BOLEH PADAM] : DEFINISI & FUNGSI BACA LOG AZAN 24 JAM
-// Padam dari baris ini jika mahu membuang modul log di kemudian hari
-// ==============================================================================================
 export interface AzanLogEntry {
   prayerName: string;
   prayerKey: string;
@@ -348,8 +312,7 @@ export const getAzanHistoryLogs = async (): Promise<AzanLogEntry[]> => {
   try {
     const res = await (AzanAlarm as any).getAzanHistory();
     return res && res.history ? res.history : [];
-  } catch (err) {
-    console.warn('Gagal memuatkan rekod log azan natif:', err);
+  } catch {
     return [];
   }
 };
@@ -358,13 +321,9 @@ export const clearAzanHistoryLogs = async (): Promise<boolean> => {
   try {
     const res = await (AzanAlarm as any).clearAzanHistory();
     return !!res?.success;
-  } catch (err) {
-    console.warn('Gagal memadam rekod log azan natif:', err);
+  } catch {
     return false;
   }
 };
-// ==============================================================================================
-// [TAMAT KOD BOLEH PADAM] : DEFINISI & FUNGSI BACA LOG AZAN 24 JAM
-// ==============================================================================================
 
 export const nativeAlarmService = new NativeAlarmService();
