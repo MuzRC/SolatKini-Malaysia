@@ -4,7 +4,6 @@
 
     <!-- ======================================================== -->
     <!-- 1. KEBENARAN LOKASI (GPS & RANGKAIAN)                    -->
-    <!-- Mengelakkan ralat "User denied Geolocation" (Kod 1)       -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -13,7 +12,6 @@
 
     <!-- ======================================================== -->
     <!-- 2. KEBENARAN NOTIFIKASI & PENGGERA AZAN TEPAT            -->
-    <!-- Wajib untuk Android 13+ (TargetSDK 33, 34, 35)           -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
@@ -22,18 +20,18 @@
     <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- ======================================================== -->
-    <!-- 3. KEBENARAN AUTO-START SELEPAS RESTART TELEFON          -->
+    <!-- 3. KEBENARAN AUTO-START SELEPAS REBOOT TELEFON           -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- ======================================================== -->
-    <!-- 4. PENGECUALIAN BATERI & RANGKAIAN (E-SOLAT JAKIM)       -->
+    <!-- 4. PENGECUALIAN BATERI & RANGKAIAN                      -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- Kebenaran memainkan audio di latar belakang Android -->
+    <!-- Kebenaran servis latar belakang Android 14+ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
@@ -59,7 +57,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
         <provider
@@ -72,7 +69,7 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Receiver untuk menjadualkan semula azan secara automatik bila telefon siap reboot -->
+        <!-- Receiver Boot untuk jadualkan semula azan selepas telefon hidup semula -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
@@ -83,6 +80,23 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- Receiver penerima isyarat cetusan waktu solat -->
+        <receiver
+            android:name=".AzanAlarmReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.solatkini.app.TRIGGER_AZAN_ALARM" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Servis memainkan audio azan pada saluran penggera berkeutamaan tinggi -->
+        <service
+            android:name=".AzanAudioService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
 
     </application>
 
