@@ -120,7 +120,7 @@ export default function App() {
     voice: 'jakim',
   });
 
-  // Fungsi pembantu untuk menjadwalkan alarm ke sistem Android
+  // Fungsi pembantu untuk menjadualkan penggera ke sistem Android
   const syncAlarmsToNative = (times: DayPrayerTimes, voice: AzanVoice) => {
     if (!times || !times.times) return;
     try {
@@ -162,7 +162,7 @@ export default function App() {
     }
   };
 
-  // 1. Deteksi GPS otomatis
+  // 1. Pengesanan GPS automatik (Hanya berjalan SELEPAS onboarding selesai)
   useEffect(() => {
     if (showOnboarding) return;
     if (hasAutoLocatedRef.current) return;
@@ -191,15 +191,15 @@ export default function App() {
           console.info('Makluman geolokasi:', error.message);
         },
         {
-          enableHighAccuracy: true,
-          timeout: 8000,
+          enableHighAccuracy: false,
+          timeout: 10000,
           maximumAge: 60000,
         }
       );
     }
   }, [showOnboarding]);
 
-  // 2. Muat data waktu solat & jadwalkan alarm native
+  // 2. Muat data waktu solat & jadualkan penggera natif
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -248,14 +248,19 @@ export default function App() {
     }
   };
 
-  // 4. Periksa izin notifikasi Android 13+ & tangani event azan asli
+  // 4. Semak kebenaran notifikasi Android 13+ HANYA jika onboarding sudah selesai
   useEffect(() => {
+    if (showOnboarding) return;
+
     nativeAlarmService.checkPermissions().then((status) => {
       if (!status.notificationsGranted) {
         nativeAlarmService.requestNotificationPermission();
       }
     });
+  }, [showOnboarding]);
 
+  // 5. Tangani acara pemicu azan asli (Event Listener Android)
+  useEffect(() => {
     const handleNativeAzanTrigger = (event: any) => {
       try {
         let data: { prayerName?: string; prayerKey?: PrayerKey; voice?: AzanVoice } = {};
@@ -281,7 +286,7 @@ export default function App() {
     return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
   }, []);
 
-  // 5. Listener untuk peramban web
+  // 6. Listener azan untuk peramban web
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
