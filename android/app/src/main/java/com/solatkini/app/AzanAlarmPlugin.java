@@ -2,7 +2,6 @@ package com.solatkini.app;
 
 import android.Manifest;
 import android.app.AlarmManager;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
@@ -17,7 +16,6 @@ import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
-import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -46,7 +44,7 @@ public class AzanAlarmPlugin extends Plugin {
         Context context = getContext();
         boolean notificationsGranted = false;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+ / API 33
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationsGranted = ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
@@ -56,7 +54,7 @@ public class AzanAlarmPlugin extends Plugin {
         }
 
         boolean exactAlarmAllowed = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12+ / API 31
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             if (alarmManager != null) {
                 exactAlarmAllowed = alarmManager.canScheduleExactAlarms();
@@ -133,7 +131,7 @@ public class AzanAlarmPlugin extends Plugin {
                 call.resolve(ret);
                 return;
             } catch (Exception e) {
-                Log.w(TAG, "Gagal membuka tetapan exact alarm khusus, mencuba tetapan aplikasi", e);
+                Log.w(TAG, "Gagal membuka tetapan exact alarm khusus", e);
             }
         }
 
@@ -169,7 +167,7 @@ public class AzanAlarmPlugin extends Plugin {
             ret.put("opened", true);
             call.resolve(ret);
         } catch (Exception e) {
-            Log.e(TAG, "Gagal membuka tetapan notifikasi khusus, beralih ke tetapan aplikasi", e);
+            Log.e(TAG, "Gagal membuka tetapan notifikasi", e);
             try {
                 Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
                 fallback.setData(Uri.parse("package:" + context.getPackageName()));
@@ -221,6 +219,7 @@ public class AzanAlarmPlugin extends Plugin {
                 jsonList.put(storedObj);
 
                 if (timestamp > now) {
+                    // PendingIntent ke AzanAlarmReceiver
                     Intent intent = new Intent(context, AzanAlarmReceiver.class);
                     intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
                     intent.putExtra("prayer_key", prayerKey);
@@ -234,20 +233,27 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
+                    // PendingIntent paparan aktiviti ke MainActivity
+                    Intent showIntent = new Intent(context, MainActivity.class);
+                    showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    PendingIntent showPendingIntent = PendingIntent.getActivity(
+                        context,
+                        requestCode + 10000,
+                        showIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
                         alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
                     scheduledCount++;
-                    Log.i(TAG, "Penggera solat (" + prayerName + ") tepat dijadualkan melalui setAlarmClock pada: " + timestamp);
+                    Log.i(TAG, "Penggera solat (" + prayerName + ") berjaya dijadualkan melalui setAlarmClock pada: " + timestamp);
                 }
             }
 
-            // Simpan ke SharedPreferences untuk penjadualan semula apabila telefon 'reboot'
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
             if (alarmsArray.length() > 0) {
@@ -323,13 +329,20 @@ public class AzanAlarmPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
+            Intent showIntent = new Intent(context, MainActivity.class);
+            showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent showPendingIntent = PendingIntent.getActivity(
+                context,
+                19999,
+                showIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
             long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
             if (alarmManager != null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent);
+                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent);
                     alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
                 } else {
                     alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
                 }
@@ -353,7 +366,7 @@ public class AzanAlarmPlugin extends Plugin {
         Context context = getContext();
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         prefs.edit().putString("selected_azan_voice", voice).apply();
-        Log.i(TAG, "Nada azan aktif dikemaskini dalam SharedPreferences: " + voice);
+        Log.i(TAG, "Nada azan dikemaskini dalam SharedPreferences: " + voice);
         JSObject ret = new JSObject();
         ret.put("success", true);
         ret.put("voice", voice);
