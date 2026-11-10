@@ -2,12 +2,20 @@ package com.solatkini.app;
 
 import android.Manifest;
 import android.app.AlarmManager;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
-import android.os.PowerManager;
 import android.provider.Settings;
+import android.util.Log;
+import androidx.core.app.ActivityCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -16,6 +24,8 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(
     name = "AzanAlarm",
@@ -27,18 +37,35 @@ import com.getcapacitor.annotation.PermissionCallback;
     }
 )
 public class AzanAlarmPlugin extends Plugin {
+    private static final String TAG = "AzanAlarmPlugin";
+    private static final String PREFS_NAME = "SolatKiniAlarms";
+    private static final String KEY_STORED_ALARMS = "scheduled_alarms_json";
 
-    // --- 1. NOTIFIKASI ---
     @PluginMethod
     public void checkNotificationPermission(PluginCall call) {
-        JSObject ret = new JSObject();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            boolean isGranted = getPermissionState("notifications") == PermissionState.GRANTED;
-            ret.put("notificationsGranted", isGranted);
+        Context context = getContext();
+        boolean notificationsGranted = false;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // Android 13+ / API 33
+            notificationsGranted = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED;
         } else {
-            ret.put("notificationsGranted", true);
+            notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled();
         }
-        ret.put("exactAlarmAllowed", true);
+
+        boolean exactAlarmAllowed = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { // Android 12+ / API 31
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null) {
+                exactAlarmAllowed = alarmManager.canScheduleExactAlarms();
+            }
+        }
+
+        JSObject ret = new JSObject();
+        ret.put("notificationsGranted", notificationsGranted);
+        ret.put("exactAlarmAllowed", exactAlarmAllowed);
         ret.put("sdkInt", Build.VERSION.SDK_INT);
         call.resolve(ret);
     }
@@ -46,11 +73,28 @@ public class AzanAlarmPlugin extends Plugin {
     @PluginMethod
     public void requestNotificationPermission(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (getPermissionState("notifications") != PermissionState.GRANTED) {
-                requestPermissionForAlias("notifications", call, "notificationPermCallback");
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            ActivityCompat.requestPermissions(
+                                getActivity(),
+                                new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                                MainActivity.NOTIFICATION_PERMISSION_CODE
+                            );
+                        }
+                    });
+                }
+                JSObject ret = new JSObject();
+                ret.put("granted", false);
+                ret.put("status", "requested");
+                call.resolve(ret);
                 return;
             }
         }
+
         JSObject ret = new JSObject();
         ret.put("granted", true);
         ret.put("status", "granted");
@@ -58,125 +102,258 @@ public class AzanAlarmPlugin extends Plugin {
     }
 
     @PermissionCallback
-    private void notificationPermCallback(PluginCall call) {
-        JSObject ret = new JSObject();
-        if (getPermissionState("notifications") == PermissionState.GRANTED) {
-            ret.put("granted", true);
-            ret.put("status", "granted");
+    public void notificationCallback(PluginCall call) {
+        boolean granted = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            granted = ContextCompat.checkSelfPermission(
+                getContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED;
         } else {
-            ret.put("granted", false);
-            ret.put("status", "denied");
+            granted = NotificationManagerCompat.from(getContext()).areNotificationsEnabled();
         }
+
+        JSObject ret = new JSObject();
+        ret.put("granted", granted);
+        ret.put("status", granted ? "granted" : "denied");
         call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openExactAlarmSettings(PluginCall call) {
+        Context context = getContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "Gagal membuka tetapan exact alarm khusus, mencuba tetapan aplikasi", e);
+            }
+        }
+
+        try {
+            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(Uri.parse("package:" + context.getPackageName()));
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Tidak dapat membuka tetapan aplikasi: " + e.getMessage());
+        }
     }
 
     @PluginMethod
     public void openNotificationSettings(PluginCall call) {
+        Context context = getContext();
         try {
             Intent intent = new Intent();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 intent.setAction(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-                intent.putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+                intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
             } else {
                 intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
             }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+
             JSObject ret = new JSObject();
             ret.put("opened", true);
             call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Gagal buka tetapan notifikasi: " + e.getMessage());
-        }
-    }
-
-    // --- 2. BATERI & OPTIMASI SISTEM ---
-    @PluginMethod
-    public void isBatteryOptimized(PluginCall call) {
-        JSObject ret = new JSObject();
-        PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
-        boolean isIgnoring = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && pm != null) {
-            isIgnoring = pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
-        }
-        ret.put("isIgnoringBatteryOptimizations", isIgnoring);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void requestIgnoreBatteryOptimization(PluginCall call) {
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(intent);
+            Log.e(TAG, "Gagal membuka tetapan notifikasi khusus, beralih ke tetapan aplikasi", e);
+            try {
+                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                fallback.setData(Uri.parse("package:" + context.getPackageName()));
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(fallback);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+            } catch (Exception err) {
+                call.reject("Tidak dapat membuka tetapan sistem: " + err.getMessage());
             }
-            JSObject ret = new JSObject();
-            ret.put("opened", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal buka pengecualian bateri: " + e.getMessage());
         }
     }
 
     @PluginMethod
-    public void openAutostartSettings(PluginCall call) {
-        openNotificationSettings(call);
-    }
-
-    // --- 3. PENGGERA TEPAT & MASA AUTOMATIK ---
-    @PluginMethod
-    public void openExactAlarmSettings(PluginCall call) {
+    public void schedulePrayerAlarms(PluginCall call) {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
-                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(intent);
+            Context context = getContext();
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager == null) {
+                call.reject("AlarmManager peranti tidak tersedia");
+                return;
             }
+
+            JSArray alarmsArray = call.getArray("alarms");
+            if (alarmsArray == null) {
+                call.reject("Parameter 'alarms' diperlukan");
+                return;
+            }
+
+            long now = System.currentTimeMillis();
+            JSONArray jsonList = new JSONArray();
+            int scheduledCount = 0;
+
+            for (int i = 0; i < alarmsArray.length(); i++) {
+                JSONObject obj = alarmsArray.getJSONObject(i);
+                String prayerKey = obj.optString("prayerKey", "solat");
+                String prayerName = obj.optString("prayerName", "Solat");
+                String voice = obj.optString("voice", "jakim");
+                long timestamp = obj.optLong("timestamp", 0);
+                int requestCode = 2000 + i;
+
+                JSONObject storedObj = new JSONObject();
+                storedObj.put("prayerKey", prayerKey);
+                storedObj.put("prayerName", prayerName);
+                storedObj.put("voice", voice);
+                storedObj.put("timestamp", timestamp);
+                storedObj.put("requestCode", requestCode);
+                jsonList.put(storedObj);
+
+                if (timestamp > now) {
+                    Intent intent = new Intent(context, AzanAlarmReceiver.class);
+                    intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
+                    intent.putExtra("prayer_key", prayerKey);
+                    intent.putExtra("prayer_name", prayerName);
+                    intent.putExtra("voice", voice);
+
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        requestCode,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
+                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                    }
+                    scheduledCount++;
+                    Log.i(TAG, "Penggera solat (" + prayerName + ") tepat dijadualkan melalui setAlarmClock pada: " + timestamp);
+                }
+            }
+
+            // Simpan ke SharedPreferences untuk penjadualan semula apabila telefon 'reboot'
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
+            if (alarmsArray.length() > 0) {
+                JSONObject firstObj = alarmsArray.getJSONObject(0);
+                String activeVoice = firstObj.optString("voice", "jakim");
+                prefs.edit().putString("selected_azan_voice", activeVoice).apply();
+            }
+
             JSObject ret = new JSObject();
-            ret.put("opened", true);
+            ret.put("success", true);
+            ret.put("scheduledCount", scheduledCount);
             call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Gagal buka tetapan exact alarm: " + e.getMessage());
+            Log.e(TAG, "Ralat menjadualkan penggera solat asli", e);
+            call.reject("Gagal menjadualkan penggera azan: " + e.getMessage(), e);
         }
     }
 
     @PluginMethod
-    public void checkAutoTime(PluginCall call) {
-        JSObject ret = new JSObject();
+    public void cancelAllAlarms(PluginCall call) {
         try {
-            int autoTime = Settings.Global.getInt(getContext().getContentResolver(), Settings.Global.AUTO_TIME, 1);
-            int autoTimeZone = Settings.Global.getInt(getContext().getContentResolver(), Settings.Global.AUTO_TIME_ZONE, 1);
-            ret.put("isAutoTimeEnabled", autoTime == 1);
-            ret.put("isAutoTimeZoneEnabled", autoTimeZone == 1);
+            Context context = getContext();
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+
+            if (alarmManager != null) {
+                for (int i = 0; i < 20; i++) {
+                    Intent intent = new Intent(context, AzanAlarmReceiver.class);
+                    intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                        context,
+                        2000 + i,
+                        intent,
+                        PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE
+                    );
+                    if (pendingIntent != null) {
+                        alarmManager.cancel(pendingIntent);
+                        pendingIntent.cancel();
+                    }
+                }
+            }
+
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().remove(KEY_STORED_ALARMS).apply();
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
         } catch (Exception e) {
-            ret.put("isAutoTimeEnabled", true);
-            ret.put("isAutoTimeZoneEnabled", true);
+            call.reject("Gagal membatalkan penggera azan: " + e.getMessage(), e);
         }
-        call.resolve(ret);
     }
 
     @PluginMethod
-    public void openDateSettings(PluginCall call) {
+    public void testAlarmNow(PluginCall call) {
         try {
-            Intent intent = new Intent(Settings.ACTION_DATE_SETTINGS);
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
+            Context context = getContext();
+            String prayerName = call.getString("prayerName", "Ujian Azan");
+            String prayerKey = call.getString("prayerKey", "subuh");
+            String voice = call.getString("voice", "jakim");
+            int delaySeconds = call.getInt("delaySeconds", 2);
+
+            AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+            Intent intent = new Intent(context, AzanAlarmReceiver.class);
+            intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
+            intent.putExtra("prayer_key", prayerKey);
+            intent.putExtra("prayer_name", prayerName);
+            intent.putExtra("voice", voice);
+
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                context,
+                9999,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            long triggerAtMillis = System.currentTimeMillis() + (delaySeconds * 1000L);
+            if (alarmManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(triggerAtMillis, pendingIntent);
+                    alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                } else {
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
+                }
+            }
+
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit().putString("selected_azan_voice", voice).apply();
+
             JSObject ret = new JSObject();
-            ret.put("opened", true);
+            ret.put("success", true);
+            ret.put("delaySeconds", delaySeconds);
             call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Gagal buka tetapan tarikh: " + e.getMessage());
+            call.reject("Gagal menguji penggera azan: " + e.getMessage(), e);
         }
     }
 
-    // --- 4. ALARM & SUARA AZAN (STUB HANDLER) ---
     @PluginMethod
     public void setActiveAzanVoice(PluginCall call) {
         String voice = call.getString("voice", "jakim");
+        Context context = getContext();
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putString("selected_azan_voice", voice).apply();
+        Log.i(TAG, "Nada azan aktif dikemaskini dalam SharedPreferences: " + voice);
         JSObject ret = new JSObject();
         ret.put("success", true);
         ret.put("voice", voice);
@@ -184,31 +361,18 @@ public class AzanAlarmPlugin extends Plugin {
     }
 
     @PluginMethod
-    public void schedulePrayerAlarms(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("success", true);
-        ret.put("scheduledCount", 5);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void cancelAllAlarms(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("success", true);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void testAlarmNow(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("success", true);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
     public void stopAzanAudio(PluginCall call) {
-        JSObject ret = new JSObject();
-        ret.put("success", true);
-        call.resolve(ret);
+        try {
+            Context context = getContext();
+            Intent stopIntent = new Intent(context, AzanAudioService.class);
+            stopIntent.setAction(AzanAudioService.ACTION_STOP_AZAN);
+            context.startService(stopIntent);
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal menghentikan audio azan: " + e.getMessage(), e);
+        }
     }
 }
