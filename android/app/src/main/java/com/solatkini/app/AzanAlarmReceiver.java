@@ -13,16 +13,17 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i(TAG, "Penggera azan diterima! Tindakan: " + intent.getAction());
+        Log.i(TAG, "Penggera azan diterima! Tindakan: " + (intent != null ? intent.getAction() : "null"));
 
-        String prayerName = intent.getStringExtra("prayer_name");
-        String prayerKey = intent.getStringExtra("prayer_key");
-        String voice = intent.getStringExtra("voice");
+        String prayerName = intent != null ? intent.getStringExtra("prayer_name") : "Solat";
+        String prayerKey = intent != null ? intent.getStringExtra("prayer_key") : "solat";
+        String voice = intent != null ? intent.getStringExtra("voice") : "jakim";
+
         if (prayerName == null) prayerName = "Solat";
         if (prayerKey == null) prayerKey = "solat";
         if (voice == null) voice = "jakim";
 
-        // 1. Dapatkan WakeLock untuk membangunkan perkakasan CPU telefon
+        // Tahan CPU selama 15 saat sahaja untuk memberi laluan servis bermula
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         PowerManager.WakeLock wakeLock = null;
         if (powerManager != null) {
@@ -30,11 +31,11 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
                 "SolatKini::AlarmReceiverWakeLock"
             );
-            wakeLock.acquire(3 * 60 * 1000L); // 3 minutes
+            wakeLock.acquire(15 * 1000L);
         }
 
         try {
-            // 2. Mulakan perkhidmatan audio latar depan (AzanAudioService) pada saluran penggera
+            // Mulakan servis audio azan latar depan
             Intent serviceIntent = new Intent(context, AzanAudioService.class);
             serviceIntent.setAction(AzanAudioService.ACTION_PLAY_AZAN);
             serviceIntent.putExtra("prayer_name", prayerName);
@@ -46,29 +47,8 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             } else {
                 context.startService(serviceIntent);
             }
-
-            // 3. Bangunkan dan lancarkan MainActivity untuk memaparkan skrin visual azan penuh automatik
-            Intent activityIntent = new Intent(context, MainActivity.class);
-            activityIntent.setFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK |
-                Intent.FLAG_ACTIVITY_CLEAR_TOP |
-                Intent.FLAG_ACTIVITY_SINGLE_TOP |
-                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            );
-            activityIntent.putExtra("azan_trigger", true);
-            activityIntent.putExtra("prayer_name", prayerName);
-            activityIntent.putExtra("prayer_key", prayerKey);
-            activityIntent.putExtra("voice", voice);
-            context.startActivity(activityIntent);
-
         } catch (Exception e) {
-            Log.e(TAG, "Ralat mengaktifkan servis azan / aktiviti skrin penuh", e);
-        } finally {
-            if (wakeLock != null && wakeLock.isHeld()) {
-                try {
-                    wakeLock.release();
-                } catch (Exception ignored) {}
-            }
+            Log.e(TAG, "Ralat menghidupkan servis audio azan", e);
         }
     }
 }
