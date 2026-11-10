@@ -63,12 +63,33 @@ jobs:
       - name: 6. Build Web Assets (Vite)
         run: npm run build
 
-      # 7. Sediakan Platform Android Capacitor
+      # 7. Sediakan Platform Android Capacitor (Pintar & Kebal Error)
       - name: 7. Sediakan Platform Android Capacitor
         run: |
+          # A. Jika folder android langsung belum ada:
           if [ ! -d "android" ]; then
+            echo "Folder android belum wujud. Menjana projek penuh Capacitor..."
             npx cap add android
+          
+          # B. Jika folder android wujud tapi tidak lengkap (cth: cuma ada manifest, tiada build.gradle):
+          elif [ ! -f "android/build.gradle" ] && [ ! -f "android/settings.gradle" ]; then
+            echo "Folder android dikesan tidak lengkap. Membuat backup fail kustom dan membina semula..."
+            mkdir -p /tmp/android_custom_backup
+            cp -r android/* /tmp/android_custom_backup/ 2>/dev/null || true
+            rm -rf android
+            npx cap add android
+            # Pulihkan semula fail kustom (AndroidManifest.xml dsb)
+            cp -r /tmp/android_custom_backup/* android/ 2>/dev/null || true
+          
+          # C. Jika projek lengkap tapi gradlew sahaja yang tertinggal dalam git:
+          elif [ ! -f "android/gradlew" ]; then
+            echo "Projek android wujud tapi gradlew tiada. Menjana gradlew wrapper..."
+            cd android
+            gradle wrapper || true
+            cd ..
           fi
+
+          # Segerakkan aset web dan plugin ke dalam Android
           npx cap sync android
 
       # 8. Suntik versi ke build.gradle
@@ -93,10 +114,14 @@ jobs:
             cp -r res/* android/app/src/main/res/
           fi
 
-      # 10. Beri kebenaran gradlew
+      # 10. Beri kebenaran gradlew (dengan fallback)
       - name: 10. Beri Kebenaran Gradlew
         run: |
           cd android
+          if [ ! -f "gradlew" ]; then
+            echo "Fail gradlew masih tiada, menjana wrapper kecemasan..."
+            gradle wrapper
+          fi
           chmod +x gradlew
 
       # 11. Compile Release APK
