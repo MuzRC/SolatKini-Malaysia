@@ -23,7 +23,8 @@ import {
   Check,
   RefreshCw,
   WifiOff,
-  AlertTriangle
+  AlertTriangle,
+  Settings
 } from 'lucide-react';
 import {
   DayPrayerTimes,
@@ -95,7 +96,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
   const [zoneSearchQuery, setZoneSearchQuery] = useState('');
   const [selectedStateFilter, setSelectedStateFilter] = useState<string>('Semua');
   const [isLocating, setIsLocating] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationError, setLocationError] = useState<{ message: string; isDenied: boolean } | null>(null);
   const [notificationsGranted, setNotificationsGranted] = useState<boolean>(true);
   const [isAutoTimeEnabled, setIsAutoTimeEnabled] = useState<boolean>(true);
 
@@ -366,7 +367,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone]);
 
-  // Sinkronisasi otomatis ke AlarmManager Android saat data sholat atau setelan berubah
+  // Sinkronisasi automatik ke AlarmManager Android saat data solat atau tetapan berubah
   useEffect(() => {
     if (prayerTimes && prayerTimes.times) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
@@ -621,9 +622,13 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   };
 
+  // Pengesanan GPS dengan pengendalian ralat menyeluruh
   const handleDetectGPS = () => {
-    if (!navigator.geolocation) {
-      setLocationError('Pelayar anda tidak menyokong pengesanan GPS.');
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocationError({
+        message: 'Peranti anda tidak menyokong pengesanan geolokasi GPS.',
+        isDenied: false,
+      });
       return;
     }
     setIsLocating(true);
@@ -634,12 +639,37 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         setIsLocating(false);
         const nearest = findNearestZone(pos.coords.latitude, pos.coords.longitude);
         onZoneChange(nearest);
+        setLocationError(null);
       },
-      () => {
+      (err) => {
         setIsLocating(false);
-        setLocationError('Gagal mengesan lokasi automatik. Sila pilih zon secara manual.');
+        if (err.code === 1) {
+          setLocationError({
+            message: 'Kebenaran lokasi telah disekat oleh Android. Sila buka Tetapan Telefon untuk membenarkan akses Lokasi.',
+            isDenied: true,
+          });
+        } else if (err.code === 2) {
+          setLocationError({
+            message: 'GPS peranti dimatikan atau tiada isyarat. Sila hidupkan suis Lokasi di bar atas telefon.',
+            isDenied: false,
+          });
+        } else if (err.code === 3) {
+          setLocationError({
+            message: 'Masa carian GPS tamat. Sila cuba lagi atau pilih zon solat secara manual.',
+            isDenied: false,
+          });
+        } else {
+          setLocationError({
+            message: `Gagal mengesan lokasi (${err.message || 'Ralat tidak diketahui'}). Sila pilih secara manual.`,
+            isDenied: false,
+          });
+        }
       },
-      { timeout: 8000 }
+      {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 300000,
+      }
     );
   };
 
@@ -739,8 +769,33 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         </div>
 
         {locationError && (
-          <div className="mt-3 text-xs text-amber-400 bg-amber-950/40 border border-amber-800/50 rounded-xl p-2.5">
-            {locationError}
+          <div className="mt-3 text-xs text-amber-300 bg-amber-950/40 border border-amber-800/50 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{locationError.message}</span>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              {locationError.isDenied && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await nativeAlarmService.openNotificationSettings();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-[11px] flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>Buka Tetapan</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setLocationError(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -805,11 +860,11 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           <div className="pt-1 flex flex-wrap items-center gap-2">
             <button
               onClick={async () => {
-                await nativeAlarmService.requestNotificationPermission();
-                setTimeout(async () => {
-                  const perms = await nativeAlarmService.checkPermissions();
-                  setNotificationsGranted(perms.notificationsGranted);
-                }, 1000);
+                const granted = await nativeAlarmService.requestNotificationPermission();
+                setNotificationsGranted(granted);
+                if (!granted) {
+                  await nativeAlarmService.openNotificationSettings();
+                }
               }}
               className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/40 cursor-pointer"
             >
