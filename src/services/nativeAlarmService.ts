@@ -54,62 +54,59 @@ class NativeAlarmService {
   }
 
   /**
-   * Semak status kebenaran notifikasi dengan sandaran fallback storan tempatan.
+   * Semak status kebenaran notifikasi rasmi daripada perkakasan peranti (bukan tekaan localStorage).
    */
   public async checkPermissions(): Promise<PermissionStatusResult> {
-    // Semak jika pengguna sudah aktifkan kebenaran secara manual sebelum ini
-    const manualGranted = typeof window !== 'undefined' && localStorage.getItem('solatkini_notif_granted') === 'true';
-
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
         return {
-          notificationsGranted: Notification.permission === 'granted' || manualGranted,
+          notificationsGranted: Notification.permission === 'granted',
           exactAlarmAllowed: true,
           sdkInt: 0,
         };
       }
-      return { notificationsGranted: manualGranted, exactAlarmAllowed: true, sdkInt: 0 };
+      return { notificationsGranted: false, exactAlarmAllowed: true, sdkInt: 0 };
     }
 
     try {
       const res = await AzanAlarm.checkNotificationPermission();
       return {
-        notificationsGranted: res.notificationsGranted || manualGranted,
+        notificationsGranted: !!res.notificationsGranted,
         exactAlarmAllowed: res.exactAlarmAllowed ?? true,
         sdkInt: res.sdkInt ?? 33,
       };
     } catch {
-      // Jika plugin Java tiada dalam APK, gunakan status dari localStorage
-      return { notificationsGranted: manualGranted, exactAlarmAllowed: true, sdkInt: 33 };
+      return { notificationsGranted: false, exactAlarmAllowed: true, sdkInt: 33 };
     }
   }
 
   /**
-   * Minta kebenaran notifikasi. Jika plugin tiada, terus tandakan aktif & tutup banner.
+   * Minta kebenaran notifikasi secara sah daripada dialog sistem peranti.
    */
   public async requestNotificationPermission(): Promise<boolean> {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_notif_granted', 'true');
-    }
-
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
         try {
           const res = await Notification.requestPermission();
           return res === 'granted';
         } catch {
-          return true;
+          return false;
         }
       }
-      return true;
+      return false;
     }
 
     try {
       const result = await AzanAlarm.requestNotificationPermission();
-      return !!result.granted;
+      const granted = !!result.granted;
+      if (granted && typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_notif_granted', 'true');
+      } else if (typeof window !== 'undefined') {
+        localStorage.removeItem('solatkini_notif_granted');
+      }
+      return granted;
     } catch {
-      // Fallback sekiranya plugin Java belum dipasang
-      return true;
+      return false;
     }
   }
 
@@ -124,13 +121,9 @@ class NativeAlarmService {
   }
 
   /**
-   * Buka tetapan notifikasi atau paparkan panduan terus ke pengguna.
+   * Buka tetapan notifikasi telefon (tanpa menanda status sebagai aktif secara melulu).
    */
   public async openNotificationSettings(): Promise<boolean> {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_notif_granted', 'true');
-    }
-
     if (!this.isNative) return false;
 
     try {
