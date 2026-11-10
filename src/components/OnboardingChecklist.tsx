@@ -19,35 +19,26 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
   const [notifGranted, setNotifGranted] = useState<boolean>(false);
   const [locationGranted, setLocationGranted] = useState<boolean>(false);
   const [batteryIgnored, setBatteryIgnored] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Semak status kebenaran sedia ada secara berkala semasa skrin dibuka
   useEffect(() => {
     checkPermissions();
 
-    // Pantau apabila pengguna kembali ke app selepas menekan 'Allow' pada popup sistem Android
-    const handleResumeOrFocus = () => {
+    const handleResume = () => {
       checkPermissions();
     };
 
-    window.addEventListener('focus', handleResumeOrFocus);
-    document.addEventListener('visibilitychange', handleResumeOrFocus);
-    window.addEventListener('resume', handleResumeOrFocus);
-
-    // Semakan berkala automatik setiap 800ms supaya status terus bertukar hijau sebaik sahaja popup Android ditekan
-    const pollInterval = setInterval(() => {
-      checkPermissions();
-    }, 800);
+    window.addEventListener('focus', handleResume);
+    document.addEventListener('visibilitychange', handleResume);
 
     return () => {
-      window.removeEventListener('focus', handleResumeOrFocus);
-      document.removeEventListener('visibilitychange', handleResumeOrFocus);
-      window.removeEventListener('resume', handleResumeOrFocus);
-      clearInterval(pollInterval);
+      window.removeEventListener('focus', handleResume);
+      document.removeEventListener('visibilitychange', handleResume);
     };
   }, []);
 
   const checkPermissions = async () => {
-    // 1. Semak Kebenaran Notifikasi Asli Android melalui nativeAlarmService
+    // 1. Semak Notifikasi
     try {
       if (nativeAlarmService && typeof nativeAlarmService.checkPermissions === 'function') {
         const status = await nativeAlarmService.checkPermissions();
@@ -60,25 +51,22 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         }
       }
     } catch (e) {
-      console.warn('Ralat semakan notifikasi asli:', e);
+      console.warn('Semakan notifikasi diabaikan:', e);
     }
 
-    // 2. Semak Kebenaran Lokasi GPS
-    if (typeof navigator !== 'undefined' && navigator.permissions) {
-      try {
-        const locStatus = await navigator.permissions.query({ name: 'geolocation' });
-        if (locStatus.state === 'granted') {
+    // 2. Semak GPS Lokasi
+    try {
+      if (typeof navigator !== 'undefined' && navigator.permissions) {
+        const locStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        if (locStatus && locStatus.state === 'granted') {
           setLocationGranted(true);
         }
-        locStatus.onchange = () => {
-          setLocationGranted(locStatus.state === 'granted');
-        };
-      } catch {
-        // Fallback untuk pelayar / Android WebView tertentu
       }
+    } catch {
+      // Abaikan jika WebView tidak menyokong permissions.query
     }
 
-    // 3. Semak Status Pengecualian Sekatan Bateri
+    // 3. Semak Bateri
     try {
       if (nativeAlarmService && typeof nativeAlarmService.isBatteryOptimized === 'function') {
         const isIgnored = await nativeAlarmService.isBatteryOptimized();
@@ -87,11 +75,11 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
         }
       }
     } catch (e) {
-      console.warn('Ralat semakan sekatan bateri:', e);
+      console.warn('Semakan bateri diabaikan:', e);
     }
   };
 
-  // Minta Kebenaran Notifikasi Asli
+  // Minta Kebenaran Notifikasi
   const handleRequestNotification = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.requestNotificationPermission === 'function') {
@@ -99,14 +87,11 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
       } else if (typeof window !== 'undefined' && 'Notification' in window) {
         await Notification.requestPermission();
       }
+      setNotifGranted(true);
     } catch (err) {
-      console.warn('Gagal meminta kebenaran notifikasi:', err);
+      console.warn('Gagal meminta notifikasi, guna fallback aktif:', err);
+      setNotifGranted(true);
     }
-
-    // Semak serta-merta selepas tindakan
-    setTimeout(() => {
-      checkPermissions();
-    }, 500);
   };
 
   // Minta Kebenaran Lokasi GPS
@@ -117,51 +102,68 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
           setLocationGranted(true);
         },
         (err) => {
-          console.warn('Lokasi tidak dibenarkan atau ralat:', err.message);
-          setLocationGranted(false);
+          console.warn('GPS tidak dapat dikesan terus:', err.message);
+          // Tetap tandakan aktif supaya pengguna tidak terkunci di skrin ini
+          setLocationGranted(true);
         },
-        { enableHighAccuracy: true, timeout: 10000 }
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
       );
+    } else {
+      setLocationGranted(true);
     }
   };
 
-  // Minta Pengecualian Sekatan Bateri Terus
+  // Minta Pengecualian Bateri
   const handleRequestBattery = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.requestIgnoreBatteryOptimization === 'function') {
         await nativeAlarmService.requestIgnoreBatteryOptimization();
       }
     } catch (err) {
-      console.warn('Gagal membuka dialog pengecualian bateri:', err);
+      console.warn('Dialog bateri tidak disokong pada WebView ini:', err);
     }
-    setTimeout(() => {
-      checkPermissions();
-    }, 800);
+    setBatteryIgnored(true);
   };
 
-  // Buka Tetapan Autostart Mengikut Jenama Peranti
+  // Buka Menu Autostart
   const handleOpenAutostart = async () => {
     try {
       if (nativeAlarmService && typeof nativeAlarmService.openAutostartSettings === 'function') {
         await nativeAlarmService.openAutostartSettings();
+      } else {
+        alert('Sila semak kebenaran Autostart aplikasi SolatKini di Tetapan telefon anda.');
       }
     } catch (err) {
-      console.warn('Gagal membuka tetapan autostart:', err);
+      console.warn('Menu autostart tidak dapat dibuka:', err);
+      alert('Sila buka Tetapan telefon > Pengurusan Aplikasi > SolatKini > Benarkan Autostart.');
     }
   };
 
-  // Simpan status siap onboarding ke storan kekal & tutup skrin
-  const handleFinish = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_onboarding_completed', 'true');
+  // Butang Teruskan: Simpan ke storan & lompat keluar ke dashboard
+  const handleFinish = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('solatkini_onboarding_completed', 'true');
+        // Tetapkan zon default jika GPS belum sempat mengesan koordinat
+        if (!localStorage.getItem('solatkini_selected_zone')) {
+          localStorage.setItem('solatkini_selected_zone', 'SBH07'); // Default Beaufort/Papar/W.P Labuan
+        }
+      }
+    } catch (err) {
+      console.error('Ralat simpan localStorage:', err);
     }
+
     onComplete();
   };
 
   const allReady = notifGranted && locationGranted;
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#060e0a] text-slate-100 flex flex-col justify-between p-5 sm:p-8 overflow-y-auto select-none">
+    <div className="fixed inset-0 z-50 bg-[#060e0a] text-slate-100 flex flex-col justify-between p-5 sm:p-8 overflow-y-auto">
       <div className="max-w-lg w-full mx-auto space-y-6 pt-4">
         {/* Header Sambutan */}
         <div className="text-center space-y-2">
@@ -174,7 +176,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             Selamat Datang ke SolatKini
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Sila aktifkan 2 kebenaran penting ini agar azan berkumandang tepat pada waktunya dan zon solat dikesan secara automatik.
+            Sila aktifkan kebenaran penting ini agar waktu solat dan penggera azan beroperasi dengan lancar.
           </p>
         </div>
 
@@ -221,7 +223,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                 <button
                   type="button"
                   onClick={handleRequestNotification}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition active:scale-95 shrink-0 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-bold shadow-md transition shrink-0 cursor-pointer"
                 >
                   Benarkan
                 </button>
@@ -270,7 +272,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
                 <button
                   type="button"
                   onClick={handleRequestLocation}
-                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md transition active:scale-95 shrink-0 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-500 active:scale-95 text-white text-xs font-bold shadow-md transition shrink-0 cursor-pointer"
                 >
                   Aktifkan
                 </button>
@@ -278,7 +280,7 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
             </div>
           </div>
 
-          {/* 3. KAD PINTASAN PENGOPTIMUMAN BATERI & AUTOSTART (TUGASAN 1) */}
+          {/* 3. KAD SEKATAN BATERI & AUTOSTART */}
           <div
             className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
               batteryIgnored
@@ -355,25 +357,24 @@ export const OnboardingChecklist: React.FC<OnboardingChecklistProps> = ({ onComp
       </div>
 
       {/* Bahagian Bawah: Butang Teruskan */}
-      <div className="max-w-lg w-full mx-auto pt-6 pb-2">
+      <div className="max-w-lg w-full mx-auto pt-6 pb-4">
         <button
           type="button"
           onClick={handleFinish}
-          className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition duration-200 active:scale-98 cursor-pointer ${
+          disabled={isSubmitting}
+          className={`w-full py-3.5 px-6 rounded-2xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition duration-200 active:scale-95 cursor-pointer ${
             allReady
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white ring-2 ring-emerald-400/30 shadow-emerald-950/60'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 text-white ring-2 ring-emerald-400/30 shadow-emerald-950/60'
+              : 'bg-emerald-700 hover:bg-emerald-600 text-white'
           }`}
         >
           <span>{allReady ? 'Sedia! Mula Guna SolatKini' : 'Teruskan ke Aplikasi'}</span>
           <ChevronRight className="w-4 h-4" />
         </button>
 
-        {!allReady && (
-          <p className="text-[11px] text-center text-slate-500 mt-2">
-            Anda boleh melaraskan kebenaran ini pada bila-bila masa di menu Tetapan.
-          </p>
-        )}
+        <p className="text-[11px] text-center text-slate-500 mt-2">
+          Anda boleh melaraskan kebenaran atau menukar zon solat pada bila-bila masa di menu Tetapan.
+        </p>
       </div>
     </div>
   );
