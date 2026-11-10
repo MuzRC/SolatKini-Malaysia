@@ -54,10 +54,12 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-      # 5. Pasang dependensi (Akan guna cache npm automatik)
+            # 5. Pasang dependensi
       - name: 5. Pasang Dependensi Projek
         run: |
           npm install --legacy-peer-deps
+          npm install react-is --legacy-peer-deps
+
 
       # 6. Build Web Assets (Vite akan bungkus fail audio yang sudah kurus)
       - name: 6. Build Web Assets (Vite)
