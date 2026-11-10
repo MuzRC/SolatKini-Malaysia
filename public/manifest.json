@@ -16,44 +16,28 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/pwa-192x192.png",
+      "src": "/icon.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pwa-512x512.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/pwa-maskable-512x512.png",
+      "src": "/icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
       "purpose": "any"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Paparan Waktu Solat & Azan Malaysia"
-    },
-    {
-      "src": "/screenshot-desktop.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "SolatKini Malaysia"
     }
   ],
   "shortcuts": [
@@ -62,21 +46,21 @@
       "short_name": "Solat",
       "description": "Semak waktu solat zon anda sekarang",
       "url": "/",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
     },
     {
       "name": "Kompas Kiblat",
       "short_name": "Kiblat",
       "description": "Cari arah kiblat tepat ke Kaabah",
       "url": "/#kiblat",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
     },
     {
       "name": "Wirid & Tasbih",
       "short_name": "Wirid",
       "description": "Zikir digital dengan maklum balas haptik",
       "url": "/#wirid",
-      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icon.png", "sizes": "192x192" }]
     }
   ]
 }
