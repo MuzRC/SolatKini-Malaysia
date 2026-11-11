@@ -8,7 +8,9 @@ interface SolatWidgetPluginInterface {
     zone: string;
     next_label: string;
     next_time: string;
+    imsak?: string;
     subuh: string;
+    syuruk?: string;
     zohor: string;
     asar: string;
     maghrib: string;
@@ -22,7 +24,9 @@ interface SolatWidgetPluginInterface {
     countdown?: string;
     next_timestamp: number;
     target_timestamp?: number;
+    imsak: string;
     subuh: string;
+    syuruk: string;
     zohor: string;
     asar: string;
     maghrib: string;
@@ -55,7 +59,9 @@ export class WidgetService {
         zone: zone?.code || 'WLY01',
         next_label: nextLabel,
         next_time: nextTime,
+        imsak: formatDisplayTime(prayerTimes.times.imsak),
         subuh: formatDisplayTime(prayerTimes.times.subuh),
+        syuruk: formatDisplayTime(prayerTimes.times.syuruk),
         zohor: formatDisplayTime(prayerTimes.times.zohor),
         asar: formatDisplayTime(prayerTimes.times.asar),
         maghrib: formatDisplayTime(prayerTimes.times.maghrib),
@@ -102,7 +108,7 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
 
-      // 1. Dapatkan nilai milisaat terus daripada targetTimestamp atau targetDate (bersih tanpa 'as any')
+      // 1. Dapatkan nilai milisaat terus daripada targetTimestamp atau targetDate
       let nextTimestamp = 0;
       if (nextPrayer) {
         if (nextPrayer.targetTimestamp && nextPrayer.targetTimestamp > now.getTime()) {
@@ -121,7 +127,7 @@ export class WidgetService {
             const target = new Date();
             target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
             if (target.getTime() <= now.getTime()) {
-              target.setDate(target.getDate() + 1); // Anjak ke Subuh esok
+              target.setDate(target.getDate() + 1); // Anjak ke Imsak hari esok
             }
             nextTimestamp = target.getTime();
           }
@@ -132,7 +138,7 @@ export class WidgetService {
       const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
       const zoneLabel = daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
 
-      // 3. Bentuk payload lengkap bersama dwi-kunci (next_timestamp & target_timestamp)
+      // 3. Bentuk payload lengkap merangkumi kesemua 7 waktu solat dan checkpoint
       const payload = {
         zone: zoneLabel,
         hijri: hijriFormatted || '',
@@ -141,7 +147,9 @@ export class WidgetService {
         countdown: countdown,
         next_timestamp: nextTimestamp,
         target_timestamp: nextTimestamp,
+        imsak: formatDisplayTime(prayerTimes.times.imsak),
         subuh: formatDisplayTime(prayerTimes.times.subuh),
+        syuruk: formatDisplayTime(prayerTimes.times.syuruk),
         zohor: formatDisplayTime(prayerTimes.times.zohor),
         asar: formatDisplayTime(prayerTimes.times.asar),
         maghrib: formatDisplayTime(prayerTimes.times.maghrib),
@@ -164,7 +172,7 @@ export class WidgetService {
 
       if (this.isAndroid()) {
         await SolatWidget.updatePersistentNotification(payload);
-        console.info('[WidgetService] Notifikasi tetap dihantar bersama pemasa undur:', nextTimestamp);
+        console.info('[WidgetService] Notifikasi tetap dihantar bersama 7 waktu & pemasa undur:', nextTimestamp);
       }
     } catch (err) {
       console.warn('[WidgetService] Ralat mengemaskini notifikasi tetap:', err);
