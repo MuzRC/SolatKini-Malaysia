@@ -211,8 +211,13 @@ class NativeAlarmService {
     const alarms: NativeAlarmItem[] = [];
 
     for (const item of prayerTimes) {
-      if (item.key === 'imsak' || item.key === 'syuruk') continue;
-      if (enabledPrayers && enabledPrayers[item.key] === false) continue;
+      // Imsak & Syuruk sentiasa dimasukkan untuk pusingan pemasa undur (Chronometer)
+      const isTransitionOnly = item.key === 'imsak' || item.key === 'syuruk';
+
+      // Solat fardhu mematuhi suis hidup/mati tetapan pengguna
+      if (!isTransitionOnly && enabledPrayers && enabledPrayers[item.key] === false) {
+        continue;
+      }
 
       const [hoursStr, minutesStr] = item.time.split(':');
       const h = parseInt(hoursStr, 10);
@@ -228,8 +233,10 @@ class NativeAlarmService {
         targetDate.setDate(targetDate.getDate() + 1);
       }
 
-      const resolvedVoice: AzanVoice =
-        item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
+      // Imsak & Syuruk menggunakan mod suara 'none' (Peralihan senyap tanpa bunyi azan)
+      const resolvedVoice: AzanVoice = isTransitionOnly
+        ? ('none' as any)
+        : (item.voice || (item.key === 'subuh' ? 'subuh_special' : voice));
 
       alarms.push({
         prayerKey: item.key,
@@ -239,7 +246,7 @@ class NativeAlarmService {
       });
     }
 
-    // Susun secara kronologi dari waktu terdekat ke waktu paling jauh
+    // Susun jadual mengikut kronologi dari waktu terdekat ke waktu paling jauh
     alarms.sort((a, b) => a.timestamp - b.timestamp);
 
     // Simpan salinan di storan lokal sebagai rujukan diagnostik
