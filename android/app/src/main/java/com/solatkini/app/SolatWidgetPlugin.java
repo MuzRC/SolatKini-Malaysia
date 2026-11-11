@@ -6,18 +6,26 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 @CapacitorPlugin(name = "SolatWidget")
 public class SolatWidgetPlugin extends Plugin {
+    private static final String TAG = "SolatWidgetPlugin";
     public static final int PERSISTENT_NOTIFICATION_ID = 8801;
     public static final String ACTION_SYNC_PRAYER = "com.solatkini.app.ACTION_SYNC_PRAYER";
-    private static final String WIDGET_PREFS = "SolatKiniWidgetPrefs";
+    public static final String WIDGET_PREFS = "SolatKiniWidgetPrefs";
 
     @PluginMethod
     public void updateWidget(PluginCall call) {
@@ -49,19 +57,18 @@ public class SolatWidgetPlugin extends Plugin {
     public void updatePersistentNotification(PluginCall call) {
         try {
             Context context = getContext();
-            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (manager == null) {
-                call.reject("NotificationManager tidak tersedia");
-                return;
-            }
 
             String zone = call.getString("zone", "Malaysia");
             String hijri = call.getString("hijri", "");
-            String nextLabel = call.getString("next_label", "Solat");
+            String nextLabel = call.getString("next_label", "Waktu Solat");
             String nextTime = call.getString("next_time", "--:--");
+
             long nextTimestamp = 0L;
             if (call.hasOption("next_timestamp")) {
                 Double ts = call.getDouble("next_timestamp");
+                if (ts != null) nextTimestamp = ts.longValue();
+            } else if (call.hasOption("target_timestamp")) {
+                Double ts = call.getDouble("target_timestamp");
                 if (ts != null) nextTimestamp = ts.longValue();
             }
 
@@ -71,7 +78,7 @@ public class SolatWidgetPlugin extends Plugin {
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            // Simpan ke SharedPreferences supaya boleh dinaikkan semula jika telefon reboot
+            // Simpan ke SharedPreferences
             SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
             prefs.edit()
                 .putBoolean("is_persistent_enabled", true)
@@ -87,13 +94,39 @@ public class SolatWidgetPlugin extends Plugin {
                 .putString("isyak", isyak)
                 .apply();
 
-            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
-            String formatted5Times = String.format(
-                "Subuh %s   |   Zohor %s   |   Asar %s   |   Maghrib %s   |   Isyak %s",
-                subuh, zohor, asar, maghrib, isyak
-            );
+            buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nextTimestamp, subuh, zohor, asar, maghrib, isyak);
 
-            // Pintasan 1: Buka Aplikasi
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal mengemaskini notifikasi tetap: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Membina notifikasi dengan kawalan pemasa undur (Sifar Kiraan Negatif)
+     */
+    public static void buildAndShowNotification(
+        Context context,
+        String zone,
+        String hijri,
+        String nextLabel,
+        String nextTime,
+        long nextTimestamp,
+        String subuh,
+        String zohor,
+        String asar,
+        String maghrib,
+        String isyak
+    ) {
+        try {
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) return;
+
+            long now = System.currentTimeMillis();
+
+            // Pintasan Buka Aplikasi
             Intent openIntent = new Intent(context, MainActivity.class);
             openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent openPending = PendingIntent.getActivity(
@@ -103,7 +136,7 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Pintasan 2: Segerak Waktu Solat
+            // Pintasan Segerak Waktu
             Intent syncIntent = new Intent(context, MainActivity.class);
             syncIntent.setAction(ACTION_SYNC_PRAYER);
             syncIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -114,9 +147,15 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
+            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
+            String formatted5Times = String.format(
+                "Subuh %s   |   Zohor %s   |   Asar %s   |   Maghrib %s   |   Isyak %s",
+                subuh, zohor, asar, maghrib, isyak
+            );
+
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
                 .setBigContentTitle("SolatKini · Zon " + zone)
-                .setSummaryText(hijri.isEmpty() ? "Waktu Solat Hari Ini" : hijri)
+                .setSummaryText(hijri == null || hijri.isEmpty() ? "Waktu Solat Hari Ini" : hijri)
                 .bigText(nextKicker + "\n\n" + formatted5Times);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(
@@ -134,26 +173,80 @@ public class SolatWidgetPlugin extends Plugin {
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
-                .addAction(android.R.drawable.ic_popup_sync, "Segerak Waktu", syncPending);
+                .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
-            // Sokongan undur masa asli Android jika timestamp masa hadapan dibekalkan
-            if (nextTimestamp > System.currentTimeMillis()) {
+            // SYARAT KETAT: Hanya aktifkan chronometer jika masa belum lepas (Halang nombor negatif)
+            if (nextTimestamp > now) {
                 builder.setWhen(nextTimestamp);
+                builder.setShowWhen(true);
                 builder.setUsesChronometer(true);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     builder.setChronometerCountDown(true);
                 }
             } else {
+                builder.setUsesChronometer(false);
                 builder.setShowWhen(false);
             }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
-
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
+            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini. Sasaran: " + nextLabel + " (" + nextTimestamp + ")");
         } catch (Exception e) {
-            call.reject("Gagal mengemaskini notifikasi tetap: " + e.getMessage(), e);
+            Log.w(TAG, "Gagal memaparkan notifikasi tetap", e);
+        }
+    }
+
+    /**
+     * Beralih secara automatik ke waktu solat seterusnya apabila jam masuk waktu azan
+     */
+    public static void advanceToNextPrayer(Context context) {
+        try {
+            SharedPreferences alarmPrefs = context.getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
+            String alarmsJson = alarmPrefs.getString("scheduled_alarms_json", null);
+            if (alarmsJson == null || alarmsJson.isEmpty()) return;
+
+            JSONArray alarmsArray = new JSONArray(alarmsJson);
+            long now = System.currentTimeMillis();
+
+            JSONObject nextUpcoming = null;
+            long nearestTimestamp = Long.MAX_VALUE;
+
+            for (int i = 0; i < alarmsArray.length(); i++) {
+                JSONObject obj = alarmsArray.getJSONObject(i);
+                long ts = obj.optLong("timestamp", 0);
+                if (ts > now && ts < nearestTimestamp) {
+                    nearestTimestamp = ts;
+                    nextUpcoming = obj;
+                }
+            }
+
+            if (nextUpcoming != null) {
+                SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
+                if (!widgetPrefs.getBoolean("is_persistent_enabled", false)) return;
+
+                String zone = widgetPrefs.getString("zone", "Malaysia");
+                String hijri = widgetPrefs.getString("hijri", "");
+                String nextLabel = nextUpcoming.optString("prayerName", "Solat");
+
+                SimpleDateFormat timeFmt = new SimpleDateFormat("h:mm a", Locale.getDefault());
+                String nextTime = timeFmt.format(new Date(nearestTimestamp));
+
+                String subuh = widgetPrefs.getString("subuh", "--:--");
+                String zohor = widgetPrefs.getString("zohor", "--:--");
+                String asar = widgetPrefs.getString("asar", "--:--");
+                String maghrib = widgetPrefs.getString("maghrib", "--:--");
+                String isyak = widgetPrefs.getString("isyak", "--:--");
+
+                widgetPrefs.edit()
+                    .putString("next_label", nextLabel)
+                    .putString("next_time", nextTime)
+                    .putLong("next_timestamp", nearestTimestamp)
+                    .apply();
+
+                buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nearestTimestamp, subuh, zohor, asar, maghrib, isyak);
+                Log.i(TAG, "Notifikasi automatik dianjakkan ke solat seterusnya: " + nextLabel);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Ralat menganjak waktu solat seterusnya", e);
         }
     }
 
