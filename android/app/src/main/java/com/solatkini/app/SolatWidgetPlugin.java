@@ -64,16 +64,32 @@ public class SolatWidgetPlugin extends Plugin {
             String nextLabel = call.getString("next_label", "Waktu Solat");
             String nextTime = call.getString("next_time", "--:--");
 
+            // Baca timestamp secara defensif (sokong Long & Double daripada JSON Capacitor)
             long nextTimestamp = 0L;
             if (call.hasOption("next_timestamp")) {
-                Double ts = call.getDouble("next_timestamp");
-                if (ts != null) nextTimestamp = ts.longValue();
+                try {
+                    Long lVal = call.getLong("next_timestamp");
+                    if (lVal != null && lVal > 0) nextTimestamp = lVal;
+                } catch (Exception ignored) {}
+                if (nextTimestamp == 0L) {
+                    try {
+                        Double dVal = call.getDouble("next_timestamp");
+                        if (dVal != null && dVal > 0) nextTimestamp = dVal.longValue();
+                    } catch (Exception ignored) {}
+                }
             } else if (call.hasOption("target_timestamp")) {
-                Double ts = call.getDouble("target_timestamp");
-                if (ts != null) nextTimestamp = ts.longValue();
+                try {
+                    Long lVal = call.getLong("target_timestamp");
+                    if (lVal != null && lVal > 0) nextTimestamp = lVal;
+                } catch (Exception ignored) {}
+                if (nextTimestamp == 0L) {
+                    try {
+                        Double dVal = call.getDouble("target_timestamp");
+                        if (dVal != null && dVal > 0) nextTimestamp = dVal.longValue();
+                    } catch (Exception ignored) {}
+                }
             }
 
-            // Ekstrak kesemua 7 waktu dan checkpoint
             String imsak = call.getString("imsak", "--:--");
             String subuh = call.getString("subuh", "--:--");
             String syuruk = call.getString("syuruk", "--:--");
@@ -82,7 +98,7 @@ public class SolatWidgetPlugin extends Plugin {
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            // Simpan ke SharedPreferences untuk sandaran pemulihan (Reboot & Background Alarm)
+            // Simpan ke SharedPreferences
             SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
             prefs.edit()
                 .putBoolean("is_persistent_enabled", true)
@@ -111,7 +127,7 @@ public class SolatWidgetPlugin extends Plugin {
     }
 
     /**
-     * Membina notifikasi status bar dengan Chronometer CountDown rasmi (Sifar Kiraan Negatif)
+     * Membina notifikasi dengan Chronometer Countdown rasmi Android (Sifar Negatif)
      */
     public static void buildAndShowNotification(
         Context context,
@@ -155,17 +171,21 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
+            // Susun maklumat tajuk dan kandungan
+            String titleText = (hijri != null && !hijri.isEmpty())
+                ? "SolatKini · Zon " + zone + " (" + hijri + ")"
+                : "SolatKini · Zon " + zone;
+
             String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
 
-            // Format kemas 2 baris untuk 7 waktu agar tidak terpotong pada skrin kecil telefon
             String formatted7Times = String.format(
                 "Imsak %s   •   Subuh %s   •   Syuruk %s\nZohor %s   •   Asar %s   •   Maghrib %s   •   Isyak %s",
                 imsak, subuh, syuruk, zohor, asar, maghrib, isyak
             );
 
+            // NOTA PENTING: JANGAN panggil .setSummaryText() di sini supaya header tidak menindih Chronometer!
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
-                .setBigContentTitle("SolatKini · Zon " + zone)
-                .setSummaryText(hijri == null || hijri.isEmpty() ? "Jadual Waktu Solat" : hijri)
+                .setBigContentTitle(titleText)
                 .bigText(nextKicker + "\n\n" + formatted7Times);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(
@@ -173,7 +193,7 @@ public class SolatWidgetPlugin extends Plugin {
                 SolatKiniApplication.PERSISTENT_CHANNEL_ID
             )
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("SolatKini · Zon " + zone)
+                .setContentTitle(titleText)
                 .setContentText(nextKicker)
                 .setStyle(bigStyle)
                 .setContentIntent(openPending)
@@ -185,7 +205,7 @@ public class SolatWidgetPlugin extends Plugin {
                 .addAction(android.R.drawable.ic_menu_today, "Buka", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
-            // SYARAT KETAT: Jam undur hanya aktif jika waktu belum berlalu (Halang nombor negatif)
+            // Aktifkan jam undur (Chronometer Countdown) sekiranya waktu sasaran belum lepas
             if (nextTimestamp > now) {
                 builder.setWhen(nextTimestamp);
                 builder.setShowWhen(true);
@@ -193,20 +213,22 @@ public class SolatWidgetPlugin extends Plugin {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     builder.setChronometerCountDown(true);
                 }
+                Log.d(TAG, "Chronometer Countdown diaktifkan ke sasaran ms: " + nextTimestamp);
             } else {
                 builder.setUsesChronometer(false);
                 builder.setShowWhen(false);
+                Log.d(TAG, "Waktu sasaran sudah berlalu atau 0, chronometer ditutup.");
             }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
-            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini: " + nextLabel + " (" + nextTimestamp + ")");
+            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini bagi: " + nextLabel);
         } catch (Exception e) {
             Log.w(TAG, "Gagal memaparkan notifikasi tetap", e);
         }
     }
 
     /**
-     * Beralih secara automatik ke waktu seterusnya (termasuk Imsak & Syuruk)
+     * Beralih secara automatik ke waktu seterusnya apabila penggera azan/peralihan senyap dicetuskan
      */
     public static void advanceToNextPrayer(Context context) {
         try {
