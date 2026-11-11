@@ -14,7 +14,6 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 import org.json.JSONArray;
@@ -37,7 +36,9 @@ public class SolatWidgetPlugin extends Plugin {
             if (call.hasOption("zone")) intent.putExtra("zone", call.getString("zone"));
             if (call.hasOption("next_label")) intent.putExtra("next_label", call.getString("next_label"));
             if (call.hasOption("next_time")) intent.putExtra("next_time", call.getString("next_time"));
+            if (call.hasOption("imsak")) intent.putExtra("imsak", call.getString("imsak"));
             if (call.hasOption("subuh")) intent.putExtra("subuh", call.getString("subuh"));
+            if (call.hasOption("syuruk")) intent.putExtra("syuruk", call.getString("syuruk"));
             if (call.hasOption("zohor")) intent.putExtra("zohor", call.getString("zohor"));
             if (call.hasOption("asar")) intent.putExtra("asar", call.getString("asar"));
             if (call.hasOption("maghrib")) intent.putExtra("maghrib", call.getString("maghrib"));
@@ -72,13 +73,16 @@ public class SolatWidgetPlugin extends Plugin {
                 if (ts != null) nextTimestamp = ts.longValue();
             }
 
+            // Ekstrak kesemua 7 waktu dan checkpoint
+            String imsak = call.getString("imsak", "--:--");
             String subuh = call.getString("subuh", "--:--");
+            String syuruk = call.getString("syuruk", "--:--");
             String zohor = call.getString("zohor", "--:--");
             String asar = call.getString("asar", "--:--");
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            // Simpan ke SharedPreferences
+            // Simpan ke SharedPreferences untuk sandaran pemulihan (Reboot & Background Alarm)
             SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
             prefs.edit()
                 .putBoolean("is_persistent_enabled", true)
@@ -87,14 +91,16 @@ public class SolatWidgetPlugin extends Plugin {
                 .putString("next_label", nextLabel)
                 .putString("next_time", nextTime)
                 .putLong("next_timestamp", nextTimestamp)
+                .putString("imsak", imsak)
                 .putString("subuh", subuh)
+                .putString("syuruk", syuruk)
                 .putString("zohor", zohor)
                 .putString("asar", asar)
                 .putString("maghrib", maghrib)
                 .putString("isyak", isyak)
                 .apply();
 
-            buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nextTimestamp, subuh, zohor, asar, maghrib, isyak);
+            buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nextTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -105,7 +111,7 @@ public class SolatWidgetPlugin extends Plugin {
     }
 
     /**
-     * Membina notifikasi dengan kawalan pemasa undur (Sifar Kiraan Negatif)
+     * Membina notifikasi status bar dengan Chronometer CountDown rasmi (Sifar Kiraan Negatif)
      */
     public static void buildAndShowNotification(
         Context context,
@@ -114,7 +120,9 @@ public class SolatWidgetPlugin extends Plugin {
         String nextLabel,
         String nextTime,
         long nextTimestamp,
+        String imsak,
         String subuh,
+        String syuruk,
         String zohor,
         String asar,
         String maghrib,
@@ -148,15 +156,17 @@ public class SolatWidgetPlugin extends Plugin {
             );
 
             String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
-            String formatted5Times = String.format(
-                "Subuh %s   |   Zohor %s   |   Asar %s   |   Maghrib %s   |   Isyak %s",
-                subuh, zohor, asar, maghrib, isyak
+
+            // Format kemas 2 baris untuk 7 waktu agar tidak terpotong pada skrin kecil telefon
+            String formatted7Times = String.format(
+                "Imsak %s   •   Subuh %s   •   Syuruk %s\nZohor %s   •   Asar %s   •   Maghrib %s   •   Isyak %s",
+                imsak, subuh, syuruk, zohor, asar, maghrib, isyak
             );
 
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
                 .setBigContentTitle("SolatKini · Zon " + zone)
-                .setSummaryText(hijri == null || hijri.isEmpty() ? "Waktu Solat Hari Ini" : hijri)
-                .bigText(nextKicker + "\n\n" + formatted5Times);
+                .setSummaryText(hijri == null || hijri.isEmpty() ? "Jadual Waktu Solat" : hijri)
+                .bigText(nextKicker + "\n\n" + formatted7Times);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(
                 context,
@@ -172,10 +182,10 @@ public class SolatWidgetPlugin extends Plugin {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(android.R.drawable.ic_menu_today, "Buka SolatKini", openPending)
+                .addAction(android.R.drawable.ic_menu_today, "Buka", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
-            // SYARAT KETAT: Hanya aktifkan chronometer jika masa belum lepas (Halang nombor negatif)
+            // SYARAT KETAT: Jam undur hanya aktif jika waktu belum berlalu (Halang nombor negatif)
             if (nextTimestamp > now) {
                 builder.setWhen(nextTimestamp);
                 builder.setShowWhen(true);
@@ -189,14 +199,14 @@ public class SolatWidgetPlugin extends Plugin {
             }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
-            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini. Sasaran: " + nextLabel + " (" + nextTimestamp + ")");
+            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini: " + nextLabel + " (" + nextTimestamp + ")");
         } catch (Exception e) {
             Log.w(TAG, "Gagal memaparkan notifikasi tetap", e);
         }
     }
 
     /**
-     * Beralih secara automatik ke waktu solat seterusnya apabila jam masuk waktu azan
+     * Beralih secara automatik ke waktu seterusnya (termasuk Imsak & Syuruk)
      */
     public static void advanceToNextPrayer(Context context) {
         try {
@@ -230,7 +240,9 @@ public class SolatWidgetPlugin extends Plugin {
                 SimpleDateFormat timeFmt = new SimpleDateFormat("h:mm a", Locale.getDefault());
                 String nextTime = timeFmt.format(new Date(nearestTimestamp));
 
+                String imsak = widgetPrefs.getString("imsak", "--:--");
                 String subuh = widgetPrefs.getString("subuh", "--:--");
+                String syuruk = widgetPrefs.getString("syuruk", "--:--");
                 String zohor = widgetPrefs.getString("zohor", "--:--");
                 String asar = widgetPrefs.getString("asar", "--:--");
                 String maghrib = widgetPrefs.getString("maghrib", "--:--");
@@ -242,8 +254,8 @@ public class SolatWidgetPlugin extends Plugin {
                     .putLong("next_timestamp", nearestTimestamp)
                     .apply();
 
-                buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nearestTimestamp, subuh, zohor, asar, maghrib, isyak);
-                Log.i(TAG, "Notifikasi automatik dianjakkan ke solat seterusnya: " + nextLabel);
+                buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nearestTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
+                Log.i(TAG, "Notifikasi automatik dianjakkan ke waktu seterusnya: " + nextLabel);
             }
         } catch (Exception e) {
             Log.w(TAG, "Ralat menganjak waktu solat seterusnya", e);
