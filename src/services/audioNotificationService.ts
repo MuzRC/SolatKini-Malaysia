@@ -177,10 +177,10 @@ class AudioNotificationService {
     this.activeVoice = resolvedVoice;
     this.unlockAudio();
 
-    // 1. Notify listeners (Open full-screen modal)
+    // 1. Beritahu modal skrin penuh untuk terpapar
     this.onAzanTriggerCallbacks.forEach((cb) => cb(prayerKey, prayerName, resolvedVoice));
 
-    // 2. Play Audio: Jika di peranti Android Native, serahkan kepada AzanAudioService (STREAM_ALARM)
+    // 2. Mainkan Audio: Jika pada Android Native, guna AzanAudioService (STREAM_ALARM)
     if (nativeAlarmService.getIsNative()) {
       nativeAlarmService.testAlarm(prayerName, resolvedVoice, 0);
     } else {
@@ -189,7 +189,7 @@ class AudioNotificationService {
       this.sendNotification(prayerName);
     }
 
-    // 3. Haptic vibration
+    // 3. Cetusan getaran haptik
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       navigator.vibrate([600, 300, 600, 300, 1000]);
     }
@@ -212,7 +212,7 @@ class AudioNotificationService {
           notif.close();
         };
       } catch {
-        // Ignore fallback
+        // Abaikan sandaran
       }
     }
   }
@@ -229,14 +229,12 @@ class AudioNotificationService {
   }
 
   /**
-   * Primary Playback:
-   * 1. Checks if an offline cached Blob exists in IndexedDB (instant offline playback, zero buffering).
-   * 2. If not cached, plays local MP3 (/audio/azan/<id>.mp3) from app server.
-   * 3. If local file encounters issue, attempts fallback local JAKIM vocal or remote backup.
-   * NOTE: Web Audio piano/synth has been completely eliminated. Azan is strictly 100% human vocal recordings.
+   * Mainkan Audio Azan dengan rantaian sandaran pintar:
+   * 1. IndexedDB Blob (Luar talian sepantas kilat)
+   * 2. Fail tempatan pelayan (/audio/azan/<id>.mp3)
+   * 3. Pautan CDN Sandaran Luar (fallbackUrl)
    */
   public async playAzan(voice: AzanVoice = 'jakim', onEnded?: () => void) {
-    // 1. Forcefully stop previous audio and generate new session ID
     this.stopAudio();
     const sessionId = this.currentPlaySessionId;
 
@@ -246,40 +244,30 @@ class AudioNotificationService {
 
     const voiceConfig = AZAN_OPTIONS.find((v) => v.id === voice) || AZAN_OPTIONS[2];
 
-    // STEP 1: Check IndexedDB for locally cached audio blob
+    // LANGKAH 1: Semak Blob IndexedDB
     let sourceUrl = this.customAudioUrl;
 
     if (!sourceUrl) {
       try {
         const cachedBlob = await audioStorageService.getAudioBlob(voice);
 
-        // Session check: Abort immediately if user switched or cancelled while waiting for IndexedDB
-        if (this.currentPlaySessionId !== sessionId) {
-          return;
-        }
+        if (this.currentPlaySessionId !== sessionId) return;
 
         if (cachedBlob && audioStorageService.isValidAudioBlob(cachedBlob)) {
           sourceUrl = URL.createObjectURL(cachedBlob);
           this.currentBlobUrl = sourceUrl;
         }
       } catch {
-        // proceed to local bundled file
+        // Teruskan ke fail tempatan
       }
     }
 
-    // Secondary check prior to creating audio element
     if (this.currentPlaySessionId !== sessionId) {
-      if (this.currentBlobUrl) {
-        try {
-          URL.revokeObjectURL(this.currentBlobUrl);
-        } catch {
-          // ignore
-        }
-        this.currentBlobUrl = null;
-      }
+      this.cleanupBlobUrl();
       return;
     }
 
+    // LANGKAH 2: Guna fail tempatan atau fallback CDN
     if (!sourceUrl) {
       sourceUrl = voiceConfig.audioUrl;
     }
@@ -302,79 +290,77 @@ class AudioNotificationService {
           if (this.currentPlaySessionId === sessionId) {
             this.isPlaying = false;
             this.notifyState(0, 0);
-            if (this.currentBlobUrl) {
-              try {
-                URL.revokeObjectURL(this.currentBlobUrl);
-              } catch {
-                // ignore
-              }
-              this.currentBlobUrl = null;
-            }
+            this.cleanupBlobUrl();
             if (onEnded) onEnded();
           }
         };
 
+        // Pengendali Ralat Pintar 3 Peringkat
         audio.onerror = () => {
           if (this.currentPlaySessionId !== sessionId) return;
-          console.warn(`Ralat memainkan audio (${sourceUrl}). Mencuba sumber fail tempatan...`);
+          console.warn(`Ralat memainkan sumber (${sourceUrl}). Mencuba sumber sandaran...`);
 
-          // Jika sumber terdahulu ialah blob yang gagal atau rosak, beralih ke fail MP3 tempatan
-          if (sourceUrl.startsWith('blob:') && voiceConfig.audioUrl) {
-            console.info('Beralih ke fail MP3 tempatan pelayan:', voiceConfig.audioUrl);
-            if (this.currentBlobUrl) {
-              try {
-                URL.revokeObjectURL(this.currentBlobUrl);
-              } catch {
-                // ignore
-              }
-              this.currentBlobUrl = null;
-            }
+          this.cleanupBlobUrl();
+
+          // Peringkat 1: Cuba fail tempatan jika sebelum ini guna blob yang gagal
+          if (typeof sourceUrl === 'string' && sourceUrl.startsWith('blob:') && voiceConfig.audioUrl) {
             audio.src = voiceConfig.audioUrl;
-            audio.play().catch((errLocal) => {
-              console.warn('Fail tempatan turut menghadapi ralat:', errLocal);
-              if (this.currentPlaySessionId === sessionId) {
-                this.isPlaying = false;
-                this.notifyState(0, 0);
-                if (onEnded) onEnded();
-              }
-            });
+            audio.play().catch(() => this.tryFallbackUrl(audio, voiceConfig, sessionId, onEnded));
             return;
           }
 
-          // Cuba fail vokal azan JAKIM rasmi tempatan jika pilihan semasa bukan JAKIM
-          if (voice !== 'jakim') {
-            audio.src = '/audio/azan/jakim.mp3';
-            audio.play().catch((e) => {
-              console.warn('Vokal azan JAKIM sandaran gagal:', e);
-              if (this.currentPlaySessionId === sessionId) {
-                this.isPlaying = false;
-                this.notifyState(0, 0);
-                if (onEnded) onEnded();
-              }
-            });
-          } else {
-            if (this.currentPlaySessionId === sessionId) {
-              this.isPlaying = false;
-              this.notifyState(0, 0);
-              if (onEnded) onEnded();
-            }
-          }
+          // Peringkat 2: Cuba CDN rasmi jika fail tempatan tiada
+          this.tryFallbackUrl(audio, voiceConfig, sessionId, onEnded);
         };
 
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
-            console.warn('Autoplay disekat oleh pelayar (memerlukan ketukan pengguna):', err);
+            console.warn('Autoplay disekat oleh pelayar (perlu interaksi pengguna):', err);
           });
         }
-        return;
       } catch (e) {
-        console.warn('HTMLAudioElement init error:', e);
+        console.warn('Ralat HTMLAudioElement:', e);
         if (this.currentPlaySessionId === sessionId) {
           this.isPlaying = false;
           this.notifyState(0, 0);
         }
       }
+    }
+  }
+
+  private tryFallbackUrl(
+    audio: HTMLAudioElement,
+    voiceConfig: ExtendedAzanAudioOption,
+    sessionId: number,
+    onEnded?: () => void
+  ) {
+    if (voiceConfig.fallbackUrl && audio.src !== voiceConfig.fallbackUrl) {
+      console.info('Beralih ke fail CDN sandaran:', voiceConfig.fallbackUrl);
+      audio.src = voiceConfig.fallbackUrl;
+      audio.play().catch((errCdn) => {
+        console.warn('Pautan CDN sandaran turut gagal:', errCdn);
+        this.handlePlaybackFailure(sessionId, onEnded);
+      });
+    } else {
+      this.handlePlaybackFailure(sessionId, onEnded);
+    }
+  }
+
+  private handlePlaybackFailure(sessionId: number, onEnded?: () => void) {
+    if (this.currentPlaySessionId === sessionId) {
+      this.isPlaying = false;
+      this.notifyState(0, 0);
+      if (onEnded) onEnded();
+    }
+  }
+
+  private cleanupBlobUrl() {
+    if (this.currentBlobUrl) {
+      try {
+        URL.revokeObjectURL(this.currentBlobUrl);
+      } catch {}
+      this.currentBlobUrl = null;
     }
   }
 
@@ -423,31 +409,34 @@ class AudioNotificationService {
   }
 
   public stopAudio() {
-    // Invalidate any active or pending async play requests
     this.currentPlaySessionId++;
 
+    // 1. Matikan audio pelayar web
     if (this.currentAudioElement) {
       try {
         this.currentAudioElement.pause();
         this.currentAudioElement.src = '';
         this.currentAudioElement.load();
-      } catch {
-        // ignore
-      }
+      } catch {}
       this.currentAudioElement = null;
     }
 
-    if (this.currentBlobUrl) {
-      try {
-        URL.revokeObjectURL(this.currentBlobUrl);
-      } catch {
-        // ignore
-      }
-      this.currentBlobUrl = null;
-    }
-
+    this.cleanupBlobUrl();
     this.isPlaying = false;
     this.notifyState(0, 0);
+
+    // 2. Berhentikan servis audio native Android jika sedang berjalan
+    if (nativeAlarmService.getIsNative()) {
+      try {
+        if (typeof (nativeAlarmService as any).stopAlarm === 'function') {
+          (nativeAlarmService as any).stopAlarm();
+        } else if (typeof (nativeAlarmService as any).stopAudio === 'function') {
+          (nativeAlarmService as any).stopAudio();
+        }
+      } catch (err) {
+        console.warn('Gagal mematikan audio native dari stopAudio:', err);
+      }
+    }
   }
 
   public getIsPlaying(): boolean {
