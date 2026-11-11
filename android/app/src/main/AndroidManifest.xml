@@ -25,7 +25,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- ======================================================== -->
-    <!-- 4. PENGECUALIAN BATERI & RANGKAIAN                      -->
+    <!-- 4. PENGECUALIAN BATERI & RANGKAIAN                       -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -36,6 +36,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
+        android:name=".SolatKiniApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -69,21 +70,20 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Gantikan .BootReceiver kepada .AzanBootReceiver -->
-<receiver
-    android:name=".AzanBootReceiver"
-    android:enabled="true"
-    android:exported="true">
-    <intent-filter>
-        <action android:name="android.intent.action.BOOT_COMPLETED" />
-        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-        <!-- Tambah sekali ini supaya auto-jadual semula bila siap install kemas kini APK -->
-        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-    </intent-filter>
-</receiver>
-        
-        <!-- Receiver penerima isyarat cetusan waktu solat -->
+        <!-- Receiver Boot: Auto-jadual semula waktu solat bila telefon reboot / update APK -->
+        <receiver
+            android:name=".AzanBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Receiver penerima cetusan waktu solat -->
         <receiver
             android:name=".AzanAlarmReceiver"
             android:enabled="true"
@@ -93,7 +93,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- Servis memainkan audio azan pada saluran penggera berkeutamaan tinggi -->
+        <!-- Servis audio azan pada saluran STREAM_ALARM -->
         <service
             android:name=".AzanAudioService"
             android:enabled="true"
