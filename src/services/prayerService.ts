@@ -236,14 +236,19 @@ export function getPrayerDateObj(baseDate: Date, timeStr: string): Date {
   return d;
 }
 
+/**
+ * Mengira dan menentukan waktu seterusnya merangkumi kesemua 7 checkpoint (Imsak & Syuruk disertakan).
+ * Mengelakkan paparan negatif dan sentiasa beralih secara automatik.
+ */
 export function determineNextPrayer(
   prayerTimes: DayPrayerTimes,
   currentTime: Date = new Date()
 ): NextPrayerInfo {
   const now = currentTime.getTime();
 
-  for (let i = 0; i < OBLIGATORY_PRAYERS_ORDER.length; i++) {
-    const key = OBLIGATORY_PRAYERS_ORDER[i];
+  // 1. Semak kesemua 7 waktu hari ini mengikut susunan rasmi PRAYER_KEYS_ORDER
+  for (let i = 0; i < PRAYER_KEYS_ORDER.length; i++) {
+    const key = PRAYER_KEYS_ORDER[i];
     const timeStr = prayerTimes?.times?.[key] || '00:00';
     const prayerDate = getPrayerDateObj(currentTime, timeStr);
 
@@ -258,7 +263,8 @@ export function determineNextPrayer(
           ? `${hours}j ${mins}m ${secs}s`
           : `${mins}m ${secs}s`;
 
-      const prevKey = i > 0 ? OBLIGATORY_PRAYERS_ORDER[i - 1] : 'isyak';
+      // Jika waktu seterusnya ialah Imsak hari ini (antara 00:00 hingga Imsak), waktu sebelumnya ialah Isyak semalam
+      const prevKey = i > 0 ? PRAYER_KEYS_ORDER[i - 1] : 'isyak';
 
       return {
         nextKey: key,
@@ -277,23 +283,24 @@ export function determineNextPrayer(
     }
   }
 
-  // Jika semua waktu solat hari ini telah berlalu (selepas Isyak), anjak ke Subuh esok
-  const tomorrowSubuhStr = prayerTimes?.times?.subuh || '05:00';
-  const tomorrowSubuh = getPrayerDateObj(currentTime, tomorrowSubuhStr);
-  tomorrowSubuh.setDate(tomorrowSubuh.getDate() + 1);
-  const remainingSec = Math.max(0, Math.floor((tomorrowSubuh.getTime() - now) / 1000));
+  // 2. Jika semua 7 waktu hari ini telah berlalu (selepas waktu Isyak), sasaran seterusnya ialah IMSAK HARI ESOK
+  const tomorrowImsakStr = prayerTimes?.times?.imsak || '05:00';
+  const tomorrowImsak = getPrayerDateObj(currentTime, tomorrowImsakStr);
+  tomorrowImsak.setDate(tomorrowImsak.getDate() + 1);
+
+  const remainingSec = Math.max(0, Math.floor((tomorrowImsak.getTime() - now) / 1000));
   const hours = Math.floor(remainingSec / 3600);
   const mins = Math.floor((remainingSec % 3600) / 60);
   const secs = remainingSec % 60;
 
   return {
-    nextKey: 'subuh',
-    nextLabel: PRAYER_LABELS.subuh,
-    nextTime: tomorrowSubuhStr,
-    nextTimeStr: tomorrowSubuhStr,
-    nextDisplayTime: formatDisplayTime(tomorrowSubuhStr),
-    targetDate: tomorrowSubuh,
-    targetTimestamp: tomorrowSubuh.getTime(),
+    nextKey: 'imsak',
+    nextLabel: PRAYER_LABELS.imsak,
+    nextTime: tomorrowImsakStr,
+    nextTimeStr: tomorrowImsakStr,
+    nextDisplayTime: formatDisplayTime(tomorrowImsakStr),
+    targetDate: tomorrowImsak,
+    targetTimestamp: tomorrowImsak.getTime(),
     remainingSeconds: remainingSec,
     countdownFormatted: `${hours}j ${mins}m ${secs}s`,
     currentKey: 'isyak',
