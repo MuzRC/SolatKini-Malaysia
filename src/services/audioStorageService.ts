@@ -1,6 +1,8 @@
+import { Capacitor } from '@capacitor/core';
+
 /**
  * IndexedDB audio caching and download manager for SolatKini Azan MP3 files.
- * Allows users to download audio to device storage and cache it locally for 100% offline playback.
+ * Membolehkan pengguna memuat turun audio azan ke storan peranti untuk mainan 100% luar talian.
  */
 
 const DB_NAME = 'solatkini_audio_db';
@@ -21,14 +23,16 @@ class AudioStorageService {
         const currentVer = localStorage.getItem('solatkini_audio_cache_version');
         if (currentVer !== CACHE_VERSION) {
           console.info('[AudioStorage] Versi cache audio diperbaharui. Mengosongkan data lama...');
-          this.clearAllAudioCache().then(() => {
-            localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
-          }).catch(() => {
-            localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
-          });
+          this.clearAllAudioCache()
+            .then(() => {
+              localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
+            })
+            .catch(() => {
+              localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
+            });
         }
       } catch {
-        // ignore localStorage errors
+        // Abaikan ralat localStorage
       }
     }
   }
@@ -38,7 +42,7 @@ class AudioStorageService {
 
     this.dbPromise = new Promise((resolve, reject) => {
       if (typeof window === 'undefined' || !window.indexedDB) {
-        reject(new Error('IndexedDB not supported in this environment'));
+        reject(new Error('IndexedDB tidak disokong di dalam persekitaran ini'));
         return;
       }
 
@@ -56,6 +60,7 @@ class AudioStorageService {
       };
 
       request.onerror = (e) => {
+        this.dbPromise = null; // Tetapkan semula agar boleh dicuba semula
         reject((e.target as IDBOpenDBRequest).error);
       };
     });
@@ -65,8 +70,8 @@ class AudioStorageService {
 
   public isValidAudioBlob(blob: Blob | null | undefined): boolean {
     if (!blob) return false;
-    // Valid MP3 vocal audio recordings are between 2.5MB and 4.5MB.
-    // If a blob is under 200KB or has a text/html content type, it is a failed HTML response.
+    // Rakaman vokal azan sah biasanya bersaiz antara 1.5MB hingga 5MB.
+    // Jika blob kurang daripada 200KB atau jenis teks/html, ia adalah respon SPA fallback yang rosak.
     if (blob.size < 200_000) return false;
     if (blob.type && (blob.type.includes('text') || blob.type.includes('html'))) return false;
     return true;
@@ -100,7 +105,7 @@ class AudioStorageService {
           const blob = req.result as Blob | undefined;
           if (blob) {
             if (!this.isValidAudioBlob(blob)) {
-              console.warn(`[AudioStorage] Blob rosak/bukan audio dikesan bagi '${voiceId}' (${blob.size} bytes). Memadamkan dari memori.`);
+              console.warn(`[AudioStorage] Blob rosak dikesan bagi '${voiceId}' (${blob.size} bytes). Memadamkan dari memori.`);
               this.removeAudioBlob(voiceId);
               resolve(null);
               return;
@@ -138,7 +143,7 @@ class AudioStorageService {
         req.onerror = () => reject(req.error);
       });
     } catch {
-      // ignore
+      // Abaikan
     }
   }
 
@@ -151,7 +156,7 @@ class AudioStorageService {
         const req = store.clear();
 
         req.onsuccess = () => {
-          console.info('[AudioStorage] Semua memori cache audio telah berjaya dikosongkan.');
+          console.info('[AudioStorage] Semua memori cache audio berjaya dikosongkan.');
           resolve();
         };
         req.onerror = () => reject(req.error);
@@ -193,14 +198,14 @@ class AudioStorageService {
   }
 
   /**
-   * Helper to load audio blob reliably across modern browsers and Android WebViews.
-   * Uses standard fetch first, with XMLHttpRequest blob fallback to guarantee local asset reading.
+   * Pembantu muat turun blob audio dengan sokongan penjejakan peratusan
+   * serta tapisan Content-Type untuk mengelak fail HTML tersimpan.
    */
   private async fetchAudioBlobWithFallback(
     url: string,
     onProgress?: (progressPercent: number) => void
   ): Promise<Blob> {
-    // 1. Try standard fetch with progress reader
+    // 1. Cuba kaedah fetch standard
     try {
       const targetUrl = url.startsWith('/') && typeof window !== 'undefined'
         ? new URL(url, window.location.href).href
@@ -208,6 +213,12 @@ class AudioStorageService {
 
       const response = await fetch(targetUrl);
       if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        // Sekat jika pelayan memulangkan HTML (SPA routing 404 fallback)
+        if (contentType.includes('text/html') || contentType.includes('text/plain')) {
+          throw new Error('Pelayan memulangkan format HTML dan bukannya audio MP3.');
+        }
+
         const contentLength = +(response.headers.get('Content-Length') || 0);
         if (response.body && contentLength > 0 && onProgress) {
           const reader = response.body.getReader();
@@ -220,15 +231,15 @@ class AudioStorageService {
             received += value.length;
             onProgress(Math.min(100, Math.round((received / contentLength) * 100)));
           }
-          return new Blob(chunks as any[], { type: 'audio/mpeg' });
+          return new Blob(chunks, { type: 'audio/mpeg' });
         }
         return await response.blob();
       }
     } catch (err) {
-      console.warn(`[AudioStorage] Standard fetch gagal bagi ${url}, mencuba XMLHttpRequest:`, err);
+      console.warn(`[AudioStorage] Fetch gagal bagi ${url}, mencuba XMLHttpRequest:`, err);
     }
 
-    // 2. Fallback: XMLHttpRequest with responseType = 'blob' (Works 100% in Android WebView for assets)
+    // 2. Sandaran: XMLHttpRequest dengan responseType = 'blob'
     return new Promise((resolve, reject) => {
       try {
         const xhr = new XMLHttpRequest();
@@ -245,19 +256,19 @@ class AudioStorageService {
         }
 
         xhr.onload = () => {
-          if (xhr.status === 200 || xhr.status === 0) { // status 0 is valid for local android_asset
+          if (xhr.status === 200 || xhr.status === 0) {
             const blob = xhr.response as Blob;
-            if (blob && blob.size > 100_000) {
+            if (blob && blob.size > 100_000 && !blob.type.includes('html')) {
               resolve(blob);
               return;
             }
           }
-          reject(new Error(`XHR status ${xhr.status}: ${xhr.statusText || 'Gagal memuat turun fail'}`));
+          reject(new Error(`XHR status ${xhr.status}: Format fail tidak sah`));
         };
 
         xhr.onerror = () => reject(new Error('Rangkaian terputus semasa memuat turun fail audio'));
         xhr.ontimeout = () => reject(new Error('Masa muat turun tamat (timeout)'));
-        xhr.timeout = 25000;
+        xhr.timeout = 30000;
         xhr.send();
       } catch (e) {
         reject(e);
@@ -266,8 +277,8 @@ class AudioStorageService {
   }
 
   /**
-   * Fetches an MP3 from local app storage or remote URL, caches it in IndexedDB for offline play,
-   * and optionally triggers a browser download dialog for the user.
+   * Memuat turun azan dan menyimpannya ke dalam IndexedDB.
+   * Dilengkapi rantaian sandaran automatik ke pautan CDN jika fail tempatan gagal atau tidak sah.
    */
   public async downloadAndCacheAzan(
     voiceId: string,
@@ -277,11 +288,11 @@ class AudioStorageService {
     onProgress?: (progressPercent: number) => void,
     fallbackUrl?: string
   ): Promise<Blob> {
-    // Check if already in cache
+    // 1. Semak sekiranya sudah ada dalam simpanan cache IndexedDB
     const existing = await this.getAudioBlob(voiceId);
     if (existing && this.isValidAudioBlob(existing)) {
       if (onProgress) onProgress(100);
-      if (saveToDisk && typeof window !== 'undefined') {
+      if (saveToDisk && typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
         this.triggerFileDownload(existing, filename);
       }
       return existing;
@@ -289,19 +300,24 @@ class AudioStorageService {
 
     let blob: Blob | null = null;
 
-    // Try primary URL
+    // 2. Cuba pautan utama (fail tempatan)
     try {
       blob = await this.fetchAudioBlobWithFallback(audioUrl, onProgress);
     } catch (primaryErr) {
-      console.warn(`[AudioStorage] Audio utama (${audioUrl}) gagal dimuat turun:`, primaryErr);
+      console.warn(`[AudioStorage] Audio utama (${audioUrl}) tidak dapat dimuat turun.`, primaryErr);
+    }
+
+    // 3. Jika pautan utama gagal atau menghasilkan blob tidak sah, beralih ke fallback CDN
+    if (!blob || !this.isValidAudioBlob(blob)) {
       if (fallbackUrl) {
+        console.info(`[AudioStorage] Beralih ke fallback CDN bagi '${voiceId}': ${fallbackUrl}`);
         try {
           blob = await this.fetchAudioBlobWithFallback(fallbackUrl, onProgress);
         } catch (fallbackErr) {
           throw new Error(`Gagal memuat turun fail azan (${filename}). Sila pastikan sambungan internet aktif.`);
         }
       } else {
-        throw primaryErr;
+        throw new Error(`Fail audio yang dimuat turun tidak sah atau tidak dijumpai.`);
       }
     }
 
@@ -309,11 +325,11 @@ class AudioStorageService {
       throw new Error(`Fail audio yang dimuat turun tidak sah. Sila cuba sekali lagi.`);
     }
 
-    // 1. Cache into IndexedDB for instantaneous offline play
+    // 4. Simpan ke dalam IndexedDB untuk mainan luar talian serta-merta
     await this.saveAudioBlob(voiceId, blob);
 
-    // 2. Trigger disk download if requested
-    if (saveToDisk && typeof window !== 'undefined') {
+    // 5. Muat turun ke disk pelayar (hanya jika di pelayar web biasa, bukan APK Android)
+    if (saveToDisk && typeof window !== 'undefined' && !Capacitor.isNativePlatform()) {
       this.triggerFileDownload(blob, filename);
     }
 
