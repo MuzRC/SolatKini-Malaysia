@@ -233,7 +233,7 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    // PendingIntent paparan aktiviti ke MainActivity
+                    // PendingIntent paparan aktiviti bila jam ditekan di lock screen
                     Intent showIntent = new Intent(context, MainActivity.class);
                     showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     PendingIntent showPendingIntent = PendingIntent.getActivity(
@@ -326,11 +326,7 @@ public class AzanAlarmPlugin extends Plugin {
                 serviceIntent.putExtra("is_test", true);
                 serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent);
-                } else {
-                    context.startService(serviceIntent);
-                }
+                ContextCompat.startForegroundService(context, serviceIntent);
             } else {
                 AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
                 Intent intent = new Intent(context, AzanAlarmReceiver.class);
@@ -407,6 +403,30 @@ public class AzanAlarmPlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Gagal menghentikan audio azan: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void getAzanDiagnosticLogs(PluginCall call) {
+        try {
+            String logsJson = AzanHistoryLogger.getLogsJson(getContext());
+            JSObject ret = new JSObject();
+            ret.put("logsJson", logsJson);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal mengambil log diagnostik azan: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void clearAzanDiagnosticLogs(PluginCall call) {
+        try {
+            AzanHistoryLogger.clearLogs(getContext());
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal mengosongkan log diagnostik: " + e.getMessage(), e);
         }
     }
 }
