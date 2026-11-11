@@ -30,17 +30,15 @@ public class MainActivity extends BridgeActivity {
         configureWakeAndLockScreen();
         super.onCreate(savedInstanceState);
 
-        // KUNCI PENTING: Paksa butang volume tepi telefon kawal saluran ALARM bila app dibuka
+        // Paksa butang volume tepi telefon mengawal suara ALARM bila app dibuka
         setVolumeControlStream(AudioManager.STREAM_ALARM);
 
-        handleAzanIntent(getIntent());
+        handleAzanIntent(getIntent(), true);
     }
 
     @Override
     public void onResume() {
         super.onResume();
-
-        // Pastikan setiap kali skrin kembali aktif, kawalan suara kekal pada saluran ALARM
         setVolumeControlStream(AudioManager.STREAM_ALARM);
 
         if (!permissionRequested) {
@@ -74,7 +72,7 @@ public class MainActivity extends BridgeActivity {
         setIntent(intent);
         configureWakeAndLockScreen();
         setVolumeControlStream(AudioManager.STREAM_ALARM);
-        handleAzanIntent(intent);
+        handleAzanIntent(intent, false);
     }
 
     private void configureWakeAndLockScreen() {
@@ -99,32 +97,39 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    private void handleAzanIntent(Intent intent) {
+    private void handleAzanIntent(Intent intent, boolean isColdStart) {
         if (intent == null) return;
 
-        String action = intent.getAction();
-        if (SolatWidgetPlugin.ACTION_SYNC_PRAYER.equals(action)) {
-            Log.i(TAG, "Menerima Intent Segerak Waktu Solat daripada widget notifikasi.");
-            if (getBridge() != null) {
+        Runnable sendEventTask = () -> {
+            if (getBridge() == null) return;
+
+            String action = intent.getAction();
+            if (SolatWidgetPlugin.ACTION_SYNC_PRAYER.equals(action)) {
+                Log.i(TAG, "Menerima Intent Segerak Waktu Solat daripada widget.");
                 getBridge().triggerWindowJSEvent("solatSyncRequested", "{}");
             }
-        }
 
-        boolean isAzanTrigger = intent.getBooleanExtra("azan_trigger", false);
-        if (isAzanTrigger) {
-            String prayerName = intent.getStringExtra("prayer_name");
-            String prayerKey = intent.getStringExtra("prayer_key");
-            String voice = intent.getStringExtra("voice");
+            boolean isAzanTrigger = intent.getBooleanExtra("azan_trigger", false);
+            if (isAzanTrigger) {
+                String prayerName = intent.getStringExtra("prayer_name");
+                String prayerKey = intent.getStringExtra("prayer_key");
+                String voice = intent.getStringExtra("voice");
 
-            Log.i(TAG, "Menerima Intent Azan untuk solat: " + prayerName);
+                Log.i(TAG, "Menerima Intent Azan untuk solat: " + prayerName);
 
-            if (getBridge() != null) {
                 JSObject data = new JSObject();
                 data.put("prayerName", prayerName != null ? prayerName : "Solat");
                 data.put("prayerKey", prayerKey != null ? prayerKey : "solat");
                 data.put("voice", voice != null ? voice : "jakim");
                 getBridge().triggerWindowJSEvent("azanAlarmTriggered", data.toString());
             }
+        };
+
+        // Jika cold start, tangguhkan 1.2 saat supaya React selesai pasang event listener
+        if (isColdStart) {
+            new Handler(Looper.getMainLooper()).postDelayed(sendEventTask, 1200);
+        } else {
+            sendEventTask.run();
         }
     }
 }
