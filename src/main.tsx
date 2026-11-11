@@ -1,9 +1,10 @@
-import {createRoot} from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 import App from './App.tsx';
 import './index.css';
 
-// Service worker for offline capability
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+// Hanya daftar Service Worker jika dibuka di pelayar web biasa (bukan di dalam APK native Android)
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
