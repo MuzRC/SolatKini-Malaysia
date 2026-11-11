@@ -3,9 +3,9 @@ package com.solatkini.app;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.os.PowerManager;
 import android.util.Log;
+import androidx.core.content.ContextCompat;
 
 public class AzanAlarmReceiver extends BroadcastReceiver {
     private static final String TAG = "AzanAlarmReceiver";
@@ -19,46 +19,59 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         String prayerKey = intent != null ? intent.getStringExtra("prayer_key") : "solat";
         String voice = intent != null ? intent.getStringExtra("voice") : "jakim";
 
-        if (prayerName == null) prayerName = "Solat";
-        if (prayerKey == null) prayerKey = "solat";
-        if (voice == null) voice = "jakim";
+        if (prayerName == null || prayerName.isEmpty()) prayerName = "Solat";
+        if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
+        if (voice == null || voice.isEmpty()) voice = "jakim";
 
-        // Tahan CPU selama 15 saat sahaja untuk memberi laluan servis bermula
-        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-        PowerManager.WakeLock wakeLock = null;
-        if (powerManager != null) {
-            wakeLock = powerManager.newWakeLock(
-                PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                "SolatKini::AlarmReceiverWakeLock"
+        boolean isTest = intent != null && intent.getBooleanExtra("is_test", false);
+        int autoStopSeconds = intent != null ? intent.getIntExtra("auto_stop_seconds", 0) : 0;
+
+        // Catat penggera dicetuskan ke dalam sejarah diagnostik
+        if (!isTest) {
+            AzanHistoryLogger.record(
+                context,
+                prayerName,
+                prayerKey,
+                AzanHistoryLogger.STATUS_TRIGGERED,
+                "AlarmManager mencetuskan azan tepat pada waktunya (Suara: " + voice.toUpperCase() + ")"
             );
-            wakeLock.acquire(15 * 1000L);
+        }
+
+        // Tahan CPU selama 15 saat supaya telefon tidak sempat tidur sebelum servis bermula
+        PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        if (powerManager != null) {
+            try {
+                PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+                    PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                    "SolatKini::AlarmReceiverWakeLock"
+                );
+                wakeLock.acquire(15 * 1000L);
+            } catch (Exception e) {
+                Log.w(TAG, "Gagal mengaktifkan WakeLock sementara", e);
+            }
         }
 
         try {
-            // Mulakan servis audio azan latar depan
+            // Hidupkan servis audio azan latar depan
             Intent serviceIntent = new Intent(context, AzanAudioService.class);
             serviceIntent.setAction(AzanAudioService.ACTION_PLAY_AZAN);
             serviceIntent.putExtra("prayer_name", prayerName);
             serviceIntent.putExtra("prayer_key", prayerKey);
             serviceIntent.putExtra("voice", voice);
-            if (intent != null) {
-                serviceIntent.putExtra("is_test", intent.getBooleanExtra("is_test", false));
-                serviceIntent.putExtra("auto_stop_seconds", intent.getIntExtra("auto_stop_seconds", 0));
-            }
+            serviceIntent.putExtra("is_test", isTest);
+            serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
-            // Gantikan blok ini:
-/*
-if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-    context.startForegroundService(serviceIntent);
-} else {
-    context.startService(serviceIntent);
-}
-*/
-
-// Kepada kaedah standard AndroidX (lebih selamat dan serasi merentas versi Android):
-androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent);
+            ContextCompat.startForegroundService(context, serviceIntent);
+            Log.i(TAG, "Servis AzanAudioService berjaya diarahkan mula.");
         } catch (Exception e) {
             Log.e(TAG, "Ralat menghidupkan servis audio azan", e);
+            AzanHistoryLogger.record(
+                context,
+                prayerName,
+                prayerKey,
+                AzanHistoryLogger.STATUS_FAILED,
+                "Gagal memulakan servis audio: " + e.getMessage()
+            );
         }
     }
 }
