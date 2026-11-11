@@ -26,8 +26,8 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         boolean isTest = intent != null && intent.getBooleanExtra("is_test", false);
         int autoStopSeconds = intent != null ? intent.getIntExtra("auto_stop_seconds", 0) : 0;
 
-        // Catat penggera dicetuskan ke dalam sejarah diagnostik
         if (!isTest) {
+            // 1. Catat penggera dicetuskan ke dalam sejarah diagnostik
             AzanHistoryLogger.record(
                 context,
                 prayerName,
@@ -35,6 +35,9 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 AzanHistoryLogger.STATUS_TRIGGERED,
                 "AlarmManager mencetuskan azan tepat pada waktunya (Suara: " + voice.toUpperCase() + ")"
             );
+
+            // 2. Anjakkan pemasa notifikasi ke waktu solat seterusnya serta-merta (Elak kiraan negatif)
+            SolatWidgetPlugin.advanceToNextPrayer(context);
         }
 
         // Tahan CPU selama 15 saat supaya telefon tidak sempat tidur sebelum servis bermula
