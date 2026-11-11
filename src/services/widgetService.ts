@@ -20,6 +20,7 @@ interface SolatWidgetPluginInterface {
     next_label: string;
     next_time: string;
     countdown?: string;
+    next_timestamp: number;
     target_timestamp?: number;
     subuh: string;
     zohor: string;
@@ -101,33 +102,43 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
 
-      // Tentukan target timestamp (milisaat) secara defensif
-      let targetTimestamp = 0;
-      if (nextPrayer && (nextPrayer as any).targetDate) {
-        targetTimestamp = new Date((nextPrayer as any).targetDate).getTime();
-      } else if (nextPrayer && (nextPrayer as any).nextTime) {
-        const parts = (nextPrayer as any).nextTime.split(':');
-        if (parts.length >= 2) {
-          const target = new Date();
-          target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
-          if (target.getTime() <= now.getTime()) {
-            target.setDate(target.getDate() + 1);
+      // 1. Kira nilai milisaat (timestamp epoch) waktu solat seterusnya secara defensif
+      let nextTimestamp = 0;
+      if (nextPrayer) {
+        if ((nextPrayer as any).targetDate) {
+          const parsed = new Date((nextPrayer as any).targetDate).getTime();
+          if (!isNaN(parsed) && parsed > now.getTime()) {
+            nextTimestamp = parsed;
           }
-          targetTimestamp = target.getTime();
+        }
+
+        // Sandaran jika targetDate tiada atau format rentetan berbeza
+        if (!nextTimestamp && (nextPrayer as any).nextTime) {
+          const parts = (nextPrayer as any).nextTime.split(':');
+          if (parts.length >= 2) {
+            const target = new Date();
+            target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+            if (target.getTime() <= now.getTime()) {
+              target.setDate(target.getDate() + 1); // Anjak ke Subuh hari esok jika melepasi Isyak
+            }
+            nextTimestamp = target.getTime();
+          }
         }
       }
 
-      // Ekstrak nama daerah secara defensif mengelakkan TypeError
+      // 2. Ekstrak nama daerah secara defensif
       const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
       const zoneLabel = daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
 
+      // 3. Bentuk payload lengkap bersama dwi-kunci (next_timestamp & target_timestamp)
       const payload = {
         zone: zoneLabel,
         hijri: hijriFormatted || '',
         next_label: nextLabel,
         next_time: nextTime,
         countdown: countdown,
-        target_timestamp: targetTimestamp,
+        next_timestamp: nextTimestamp,
+        target_timestamp: nextTimestamp,
         subuh: formatDisplayTime(prayerTimes.times.subuh),
         zohor: formatDisplayTime(prayerTimes.times.zohor),
         asar: formatDisplayTime(prayerTimes.times.asar),
@@ -151,7 +162,7 @@ export class WidgetService {
 
       if (this.isAndroid()) {
         await SolatWidget.updatePersistentNotification(payload);
-        console.info('[WidgetService] Notifikasi tetap dihantar:', payload.zone);
+        console.info('[WidgetService] Notifikasi tetap dihantar bersama pemasa undur:', nextTimestamp);
       }
     } catch (err) {
       console.warn('[WidgetService] Ralat mengemaskini notifikasi tetap:', err);
