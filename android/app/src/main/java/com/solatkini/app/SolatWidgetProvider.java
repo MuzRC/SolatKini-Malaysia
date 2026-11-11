@@ -11,7 +11,8 @@ import android.widget.RemoteViews;
 
 public class SolatWidgetProvider extends AppWidgetProvider {
 
-    public static final String ACTION_UPDATE_PRAYER_TIMES = "com.solatkini.app.UPDATE_PRAYER_TIMES";
+    // Diselaraskan tepat dengan deklarasi di AndroidManifest.xml
+    public static final String ACTION_UPDATE_PRAYER_TIMES = "com.solatkini.app.ACTION_UPDATE_PRAYER_TIMES";
     private static final String PREFS_NAME = "SolatKiniWidgetPrefs";
 
     @Override
@@ -43,9 +44,9 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_maghrib, maghrib);
         views.setTextViewText(R.id.widget_isyak, isyak);
 
-        // Click on widget opens SolatKini app
+        // Tekan mana-mana bahagian widget untuk buka aplikasi SolatKini
         Intent intent = new Intent(context, MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
             context,
             0,
@@ -57,11 +58,28 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 
+    /**
+     * Kaedah statik untuk kemas kini kesemua widget aktif sekali gus
+     * (Boleh dipanggil oleh BootReceiver atau servis latar belakang)
+     */
+    public static void updateAllWidgets(Context context) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            ComponentName thisWidget = new ComponentName(context, SolatWidgetProvider.class);
+            int[] appWidgetIds = manager.getAppWidgetIds(thisWidget);
+            if (appWidgetIds != null && appWidgetIds.length > 0) {
+                for (int appWidgetId : appWidgetIds) {
+                    updateAppWidget(context, manager, appWidgetId);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
 
-        if (ACTION_UPDATE_PRAYER_TIMES.equals(intent.getAction())) {
+        if (intent != null && ACTION_UPDATE_PRAYER_TIMES.equals(intent.getAction())) {
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             SharedPreferences.Editor editor = prefs.edit();
 
@@ -75,12 +93,7 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             if (intent.hasExtra("isyak")) editor.putString("isyak", intent.getStringExtra("isyak"));
             editor.apply();
 
-            AppWidgetManager manager = AppWidgetManager.getInstance(context);
-            ComponentName thisWidget = new ComponentName(context, SolatWidgetProvider.class);
-            int[] appWidgetIds = manager.getAppWidgetIds(thisWidget);
-            for (int appWidgetId : appWidgetIds) {
-                updateAppWidget(context, manager, appWidgetId);
-            }
+            updateAllWidgets(context);
         }
     }
 }
