@@ -243,12 +243,22 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
-                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                    } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
-                    }
+                    // Sediakan intent bila user tekan jam penggera di status bar/lock screen
+Intent showIntent = new Intent(context, MainActivity.class);
+showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+PendingIntent showPendingIntent = PendingIntent.getActivity(
+    context,
+    requestCode + 10000,
+    showIntent,
+    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+);
+
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+    AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
+    alarmManager.setAlarmClock(clockInfo, pendingIntent);
+} else {
+    alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+}
                     scheduledCount++;
                     Log.i(TAG, "Penggera solat (" + prayerName + ") berjaya dijadualkan melalui setAlarmClock pada: " + timestamp);
                 }
