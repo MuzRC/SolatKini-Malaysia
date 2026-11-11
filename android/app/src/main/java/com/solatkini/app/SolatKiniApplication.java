@@ -25,12 +25,13 @@ public class SolatKiniApplication extends Application {
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager == null) return;
 
-            // Padamkan saluran azan versi lama supaya sistem tidak keliru
+            // Padamkan saluran versi lama supaya sistem tidak keliru dengan tetapan lapuk
             try {
                 manager.deleteNotificationChannel("solatkini_azan_channel");
                 manager.deleteNotificationChannel("solatkini_azan_channel_v2");
                 manager.deleteNotificationChannel("solatkini_azan_channel_v3");
                 manager.deleteNotificationChannel("solatkini_persistent_channel");
+                manager.deleteNotificationChannel("solatkini_top_widget_channel");
             } catch (Exception ignored) {}
 
             // 1. Saluran Penggera Azan (Audio dimainkan secara eksklusif oleh MediaPlayer STREAM_ALARM)
@@ -57,7 +58,7 @@ public class SolatKiniApplication extends Application {
             reminderChannel.enableVibration(true);
             reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
-            // 3. Saluran Notifikasi Tetap Waktu Solat Teratas (Widget Top Bar)
+            // 3. Saluran Notifikasi Tetap Waktu Solat Teratas (Widget Top Bar & Chronometer Pemasa Undur)
             NotificationChannel persistentChannel = new NotificationChannel(
                 PERSISTENT_CHANNEL_ID,
                 "Widget Bar 5 Waktu Solat Teratas",
@@ -75,7 +76,7 @@ public class SolatKiniApplication extends Application {
             manager.createNotificationChannel(reminderChannel);
             manager.createNotificationChannel(persistentChannel);
 
-            Log.i(TAG, "Semua saluran notifikasi Android (" + AZAN_CHANNEL_ID + ") berjaya didaftarkan ke sistem operasi.");
+            Log.i(TAG, "Semua saluran notifikasi Android (" + AZAN_CHANNEL_ID + ", " + PERSISTENT_CHANNEL_ID + ") berjaya didaftarkan.");
         }
     }
 }
