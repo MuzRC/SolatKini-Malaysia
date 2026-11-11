@@ -19,9 +19,10 @@ public class AzanBootReceiver extends BroadcastReceiver {
         String action = intent != null ? intent.getAction() : "";
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
             "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
-            "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
+            "com.htc.intent.action.QUICKBOOT_POWERON".equals(action) ||
+            Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
 
-            Log.i(TAG, "Peranti dihidupkan semula (Boot Completed). Menjadualkan semula penggera solat...");
+            Log.i(TAG, "Peranti dihidupkan semula (" + action + "). Menjadualkan semula penggera solat...");
             rescheduleStoredAlarms(context);
         }
     }
@@ -47,7 +48,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 String prayerName = obj.optString("prayerName", "Solat");
                 String voice = obj.optString("voice", "jakim");
                 long timestamp = obj.optLong("timestamp", 0);
-                int requestCode = obj.optInt("requestCode", 1000 + i);
+                int requestCode = obj.optInt("requestCode", 2000 + i);
 
                 // Hanya jadualkan waktu solat yang masih belum lepas
                 if (timestamp > now) {
@@ -64,11 +65,19 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
+                    // PendingIntent paparan bila user tekan jam di lock screen
+                    Intent showIntent = new Intent(context, MainActivity.class);
+                    showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                    PendingIntent showPendingIntent = PendingIntent.getActivity(
+                        context,
+                        requestCode + 10000,
+                        showIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                    );
+
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, pendingIntent);
+                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
                         alarmManager.setAlarmClock(clockInfo, pendingIntent);
-                    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
