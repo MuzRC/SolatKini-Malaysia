@@ -135,7 +135,7 @@ export default function App() {
     voice: 'jakim',
   });
 
-  // Fungsi pembantu untuk menjadualkan penggera ke sistem Android
+  // Fungsi pembantu untuk menjadualkan penggera ke AlarmManager Android
   const syncAlarmsToNative = (times: DayPrayerTimes, voice: AzanVoice) => {
     if (!times) return;
     try {
@@ -176,6 +176,34 @@ export default function App() {
       nativeAlarmService.schedulePrayers(list, voice, enabledMap);
     } catch (e) {
       console.warn('Gagal menjadualkan penggera dari App:', e);
+    }
+  };
+
+  // Fungsi segerak penuh ke Widget Skrin & Pemasa Notifikasi Tetap Android
+  const syncWidgetsAndNotifications = async (
+    times: DayPrayerTimes,
+    zone: JakimZone,
+    isPersistentEnabled: boolean
+  ) => {
+    if (!times || !zone) return;
+    try {
+      const hijri = getHijriDate(new Date());
+      // 1. Kemaskini Home Screen Widget
+      await widgetService.syncWidget(times, zone);
+
+      // 2. Kemaskini Top Bar Persistent Notification bersama Chronometer Countdown
+      if (isPersistentEnabled) {
+        await widgetService.syncPersistentNotification(
+          times,
+          zone,
+          hijri.formatted,
+          true
+        );
+      } else {
+        await widgetService.cancelPersistentNotification();
+      }
+    } catch (e) {
+      console.warn('Gagal segerak widget/notifikasi dari App:', e);
     }
   };
 
@@ -227,7 +255,7 @@ export default function App() {
     }
   }, [showOnboarding]);
 
-  // 2. Muat data waktu solat & jadualkan penggera natif (dilengkapi blok .catch)
+  // 2. Muat data waktu solat, jadualkan penggera, dan segerakkan notifikasi pemasa
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
@@ -241,6 +269,7 @@ export default function App() {
           setIsLoading(false);
           if (data.times) {
             syncAlarmsToNative(data.times, selectedVoice);
+            syncWidgetsAndNotifications(data.times, safeZone, persistentNotification);
           }
         }
       })
@@ -258,7 +287,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentZone, selectedVoice]);
+  }, [currentZone, selectedVoice, persistentNotification]);
 
   // 3. Semakan anjakan hari tengah malam (00:00 Auto-Refresh)
   useEffect(() => {
@@ -274,6 +303,7 @@ export default function App() {
               setPrayerData(data);
               if (data.times) {
                 syncAlarmsToNative(data.times, selectedVoice);
+                syncWidgetsAndNotifications(data.times, safeZone, persistentNotification);
               }
             }
           })
@@ -281,7 +311,7 @@ export default function App() {
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [currentZone, selectedVoice]);
+  }, [currentZone, selectedVoice, persistentNotification]);
 
   const handleLiveSync = async () => {
     setIsLiveSyncing(true);
@@ -292,6 +322,7 @@ export default function App() {
         setPrayerData(data);
         if (data.times) {
           syncAlarmsToNative(data.times, selectedVoice);
+          await syncWidgetsAndNotifications(data.times, safeZone, persistentNotification);
         }
       }
     } catch (e) {
@@ -393,14 +424,9 @@ export default function App() {
         localStorage.setItem('solatkini_notif_settings', JSON.stringify(parsed));
       } catch {}
     }
-    if (prayerData && prayerData.times && currentZone) {
-      const hijri = getHijriDate(new Date());
-      await widgetService.syncPersistentNotification(
-        prayerData.times,
-        currentZone,
-        hijri.formatted,
-        nextVal
-      );
+    const safeZone = currentZone || DEFAULT_ZONE;
+    if (prayerData && prayerData.times) {
+      await syncWidgetsAndNotifications(prayerData.times, safeZone, nextVal);
     }
   };
 
