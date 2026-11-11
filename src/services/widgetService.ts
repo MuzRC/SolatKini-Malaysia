@@ -102,24 +102,26 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
 
-      // 1. Kira nilai milisaat (timestamp epoch) waktu solat seterusnya secara defensif
+      // 1. Dapatkan nilai milisaat terus daripada targetTimestamp atau targetDate (bersih tanpa 'as any')
       let nextTimestamp = 0;
       if (nextPrayer) {
-        if ((nextPrayer as any).targetDate) {
-          const parsed = new Date((nextPrayer as any).targetDate).getTime();
+        if (nextPrayer.targetTimestamp && nextPrayer.targetTimestamp > now.getTime()) {
+          nextTimestamp = nextPrayer.targetTimestamp;
+        } else if (nextPrayer.targetDate) {
+          const parsed = new Date(nextPrayer.targetDate).getTime();
           if (!isNaN(parsed) && parsed > now.getTime()) {
             nextTimestamp = parsed;
           }
         }
 
-        // Sandaran jika targetDate tiada atau format rentetan berbeza
-        if (!nextTimestamp && (nextPrayer as any).nextTime) {
-          const parts = (nextPrayer as any).nextTime.split(':');
+        // Sandaran tambahan jika pengiraan masa terlepas
+        if (!nextTimestamp && nextPrayer.nextTime) {
+          const parts = nextPrayer.nextTime.split(':');
           if (parts.length >= 2) {
             const target = new Date();
             target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
             if (target.getTime() <= now.getTime()) {
-              target.setDate(target.getDate() + 1); // Anjak ke Subuh hari esok jika melepasi Isyak
+              target.setDate(target.getDate() + 1); // Anjak ke Subuh esok
             }
             nextTimestamp = target.getTime();
           }
