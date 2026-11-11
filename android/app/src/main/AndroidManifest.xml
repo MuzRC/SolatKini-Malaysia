@@ -69,19 +69,19 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Receiver Boot untuk jadualkan semula azan selepas telefon hidup semula -->
-        <receiver
-            android:name=".BootReceiver"
-            android:enabled="true"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-                <!-- Tambah action ni: jadualkan semula bila app dikemaskini/install APK baru -->
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
+        <!-- Gantikan .BootReceiver kepada .AzanBootReceiver -->
+<receiver
+    android:name=".AzanBootReceiver"
+    android:enabled="true"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+        <!-- Tambah sekali ini supaya auto-jadual semula bila siap install kemas kini APK -->
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+    </intent-filter>
+</receiver>
         
         <!-- Receiver penerima isyarat cetusan waktu solat -->
         <receiver
