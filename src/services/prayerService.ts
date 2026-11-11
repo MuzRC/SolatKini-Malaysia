@@ -15,8 +15,8 @@ export const getLocalDateString = (d: Date = new Date()): string => {
 };
 
 function getSafeZoneCoordinates(zone: JakimZone): { lat: number; lng: number } {
-  const lat = typeof (zone as any).lat === 'number' && !isNaN((zone as any).lat) ? (zone as any).lat : 5.347;
-  const lng = typeof (zone as any).lng === 'number' && !isNaN((zone as any).lng) ? (zone as any).lng : 115.743;
+  const lat = typeof (zone as any)?.lat === 'number' && !isNaN((zone as any).lat) ? (zone as any).lat : 5.347;
+  const lng = typeof (zone as any)?.lng === 'number' && !isNaN((zone as any).lng) ? (zone as any).lng : 115.743;
   return { lat, lng };
 }
 
@@ -66,7 +66,8 @@ export async function fetchDayPrayerTimes(
   if (isNetworkOnline) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      // Dilanjutkan ke 7 saat agar stabil pada sambungan selular 4G kawasan luar bandar
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
 
       const res = await fetch(`https://api.waktusolat.app/v2/solat/${zone.code}`, {
         signal: controller.signal,
@@ -188,9 +189,11 @@ export async function fetchDayPrayerTimes(
 export interface NextPrayerInfo {
   nextKey: PrayerKey;
   nextLabel: string;
-  nextTimeStr: string;
-  nextDisplayTime: string;
-  targetTimestamp: number; // <--- DITAMBAH: Epoch ms tepat untuk pemasa Android
+  nextTime: string;          // "13:15" (Format 24 jam rasmi)
+  nextTimeStr: string;       // Alias sandaran untuk keserasian kod terdahulu
+  nextDisplayTime: string;   // "1:15 PM"
+  targetDate: Date;          // Objek Date sebenar
+  targetTimestamp: number;   // Epoch milisaat tepat untuk pemasa Android
   remainingSeconds: number;
   countdownFormatted: string;
   currentKey: PrayerKey;
@@ -260,9 +263,11 @@ export function determineNextPrayer(
       return {
         nextKey: key,
         nextLabel: PRAYER_LABELS[key],
+        nextTime: timeStr,
         nextTimeStr: timeStr,
         nextDisplayTime: formatDisplayTime(timeStr),
-        targetTimestamp: prayerDate.getTime(), // <--- DITAMBAH: ms tepat hari ini
+        targetDate: prayerDate,
+        targetTimestamp: prayerDate.getTime(),
         remainingSeconds: remainingSec,
         countdownFormatted: countdown,
         currentKey: prevKey,
@@ -272,6 +277,7 @@ export function determineNextPrayer(
     }
   }
 
+  // Jika semua waktu solat hari ini telah berlalu (selepas Isyak), anjak ke Subuh esok
   const tomorrowSubuhStr = prayerTimes?.times?.subuh || '05:00';
   const tomorrowSubuh = getPrayerDateObj(currentTime, tomorrowSubuhStr);
   tomorrowSubuh.setDate(tomorrowSubuh.getDate() + 1);
@@ -283,9 +289,11 @@ export function determineNextPrayer(
   return {
     nextKey: 'subuh',
     nextLabel: PRAYER_LABELS.subuh,
+    nextTime: tomorrowSubuhStr,
     nextTimeStr: tomorrowSubuhStr,
     nextDisplayTime: formatDisplayTime(tomorrowSubuhStr),
-    targetTimestamp: tomorrowSubuh.getTime(), // <--- DITAMBAH: ms tepat Subuh esok
+    targetDate: tomorrowSubuh,
+    targetTimestamp: tomorrowSubuh.getTime(),
     remainingSeconds: remainingSec,
     countdownFormatted: `${hours}j ${mins}m ${secs}s`,
     currentKey: 'isyak',
