@@ -46,11 +46,17 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 serviceIntent.putExtra("auto_stop_seconds", intent.getIntExtra("auto_stop_seconds", 0));
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent);
-            } else {
-                context.startService(serviceIntent);
-            }
+            // Gantikan blok ini:
+/*
+if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    context.startForegroundService(serviceIntent);
+} else {
+    context.startService(serviceIntent);
+}
+*/
+
+// Kepada kaedah standard AndroidX (lebih selamat dan serasi merentas versi Android):
+androidx.core.content.ContextCompat.startForegroundService(context, serviceIntent);
         } catch (Exception e) {
             Log.e(TAG, "Ralat menghidupkan servis audio azan", e);
         }
