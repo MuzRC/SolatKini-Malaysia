@@ -20,10 +20,22 @@ export interface DayPrayerTimes {
 
 export interface JakimZone {
   code: string;
-  state: string;
+  state?: string;      // Sokong kedua-dua penamaan BI & BM
+  negeri?: string;     // Mengelakkan ralat TS pada DEFAULT_ZONE & App.tsx
   daerah: string;
   lat: number;
   lng: number;
+}
+
+export interface NextPrayerInfo {
+  nextKey: PrayerKey;
+  nextLabel: string;
+  nextTime: string;           // "13:15"
+  nextDisplayTime: string;    // "1:15 PM"
+  targetDate?: Date | string | number;
+  countdownFormatted?: string;// "01:25:30"
+  diffMinutes?: number;
+  diffMs?: number;
 }
 
 export type AzanVoice =
