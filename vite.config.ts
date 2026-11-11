@@ -11,10 +11,22 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // Paksa Vite bina semula (re-bundle) semua library yang hilang dalam .vite/deps
+    optimizeDeps: {
+      force: true,
+      include: [
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react/jsx-runtime',
+        'lucide-react',
+        '@capacitor/core',
+        'recharts',
+      ],
+    },
     server: {
-      // Matikan WebSocket HMR sepenuhnya untuk elak ralat sambungan di Cloud Run AI Studio
-      hmr: false,
-      watch: null,
+      hmr: process.env.DISABLE_HMR !== 'true',
+      watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };
 });
