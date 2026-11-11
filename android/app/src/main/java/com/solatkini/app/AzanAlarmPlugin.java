@@ -3,12 +3,14 @@ package com.solatkini.app;
 import android.Manifest;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 import android.provider.Settings;
 import android.util.Log;
 import androidx.core.app.ActivityCompat;
@@ -99,122 +101,6 @@ public class AzanAlarmPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    @PluginMethod
-    public void isBatteryOptimized(PluginCall call) {
-        Context context = getContext();
-        boolean isIgnoring = true;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
-                isIgnoring = pm.isIgnoringBatteryOptimizations(context.getPackageName());
-            }
-        }
-        JSObject ret = new JSObject();
-        ret.put("isIgnoringBatteryOptimizations", isIgnoring);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void requestIgnoreBatteryOptimization(PluginCall call) {
-        Context context = getContext();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                intent.setData(Uri.parse("package:" + context.getPackageName()));
-                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(intent);
-                JSObject ret = new JSObject();
-                ret.put("opened", true);
-                call.resolve(ret);
-                return;
-            } catch (Exception e) {
-                Log.w(TAG, "Gagal membuka dialog pengecualian bateri khusus", e);
-            }
-        }
-
-        try {
-            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(intent);
-            JSObject ret = new JSObject();
-            ret.put("opened", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal membuka tetapan bateri: " + e.getMessage());
-        }
-    }
-
-    @PluginMethod
-    public void openAutostartSettings(PluginCall call) {
-        Context context = getContext();
-        String brand = Build.MANUFACTURER.toLowerCase();
-        Intent intent = new Intent();
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-        try {
-            if (brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco")) {
-                intent.setComponent(new android.content.ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
-            } else if (brand.contains("oppo") || brand.contains("realme")) {
-                intent.setComponent(new android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
-            } else if (brand.contains("vivo")) {
-                intent.setComponent(new android.content.ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
-            } else if (brand.contains("huawei") || brand.contains("honor")) {
-                intent.setComponent(new android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"));
-            } else {
-                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                intent.setData(Uri.parse("package:" + context.getPackageName()));
-            }
-            context.startActivity(intent);
-            JSObject ret = new JSObject();
-            ret.put("opened", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            // Fallback ke tetapan app biasa jika jenama telefon guna laluan berbeza
-            try {
-                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                fallback.setData(Uri.parse("package:" + context.getPackageName()));
-                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(fallback);
-                JSObject ret = new JSObject();
-                ret.put("opened", true);
-                call.resolve(ret);
-            } catch (Exception err) {
-                call.reject("Tidak dapat membuka tetapan permulaan automatik: " + err.getMessage());
-            }
-        }
-    }
-
-    @PluginMethod
-    public void checkAutoTime(PluginCall call) {
-        Context context = getContext();
-        boolean autoTime = true;
-        boolean autoTimeZone = true;
-
-        try {
-            autoTime = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME, 1) == 1;
-            autoTimeZone = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME_ZONE, 1) == 1;
-        } catch (Exception ignored) {}
-
-        JSObject ret = new JSObject();
-        ret.put("isAutoTimeEnabled", autoTime);
-        ret.put("isAutoTimeZoneEnabled", autoTimeZone);
-        call.resolve(ret);
-    }
-
-    @PluginMethod
-    public void openDateSettings(PluginCall call) {
-        try {
-            Intent intent = new Intent(Settings.ACTION_DATE_SETTINGS);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(intent);
-            JSObject ret = new JSObject();
-            ret.put("opened", true);
-            call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal membuka tetapan tarikh & masa: " + e.getMessage());
-        }
-    }
-    
     @PermissionCallback
     public void notificationCallback(PluginCall call) {
         boolean granted = false;
@@ -335,7 +221,6 @@ public class AzanAlarmPlugin extends Plugin {
                 jsonList.put(storedObj);
 
                 if (timestamp > now) {
-                    // PendingIntent ke AzanAlarmReceiver
                     Intent intent = new Intent(context, AzanAlarmReceiver.class);
                     intent.setAction(AzanAlarmReceiver.ACTION_TRIGGER_AZAN);
                     intent.putExtra("prayer_key", prayerKey);
@@ -349,7 +234,6 @@ public class AzanAlarmPlugin extends Plugin {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    // PendingIntent paparan aktiviti bila jam ditekan di lock screen
                     Intent showIntent = new Intent(context, MainActivity.class);
                     showIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     PendingIntent showPendingIntent = PendingIntent.getActivity(
@@ -370,7 +254,6 @@ public class AzanAlarmPlugin extends Plugin {
                 }
             }
 
-            // Simpan ke SharedPreferences SolatKiniAlarms
             SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit().putString(KEY_STORED_ALARMS, jsonList.toString()).apply();
             if (alarmsArray.length() > 0) {
@@ -519,6 +402,121 @@ public class AzanAlarmPlugin extends Plugin {
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Gagal menghentikan audio azan: " + e.getMessage(), e);
+        }
+    }
+
+    @PluginMethod
+    public void isBatteryOptimized(PluginCall call) {
+        Context context = getContext();
+        boolean isIgnoring = true;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                isIgnoring = pm.isIgnoringBatteryOptimizations(context.getPackageName());
+            }
+        }
+        JSObject ret = new JSObject();
+        ret.put("isIgnoringBatteryOptimizations", isIgnoring);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestIgnoreBatteryOptimization(PluginCall call) {
+        Context context = getContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(intent);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+                return;
+            } catch (Exception e) {
+                Log.w(TAG, "Gagal membuka dialog pengecualian bateri khusus", e);
+            }
+        }
+
+        try {
+            Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal membuka tetapan bateri: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void openAutostartSettings(PluginCall call) {
+        Context context = getContext();
+        String brand = Build.MANUFACTURER.toLowerCase();
+        Intent intent = new Intent();
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+        try {
+            if (brand.contains("xiaomi") || brand.contains("redmi") || brand.contains("poco")) {
+                intent.setComponent(new ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            } else if (brand.contains("oppo") || brand.contains("realme")) {
+                intent.setComponent(new ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"));
+            } else if (brand.contains("vivo")) {
+                intent.setComponent(new ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
+            } else if (brand.contains("huawei") || brand.contains("honor")) {
+                intent.setComponent(new ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"));
+            } else {
+                intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                intent.setData(Uri.parse("package:" + context.getPackageName()));
+            }
+            context.startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            try {
+                Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                fallback.setData(Uri.parse("package:" + context.getPackageName()));
+                fallback.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                context.startActivity(fallback);
+                JSObject ret = new JSObject();
+                ret.put("opened", true);
+                call.resolve(ret);
+            } catch (Exception err) {
+                call.reject("Tidak dapat membuka tetapan permulaan automatik: " + err.getMessage());
+            }
+        }
+    }
+
+    @PluginMethod
+    public void checkAutoTime(PluginCall call) {
+        Context context = getContext();
+        boolean autoTime = true;
+        boolean autoTimeZone = true;
+
+        try {
+            autoTime = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME, 1) == 1;
+            autoTimeZone = Settings.Global.getInt(context.getContentResolver(), Settings.Global.AUTO_TIME_ZONE, 1) == 1;
+        } catch (Exception ignored) {}
+
+        JSObject ret = new JSObject();
+        ret.put("isAutoTimeEnabled", autoTime);
+        ret.put("isAutoTimeZoneEnabled", autoTimeZone);
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void openDateSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_DATE_SETTINGS);
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Gagal membuka tetapan tarikh & masa: " + e.getMessage());
         }
     }
 
