@@ -13,7 +13,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.i(TAG, "Penggera azan diterima! Tindakan: " + (intent != null ? intent.getAction() : "null"));
+        Log.i(TAG, "Penggera azan / peralihan waktu diterima! Tindakan: " + (intent != null ? intent.getAction() : "null"));
 
         String prayerName = intent != null ? intent.getStringExtra("prayer_name") : "Solat";
         String prayerKey = intent != null ? intent.getStringExtra("prayer_key") : "solat";
@@ -26,8 +26,30 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
         boolean isTest = intent != null && intent.getBooleanExtra("is_test", false);
         int autoStopSeconds = intent != null ? intent.getIntExtra("auto_stop_seconds", 0) : 0;
 
+        // 1. KES KHAS: Peralihan Senyap (Imsak & Syuruk)
+        // Anjak pemasa undur sahaja ke waktu seterusnya tanpa bangunkan audio azan
+        boolean isSilentTransition = "none".equalsIgnoreCase(voice)
+                || "silent".equalsIgnoreCase(voice)
+                || "imsak".equalsIgnoreCase(prayerKey)
+                || "syuruk".equalsIgnoreCase(prayerKey);
+
+        if (isSilentTransition && !isTest) {
+            Log.i(TAG, "Waktu peralihan (" + prayerName + ") dicapai. Mengemaskini pemasa undur notifikasi secara senyap...");
+            AzanHistoryLogger.record(
+                context,
+                prayerName,
+                prayerKey,
+                AzanHistoryLogger.STATUS_SUCCESS,
+                "Peralihan waktu " + prayerName + " selesai. Jam undur dianjakkan secara senyap ke waktu seterusnya."
+            );
+
+            // Anjakkan notifikasi terus (contoh: dari Imsak ke Subuh, atau Syuruk ke Zohor)
+            SolatWidgetPlugin.advanceToNextPrayer(context);
+            return; // Tamat di sini, elak panggil servis audio dan jimat bateri
+        }
+
+        // 2. KES SOLAT FARDHU (Subuh, Zohor, Asar, Maghrib, Isyak)
         if (!isTest) {
-            // 1. Catat penggera dicetuskan ke dalam sejarah diagnostik
             AzanHistoryLogger.record(
                 context,
                 prayerName,
@@ -36,11 +58,11 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
                 "AlarmManager mencetuskan azan tepat pada waktunya (Suara: " + voice.toUpperCase() + ")"
             );
 
-            // 2. Anjakkan pemasa notifikasi ke waktu solat seterusnya serta-merta (Elak kiraan negatif)
+            // Anjakkan pemasa notifikasi ke solat seterusnya serta-merta
             SolatWidgetPlugin.advanceToNextPrayer(context);
         }
 
-        // Tahan CPU selama 15 saat supaya telefon tidak sempat tidur sebelum servis bermula
+        // Tahan CPU selama 15 saat supaya telefon tidak tidur sebelum audio bermula
         PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         if (powerManager != null) {
             try {
@@ -65,7 +87,7 @@ public class AzanAlarmReceiver extends BroadcastReceiver {
             serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
             ContextCompat.startForegroundService(context, serviceIntent);
-            Log.i(TAG, "Servis AzanAudioService berjaya diarahkan mula.");
+            Log.i(TAG, "Servis AzanAudioService berjaya dimulakan bagi: " + prayerName);
         } catch (Exception e) {
             Log.e(TAG, "Ralat menghidupkan servis audio azan", e);
             AzanHistoryLogger.record(
