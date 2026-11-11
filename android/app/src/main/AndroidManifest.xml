@@ -93,6 +93,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- Daftarkan Home Screen Widget Provider -->
+<receiver
+    android:name=".SolatWidgetProvider"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        <action android:name="com.solatkini.app.ACTION_UPDATE_PRAYER_TIMES" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/solat_widget_info" />
+</receiver>
+        
         <!-- Servis audio azan pada saluran STREAM_ALARM -->
         <service
             android:name=".AzanAudioService"
