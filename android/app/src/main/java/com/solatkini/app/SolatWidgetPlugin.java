@@ -26,6 +26,16 @@ public class SolatWidgetPlugin extends Plugin {
     public static final String ACTION_SYNC_PRAYER = "com.solatkini.app.ACTION_SYNC_PRAYER";
     public static final String WIDGET_PREFS = "SolatKiniWidgetPrefs";
 
+    // Fungsi pembantu untuk membuang label AM/PM supaya paparan jadual padat & tidak melimpah
+    private static String stripAmPm(String timeStr) {
+        if (timeStr == null || timeStr.isEmpty() || timeStr.equals("--:--")) return "--:--";
+        return timeStr.replace(" AM", "")
+                      .replace(" PM", "")
+                      .replace(" am", "")
+                      .replace(" pm", "")
+                      .trim();
+    }
+
     @PluginMethod
     public void updateWidget(PluginCall call) {
         try {
@@ -59,12 +69,11 @@ public class SolatWidgetPlugin extends Plugin {
         try {
             Context context = getContext();
 
-            String zone = call.getString("zone", "Malaysia");
+            String zone = call.getString("zone", "Beaufort");
             String hijri = call.getString("hijri", "");
             String nextLabel = call.getString("next_label", "Waktu Solat");
             String nextTime = call.getString("next_time", "--:--");
 
-            // Baca timestamp secara defensif (sokong Long & Double daripada JSON Capacitor)
             long nextTimestamp = 0L;
             if (call.hasOption("next_timestamp")) {
                 try {
@@ -98,7 +107,6 @@ public class SolatWidgetPlugin extends Plugin {
             String maghrib = call.getString("maghrib", "--:--");
             String isyak = call.getString("isyak", "--:--");
 
-            // Simpan ke SharedPreferences
             SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
             prefs.edit()
                 .putBoolean("is_persistent_enabled", true)
@@ -126,9 +134,6 @@ public class SolatWidgetPlugin extends Plugin {
         }
     }
 
-    /**
-     * Membina notifikasi dengan Chronometer Countdown rasmi Android (Sifar Negatif)
-     */
     public static void buildAndShowNotification(
         Context context,
         String zone,
@@ -150,7 +155,7 @@ public class SolatWidgetPlugin extends Plugin {
 
             long now = System.currentTimeMillis();
 
-            // Pintasan Buka Aplikasi
+            // Pintasan Buka App
             Intent openIntent = new Intent(context, MainActivity.class);
             openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent openPending = PendingIntent.getActivity(
@@ -160,7 +165,7 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Pintasan Segerak Waktu
+            // Pintasan Segerak
             Intent syncIntent = new Intent(context, MainActivity.class);
             syncIntent.setAction(ACTION_SYNC_PRAYER);
             syncIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -171,22 +176,27 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Susun maklumat tajuk dan kandungan
+            // 1. Tajuk Padat: Buang pengulangan nama app supaya tarikh Hijri muat penuh tanpa terpotong (...)
+            String cleanZone = zone.replace("SolatKini · ", "").trim();
             String titleText = (hijri != null && !hijri.isEmpty())
-                ? "SolatKini · Zon " + zone + " (" + hijri + ")"
-                : "SolatKini · Zon " + zone;
+                ? cleanZone + " • " + hijri
+                : cleanZone;
 
-            String nextKicker = "Seterusnya: " + nextLabel + " (" + nextTime + ")";
+            // 2. Baris Fokus Waktu Seterusnya
+            String nextKicker = "⏳ Seterusnya: " + nextLabel + " (" + nextTime + ")";
 
-            String formatted7Times = String.format(
-                "Imsak %s   •   Subuh %s   •   Syuruk %s\nZohor %s   •   Asar %s   •   Maghrib %s   •   Isyak %s",
-                imsak, subuh, syuruk, zohor, asar, maghrib, isyak
-            );
+            // 3. Susunan Jadual 7 Waktu: Nilai jam dibersihkan daripada AM/PM supaya muat tepat 2 baris seimbang
+            String line1 = String.format("Imsak %s  •  Subuh %s  •  Syuruk %s",
+                stripAmPm(imsak), stripAmPm(subuh), stripAmPm(syuruk));
 
-            // NOTA PENTING: JANGAN panggil .setSummaryText() di sini supaya header tidak menindih Chronometer!
+            String line2 = String.format("Zohor %s  •  Asar %s  •  Maghrib %s  •  Isyak %s",
+                stripAmPm(zohor), stripAmPm(asar), stripAmPm(maghrib), stripAmPm(isyak));
+
+            String formattedContent = nextKicker + "\n\n" + line1 + "\n" + line2;
+
             NotificationCompat.BigTextStyle bigStyle = new NotificationCompat.BigTextStyle()
                 .setBigContentTitle(titleText)
-                .bigText(nextKicker + "\n\n" + formatted7Times);
+                .bigText(formattedContent);
 
             NotificationCompat.Builder builder = new NotificationCompat.Builder(
                 context,
@@ -205,7 +215,7 @@ public class SolatWidgetPlugin extends Plugin {
                 .addAction(android.R.drawable.ic_menu_today, "Buka", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
-            // Aktifkan jam undur (Chronometer Countdown) sekiranya waktu sasaran belum lepas
+            // Kawalan Pemasa Undur (Chronometer Countdown)
             if (nextTimestamp > now) {
                 builder.setWhen(nextTimestamp);
                 builder.setShowWhen(true);
@@ -213,23 +223,17 @@ public class SolatWidgetPlugin extends Plugin {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     builder.setChronometerCountDown(true);
                 }
-                Log.d(TAG, "Chronometer Countdown diaktifkan ke sasaran ms: " + nextTimestamp);
             } else {
                 builder.setUsesChronometer(false);
                 builder.setShowWhen(false);
-                Log.d(TAG, "Waktu sasaran sudah berlalu atau 0, chronometer ditutup.");
             }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
-            Log.i(TAG, "Notifikasi tetap berjaya dikemaskini bagi: " + nextLabel);
         } catch (Exception e) {
-            Log.w(TAG, "Gagal memaparkan notifikasi tetap", e);
+            Log.w(TAG, "Gagal memaparkan notifikasi", e);
         }
     }
 
-    /**
-     * Beralih secara automatik ke waktu seterusnya apabila penggera azan/peralihan senyap dicetuskan
-     */
     public static void advanceToNextPrayer(Context context) {
         try {
             SharedPreferences alarmPrefs = context.getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
@@ -255,7 +259,7 @@ public class SolatWidgetPlugin extends Plugin {
                 SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
                 if (!widgetPrefs.getBoolean("is_persistent_enabled", false)) return;
 
-                String zone = widgetPrefs.getString("zone", "Malaysia");
+                String zone = widgetPrefs.getString("zone", "Beaufort");
                 String hijri = widgetPrefs.getString("hijri", "");
                 String nextLabel = nextUpcoming.optString("prayerName", "Solat");
 
@@ -277,10 +281,9 @@ public class SolatWidgetPlugin extends Plugin {
                     .apply();
 
                 buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nearestTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
-                Log.i(TAG, "Notifikasi automatik dianjakkan ke waktu seterusnya: " + nextLabel);
             }
         } catch (Exception e) {
-            Log.w(TAG, "Ralat menganjak waktu solat seterusnya", e);
+            Log.w(TAG, "Ralat menganjak waktu solat", e);
         }
     }
 
