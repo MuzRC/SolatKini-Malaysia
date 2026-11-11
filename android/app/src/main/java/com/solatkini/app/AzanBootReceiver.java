@@ -41,6 +41,7 @@ public class AzanBootReceiver extends BroadcastReceiver {
             if (alarmManager == null) return;
 
             long now = System.currentTimeMillis();
+            int scheduledCount = 0;
 
             for (int i = 0; i < array.length(); i++) {
                 JSONObject obj = array.getJSONObject(i);
@@ -81,11 +82,35 @@ public class AzanBootReceiver extends BroadcastReceiver {
                     } else {
                         alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
                     }
+
+                    scheduledCount++;
                     Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula tepat melalui setAlarmClock pada: " + timestamp);
                 }
             }
+
+            // 1. Catat ke log diagnostik telefon
+            AzanHistoryLogger.record(
+                context,
+                "Sistem Reboot",
+                "boot",
+                AzanHistoryLogger.STATUS_SUCCESS,
+                "Peranti hidup semula. Sebanyak " + scheduledCount + " waktu solat berjaya dijadualkan semula ke AlarmManager."
+            );
+
+            // 2. Segerakkan widget skrin utama secara automatik
+            SolatWidgetProvider.updateAllWidgets(context);
+
+            Log.i(TAG, "Selesai! " + scheduledCount + " waktu solat dan widget berjaya disegarkan selepas reboot.");
+
         } catch (Exception e) {
             Log.e(TAG, "Ralat menjadualkan semula penggera dari BootReceiver", e);
+            AzanHistoryLogger.record(
+                context,
+                "Sistem Reboot",
+                "boot",
+                AzanHistoryLogger.STATUS_FAILED,
+                "Ralat penjadualan semula: " + e.getMessage()
+            );
         }
     }
 }
