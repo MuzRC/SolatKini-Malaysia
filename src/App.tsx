@@ -40,6 +40,15 @@ import { MusaLog } from './musalog';
 // AKHIR: MUSALOG
 // ==========================================
 
+// Zon sandaran sekiranya storan kosong atau data rosak
+const DEFAULT_ZONE: JakimZone = JAKIM_ZONES[0] || {
+  code: 'WLY01',
+  negeri: 'WILAYAH PERSEKUTUAN',
+  daerah: 'Kuala Lumpur, Putrajaya',
+  lat: 3.139,
+  lng: 101.6869,
+};
+
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -81,14 +90,20 @@ export default function App() {
     applyTheme(currentTheme);
   }, [currentTheme]);
 
+  // Jaminan zon sentiasa ada objek sah (tidak akan sekali-kali menjadi undefined)
   const [currentZone, setCurrentZone] = useState<JakimZone>(() => {
     if (typeof window !== 'undefined') {
-      const savedCode = localStorage.getItem('solatkini_active_zone');
-      if (savedCode) {
-        return findZoneByCode(savedCode);
+      try {
+        const savedCode = localStorage.getItem('solatkini_active_zone');
+        if (savedCode && savedCode !== 'undefined' && savedCode !== 'null') {
+          const matched = findZoneByCode(savedCode);
+          if (matched) return matched;
+        }
+      } catch (e) {
+        console.warn('Gagal membaca zon awal:', e);
       }
     }
-    return JAKIM_ZONES[0];
+    return DEFAULT_ZONE;
   });
 
   const [prayerData, setPrayerData] = useState<{
@@ -122,7 +137,7 @@ export default function App() {
 
   // Fungsi pembantu untuk menjadualkan penggera ke sistem Android
   const syncAlarmsToNative = (times: DayPrayerTimes, voice: AzanVoice) => {
-    if (!times || !times.times) return;
+    if (!times) return;
     try {
       let enabledMap: Record<PrayerKey, boolean> = {
         imsak: false,
@@ -138,7 +153,7 @@ export default function App() {
         const saved = localStorage.getItem('solatkini_notif_settings');
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (parsed.preferences) {
+          if (parsed && parsed.preferences) {
             enabledMap.subuh = parsed.preferences.subuh?.enabled ?? true;
             enabledMap.zohor = parsed.preferences.zohor?.enabled ?? true;
             enabledMap.asar = parsed.preferences.asar?.enabled ?? true;
@@ -148,11 +163,13 @@ export default function App() {
         }
       }
 
+      const timeSource = (times as any).times || times;
+
       const list = PRAYER_KEYS_ORDER.map((k) => ({
         key: k,
-        label: PRAYER_LABELS[k],
-        time: times.times[k],
-        displayTime: formatDisplayTime(times.times[k]),
+        label: PRAYER_LABELS[k] || k,
+        time: (timeSource as any)[k] || '00:00',
+        displayTime: formatDisplayTime((timeSource as any)[k] || '00:00'),
         voice: (k === 'subuh' ? 'subuh_special' : voice) as AzanVoice,
       }));
 
@@ -162,58 +179,80 @@ export default function App() {
     }
   };
 
-  // 1. Pengesanan GPS automatik (Hanya berjalan SELEPAS onboarding selesai)
+  // 1. Pengesanan GPS automatik dengan pelindung sekatan Permissions Policy
   useEffect(() => {
     if (showOnboarding) return;
     if (hasAutoLocatedRef.current) return;
     hasAutoLocatedRef.current = true;
 
-    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          const nearest = findNearestZone(latitude, longitude);
+    try {
+      if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            try {
+              const { latitude, longitude } = position.coords;
+              const nearest = findNearestZone(latitude, longitude);
 
-          setCurrentZone(nearest);
-          localStorage.setItem('solatkini_active_zone', nearest.code);
+              if (nearest && nearest.code) {
+                setCurrentZone(nearest);
+                localStorage.setItem('solatkini_active_zone', nearest.code);
 
-          setGeoStatus({
-            type: 'detected',
-            message: 'Zon waktu solat JAKIM diselaraskan secara automatik mengikut koordinat GPS anda.',
-            zoneName: `${nearest.daerah.split(',')[0]} (${nearest.code})`,
-          });
+                const daerahLabel = nearest.daerah ? nearest.daerah.split(',')[0] : nearest.negeri;
+                setGeoStatus({
+                  type: 'detected',
+                  message: 'Zon waktu solat JAKIM diselaraskan secara automatik mengikut koordinat GPS anda.',
+                  zoneName: `${daerahLabel} (${nearest.code})`,
+                });
 
-          setTimeout(() => {
-            setGeoStatus(null);
-          }, 5000);
-        },
-        (error) => {
-          console.info('Makluman geolokasi:', error.message);
-        },
-        {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 60000,
-        }
-      );
+                setTimeout(() => {
+                  setGeoStatus(null);
+                }, 5000);
+              }
+            } catch (err) {
+              console.warn('Ralat menentukan zon terdekat:', err);
+            }
+          },
+          (error) => {
+            console.info('Makluman geolokasi:', error.message);
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 8000,
+            maximumAge: 60000,
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('Akses geolokasi dihalang oleh polisi dokumen pelayar:', e);
     }
   }, [showOnboarding]);
 
-  // 2. Muat data waktu solat & jadualkan penggera natif
+  // 2. Muat data waktu solat & jadualkan penggera natif (dilengkapi blok .catch)
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
 
-    fetchDayPrayerTimes(currentZone, new Date(), false).then((data) => {
-      if (isMounted) {
-        setPrayerData(data);
-        setIsLoading(false);
-        syncAlarmsToNative(data.times, selectedVoice);
-      }
-    });
+    const safeZone = currentZone || DEFAULT_ZONE;
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_active_zone', currentZone.code);
+    fetchDayPrayerTimes(safeZone, new Date(), false)
+      .then((data) => {
+        if (isMounted && data) {
+          setPrayerData(data);
+          setIsLoading(false);
+          if (data.times) {
+            syncAlarmsToNative(data.times, selectedVoice);
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn('Ralat memuatkan waktu solat dari internet:', err);
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+
+    if (typeof window !== 'undefined' && safeZone?.code) {
+      localStorage.setItem('solatkini_active_zone', safeZone.code);
     }
 
     return () => {
@@ -228,10 +267,17 @@ export default function App() {
       const currentDate = new Date().getDate();
       if (currentDate !== lastDate) {
         lastDate = currentDate;
-        fetchDayPrayerTimes(currentZone, new Date(), true).then((data) => {
-          setPrayerData(data);
-          syncAlarmsToNative(data.times, selectedVoice);
-        });
+        const safeZone = currentZone || DEFAULT_ZONE;
+        fetchDayPrayerTimes(safeZone, new Date(), true)
+          .then((data) => {
+            if (data) {
+              setPrayerData(data);
+              if (data.times) {
+                syncAlarmsToNative(data.times, selectedVoice);
+              }
+            }
+          })
+          .catch((err) => console.warn('Ralat segerak waktu solat harian:', err));
       }
     }, 30000);
     return () => clearInterval(interval);
@@ -240,9 +286,16 @@ export default function App() {
   const handleLiveSync = async () => {
     setIsLiveSyncing(true);
     try {
-      const data = await fetchDayPrayerTimes(currentZone, new Date(), true);
-      setPrayerData(data);
-      syncAlarmsToNative(data.times, selectedVoice);
+      const safeZone = currentZone || DEFAULT_ZONE;
+      const data = await fetchDayPrayerTimes(safeZone, new Date(), true);
+      if (data) {
+        setPrayerData(data);
+        if (data.times) {
+          syncAlarmsToNative(data.times, selectedVoice);
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal segerak secara langsung:', e);
     } finally {
       setIsLiveSyncing(false);
     }
@@ -256,7 +309,7 @@ export default function App() {
       if (!status.notificationsGranted) {
         nativeAlarmService.requestNotificationPermission();
       }
-    });
+    }).catch(() => {});
   }, [showOnboarding]);
 
   // 5. Tangani acara pemicu azan asli (Event Listener Android)
@@ -302,7 +355,9 @@ export default function App() {
   }, []);
 
   const handleZoneChange = (zone: JakimZone) => {
-    setCurrentZone(zone);
+    if (zone && zone.code) {
+      setCurrentZone(zone);
+    }
   };
 
   const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
@@ -369,6 +424,8 @@ export default function App() {
     { id: 'tetapan', label: t('nav_tetapan', currentLang), icon: Settings },
     { id: 'kredit', label: t('nav_kredit', currentLang), icon: Award },
   ] as const;
+
+  const activeZone = currentZone || DEFAULT_ZONE;
 
   return (
     <div className="min-h-screen bg-[#070d0b] text-slate-100 flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -474,7 +531,7 @@ export default function App() {
           <>
             {activeTab === 'solat' && (
               <PrayerDashboard
-                currentZone={currentZone}
+                currentZone={activeZone}
                 onZoneChange={handleZoneChange}
                 prayerTimes={prayerData.times}
                 isOfflineCalculated={prayerData.isOfflineCalculated}
@@ -486,10 +543,10 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'kiblat' && <QiblaCompass currentZone={currentZone} />}
+            {activeTab === 'kiblat' && <QiblaCompass currentZone={activeZone} />}
 
             {activeTab === 'puasa' && (
-              <FastingTracker prayerTimes={prayerData.times} currentZone={currentZone} />
+              <FastingTracker prayerTimes={prayerData.times} currentZone={activeZone} />
             )}
 
             {activeTab === 'wirid' && <TasbihWirid />}
@@ -509,7 +566,7 @@ export default function App() {
                   applyTheme(th);
                 }}
                 prayerTimes={prayerData.times}
-                currentZone={currentZone}
+                currentZone={activeZone}
                 selectedVoice={selectedVoice}
                 onVoiceChange={handleVoiceChange}
                 persistentNotification={persistentNotification}
@@ -608,7 +665,7 @@ export default function App() {
       {/* ========================================== */}
       {/* MULA: MUSALOG (PADAM BAHAGIAN INI UNTUK BUANG) */}
       {/* ========================================== */}
-      <MusaLog />
+      {typeof MusaLog === 'function' && <MusaLog />}
       {/* ========================================== */}
       {/* AKHIR: MUSALOG */}
       {/* ========================================== */}
