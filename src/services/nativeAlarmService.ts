@@ -23,6 +23,16 @@ export interface AutoTimeStatusResult {
   isAutoTimeZoneEnabled: boolean;
 }
 
+export interface AzanLogEntry {
+  prayerName: string;
+  prayerKey: string;
+  timestamp: number;
+  timeFormatted: string;
+  dateFormatted: string;
+  status: 'BERJAYA' | 'DICETUSKAN' | 'GAGAL' | string;
+  details: string;
+}
+
 export interface AzanAlarmPluginInterface {
   checkNotificationPermission(): Promise<PermissionStatusResult>;
   requestNotificationPermission(): Promise<{ granted: boolean; status: string }>;
@@ -44,6 +54,8 @@ export interface AzanAlarmPluginInterface {
   openAutostartSettings(): Promise<{ opened: boolean }>;
   checkAutoTime(): Promise<AutoTimeStatusResult>;
   openDateSettings(): Promise<{ opened: boolean }>;
+  getAzanDiagnosticLogs(): Promise<{ logsJson: string }>;
+  clearAzanDiagnosticLogs(): Promise<{ success: boolean }>;
 }
 
 const AzanAlarm = registerPlugin<AzanAlarmPluginInterface>('AzanAlarm');
@@ -59,9 +71,6 @@ class NativeAlarmService {
     return this.isNative;
   }
 
-  /**
-   * Semak status kebenaran notifikasi rasmi daripada perkakasan peranti (bukan tekaan localStorage).
-   */
   public async checkPermissions(): Promise<PermissionStatusResult> {
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -86,9 +95,6 @@ class NativeAlarmService {
     }
   }
 
-  /**
-   * Minta kebenaran notifikasi secara sah daripada dialog sistem peranti.
-   */
   public async requestNotificationPermission(): Promise<boolean> {
     if (!this.isNative) {
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -126,18 +132,13 @@ class NativeAlarmService {
     }
   }
 
-  /**
-   * Buka tetapan notifikasi telefon (tanpa menanda status sebagai aktif secara melulu).
-   */
   public async openNotificationSettings(): Promise<boolean> {
     if (!this.isNative) return false;
-
     try {
       const res = await AzanAlarm.openNotificationSettings();
       return !!res.opened;
     } catch {
-      alert('Sila buka Tetapan telefon > Aplikasi > SolatKini > Pemberitahuan (Notifications) dan hidupkan suis Benarkan.');
-      return true;
+      return false;
     }
   }
 
@@ -167,7 +168,6 @@ class NativeAlarmService {
       const res = await AzanAlarm.openAutostartSettings();
       return !!res.opened;
     } catch {
-      alert('Sila buka Tetapan telefon > Pengurusan Aplikasi > SolatKini > Benarkan Autostart.');
       return false;
     }
   }
@@ -207,9 +207,7 @@ class NativeAlarmService {
     voice: AzanVoice = 'jakim',
     enabledPrayers?: Record<PrayerKey, boolean>
   ): Promise<number> {
-    if (!this.isNative) {
-      return 0;
-    }
+    if (!this.isNative) return 0;
 
     try {
       await this.cancelAllAlarms();
@@ -229,6 +227,7 @@ class NativeAlarmService {
         const targetDate = new Date();
         targetDate.setHours(h, m, 0, 0);
 
+        // Jika waktu hari ini sudah lepas, anjak jadual ke esok secara automatik
         if (targetDate.getTime() <= now.getTime()) {
           targetDate.setDate(targetDate.getDate() + 1);
         }
@@ -271,9 +270,7 @@ class NativeAlarmService {
     delaySeconds: number = 0,
     autoStopSeconds: number = 20
   ): Promise<boolean> {
-    if (!this.isNative) {
-      return false;
-    }
+    if (!this.isNative) return false;
     try {
       const res = await AzanAlarm.testAlarmNow({
         prayerName,
@@ -299,28 +296,24 @@ class NativeAlarmService {
   }
 }
 
-export interface AzanLogEntry {
-  prayerName: string;
-  prayerKey: string;
-  timestamp: number;
-  timeFormatted: string;
-  dateFormatted: string;
-  status: 'BERJAYA' | 'DICETUSKAN' | 'GAGAL' | string;
-  details: string;
-}
-
+// Fungsi pembantu diagnostik azan yang dipadankan terus dengan AzanAlarmPlugin.java
 export const getAzanHistoryLogs = async (): Promise<AzanLogEntry[]> => {
+  if (!Capacitor.isNativePlatform()) return [];
   try {
-    const res = await (AzanAlarm as any).getAzanHistory();
-    return res && res.history ? res.history : [];
+    const res = await AzanAlarm.getAzanDiagnosticLogs();
+    if (res && res.logsJson) {
+      return JSON.parse(res.logsJson) as AzanLogEntry[];
+    }
+    return [];
   } catch {
     return [];
   }
 };
 
 export const clearAzanHistoryLogs = async (): Promise<boolean> => {
+  if (!Capacitor.isNativePlatform()) return false;
   try {
-    const res = await (AzanAlarm as any).clearAzanHistory();
+    const res = await AzanAlarm.clearAzanDiagnosticLogs();
     return !!res?.success;
   } catch {
     return false;
