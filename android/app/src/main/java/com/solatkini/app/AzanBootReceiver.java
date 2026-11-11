@@ -100,7 +100,10 @@ public class AzanBootReceiver extends BroadcastReceiver {
             // 2. Segerakkan widget skrin utama secara automatik
             SolatWidgetProvider.updateAllWidgets(context);
 
-            Log.i(TAG, "Selesai! " + scheduledCount + " waktu solat dan widget berjaya disegarkan selepas reboot.");
+            // 3. Hidupkan semula notifikasi tetap bersama pemasa undur (Chronometer) ke waktu solat seterusnya
+            SolatWidgetPlugin.advanceToNextPrayer(context);
+
+            Log.i(TAG, "Selesai! Penggera (" + scheduledCount + "), widget skrin, dan notifikasi pemasa undur berjaya disegarkan selepas reboot.");
 
         } catch (Exception e) {
             Log.e(TAG, "Ralat menjadualkan semula penggera dari BootReceiver", e);
