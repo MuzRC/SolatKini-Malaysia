@@ -207,41 +207,52 @@ class NativeAlarmService {
     voice: AzanVoice = 'jakim',
     enabledPrayers?: Record<PrayerKey, boolean>
   ): Promise<number> {
-    if (!this.isNative) return 0;
+    const now = new Date();
+    const alarms: NativeAlarmItem[] = [];
+
+    for (const item of prayerTimes) {
+      if (item.key === 'imsak' || item.key === 'syuruk') continue;
+      if (enabledPrayers && enabledPrayers[item.key] === false) continue;
+
+      const [hoursStr, minutesStr] = item.time.split(':');
+      const h = parseInt(hoursStr, 10);
+      const m = parseInt(minutesStr, 10);
+
+      if (isNaN(h) || isNaN(m)) continue;
+
+      const targetDate = new Date();
+      targetDate.setHours(h, m, 0, 0);
+
+      // Jika waktu hari ini sudah lepas, anjak jadual ke esok secara automatik
+      if (targetDate.getTime() <= now.getTime()) {
+        targetDate.setDate(targetDate.getDate() + 1);
+      }
+
+      const resolvedVoice: AzanVoice =
+        item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
+
+      alarms.push({
+        prayerKey: item.key,
+        prayerName: item.label,
+        timestamp: targetDate.getTime(),
+        voice: resolvedVoice,
+      });
+    }
+
+    // Susun secara kronologi dari waktu terdekat ke waktu paling jauh
+    alarms.sort((a, b) => a.timestamp - b.timestamp);
+
+    // Simpan salinan di storan lokal sebagai rujukan diagnostik
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_scheduled_alarms_backup', JSON.stringify(alarms));
+    }
+
+    if (!this.isNative) {
+      return alarms.length;
+    }
 
     try {
       await this.cancelAllAlarms();
-      const now = new Date();
-      const alarms: NativeAlarmItem[] = [];
-
-      for (const item of prayerTimes) {
-        if (item.key === 'imsak' || item.key === 'syuruk') continue;
-        if (enabledPrayers && enabledPrayers[item.key] === false) continue;
-
-        const [hoursStr, minutesStr] = item.time.split(':');
-        const h = parseInt(hoursStr, 10);
-        const m = parseInt(minutesStr, 10);
-
-        if (isNaN(h) || isNaN(m)) continue;
-
-        const targetDate = new Date();
-        targetDate.setHours(h, m, 0, 0);
-
-        // Jika waktu hari ini sudah lepas, anjak jadual ke esok secara automatik
-        if (targetDate.getTime() <= now.getTime()) {
-          targetDate.setDate(targetDate.getDate() + 1);
-        }
-
-        const resolvedVoice: AzanVoice =
-          item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
-
-        alarms.push({
-          prayerKey: item.key,
-          prayerName: item.label,
-          timestamp: targetDate.getTime(),
-          voice: resolvedVoice,
-        });
-      }
 
       if (alarms.length > 0) {
         const result = await AzanAlarm.schedulePrayerAlarms({ alarms });
@@ -249,7 +260,8 @@ class NativeAlarmService {
       }
 
       return 0;
-    } catch {
+    } catch (e) {
+      console.warn('Gagal menjadualkan penggera ke plugin natif:', e);
       return 0;
     }
   }
@@ -293,6 +305,15 @@ class NativeAlarmService {
     } catch {
       return false;
     }
+  }
+
+  // Alias fungsi pembantu agar sepadan dengan pemanggil audioNotificationService
+  public async stopAudio(): Promise<boolean> {
+    return this.stopNativeAzan();
+  }
+
+  public async stopAlarm(): Promise<boolean> {
+    return this.stopNativeAzan();
   }
 }
 
