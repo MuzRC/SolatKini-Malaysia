@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   return {
@@ -12,14 +12,9 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR diselaraskan menggunakan clientPort 443 (WSS) untuk reverse proxy Cloud Run
-      hmr: process.env.DISABLE_HMR === 'true'
-        ? false
-        : {
-            clientPort: 443,
-          },
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
-      watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      // Matikan WebSocket HMR sepenuhnya untuk elak ralat sambungan di Cloud Run AI Studio
+      hmr: false,
+      watch: null,
     },
   };
 });
