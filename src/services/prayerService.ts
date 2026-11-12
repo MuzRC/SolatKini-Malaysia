@@ -21,8 +21,9 @@ function getSafeZoneCoordinates(zone: JakimZone): { lat: number; lng: number } {
 }
 
 const formatFromTimestampOrStr = (val: string | number | undefined): string => {
-  if (typeof val === 'number') {
-    const mytDate = new Date((val + 8 * 3600) * 1000);
+  if (typeof val === 'number' && !isNaN(val)) {
+    const epochSeconds = val > 1e11 ? Math.floor(val / 1000) : val;
+    const mytDate = new Date((epochSeconds + 8 * 3600) * 1000);
     const h = mytDate.getUTCHours().toString().padStart(2, '0');
     const m = mytDate.getUTCMinutes().toString().padStart(2, '0');
     return `${h}:${m}`;
@@ -50,6 +51,10 @@ export async function fetchDayPrayerTimes(
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const parsed: DayPrayerTimes = JSON.parse(cached);
+        // Pastikan hijriDate dalam cache bukan format mentah YYYY-MM-DDH
+        if (parsed.hijriDate && /^\d{4}-\d{2}-\d{2}H?$/.test(parsed.hijriDate)) {
+          parsed.hijriDate = getHijriDate(date).formatted;
+        }
         const lastSync = localStorage.getItem(`${cacheKey}_sync`) || nowTimeStr;
         return {
           times: parsed,
@@ -77,13 +82,14 @@ export async function fetchDayPrayerTimes(
       if (res.ok) {
         const data = await res.json();
         if (data && data.prayers && Array.isArray(data.prayers) && data.prayers.length > 0) {
-          const currentYear = data.year || date.getFullYear();
-          const currentMonthNum = data.month_number || (date.getMonth() + 1);
+          const currentYear = Number(data.year) || date.getFullYear();
+          const currentMonthNum = Number(data.month_number) || (date.getMonth() + 1);
 
           if (typeof window !== 'undefined') {
             data.prayers.forEach((pItem: any) => {
               if (pItem && pItem.day) {
-                const pDayStr = pItem.day.toString().padStart(2, '0');
+                const dayNum = Number(pItem.day);
+                const pDayStr = dayNum.toString().padStart(2, '0');
                 const pMonthStr = currentMonthNum.toString().padStart(2, '0');
                 const itemDateStr = `${currentYear}-${pMonthStr}-${pDayStr}`;
                 const itemCacheKey = `${CACHE_KEY_PREFIX}${zone.code}_${itemDateStr}`;
@@ -98,7 +104,10 @@ export async function fetchDayPrayerTimes(
                   isyak: formatFromTimestampOrStr(pItem.isha),
                 };
 
-                const dayHijri = pItem.hijri ? `${pItem.hijri}H` : getHijriDate(new Date(itemDateStr)).formatted;
+                // Bina tarikh tempatan (elak ralat UTC new Date('YYYY-MM-DD'))
+                const localItemDate = new Date(currentYear, currentMonthNum - 1, dayNum);
+                const dayHijri = getHijriDate(localItemDate).formatted;
+
                 const cachedDayData: DayPrayerTimes = {
                   date: itemDateStr,
                   hijriDate: dayHijri,
@@ -114,9 +123,13 @@ export async function fetchDayPrayerTimes(
             });
           }
 
-          const todayItem =
-            data.prayers.find((p: { day?: number }) => p.day === date.getDate()) ||
-            data.prayers[0];
+          // Hanya padankan jika tahun dan bulan API sepadan dengan tarikh yang diminta
+          const isMatchingMonth =
+            currentYear === date.getFullYear() && currentMonthNum === date.getMonth() + 1;
+
+          const todayItem = isMatchingMonth
+            ? data.prayers.find((p: { day?: number }) => Number(p.day) === date.getDate())
+            : null;
 
           if (todayItem) {
             fetchedTimes = {
@@ -140,6 +153,9 @@ export async function fetchDayPrayerTimes(
       const existingCached = localStorage.getItem(cacheKey);
       if (existingCached) {
         const parsed: DayPrayerTimes = JSON.parse(existingCached);
+        if (parsed.hijriDate && /^\d{4}-\d{2}-\d{2}H?$/.test(parsed.hijriDate)) {
+          parsed.hijriDate = getHijriDate(date).formatted;
+        }
         const lastSync = localStorage.getItem(`${cacheKey}_sync`) || nowTimeStr;
         return {
           times: parsed,
@@ -230,9 +246,19 @@ export const OBLIGATORY_PRAYERS_ORDER: PrayerKey[] = [
 ];
 
 export function getPrayerDateObj(baseDate: Date, timeStr: string): Date {
-  const [h, m] = (timeStr || '00:00').split(':').map(Number);
+  const cleaned = (timeStr || '00:00').trim().toUpperCase();
+  const isPM = cleaned.includes('PM');
+  const isAM = cleaned.includes('AM');
+  const [hRaw, mRaw] = cleaned.replace(/[A-Z\s]/g, '').split(':').map(Number);
+
+  let h = isNaN(hRaw) ? 0 : hRaw;
+  const m = isNaN(mRaw) ? 0 : mRaw;
+
+  if (isPM && h < 12) h += 12;
+  else if (isAM && h === 12) h = 0;
+
   const d = new Date(baseDate);
-  d.setHours(h || 0, m || 0, 0, 0);
+  d.setHours(h, m, 0, 0);
   return d;
 }
 
