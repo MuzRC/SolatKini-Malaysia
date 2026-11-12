@@ -98,33 +98,30 @@ public class AzanAudioService extends Service {
             voice = "jakim";
         }
 
-        // 1. Wajib panggil startForeground() dahulu bagi memenuhi kontrak startForegroundService() Android 8+
+        // 1. Panggil startForeground() dahulu sekiranya servis dimulakan sebagai foreground service
         Notification notification = buildForegroundNotification(prayerName, prayerKey, voice, isTest);
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
             } else {
                 startForeground(NOTIFICATION_ID, notification);
             }
         } catch (Throwable t) {
-            Log.e(TAG, "startForeground gagal: " + t.getMessage(), t);
+            Log.w(TAG, "startForeground tidak dibenarkan (teruskan audio jika startService biasa): " + t.getMessage());
             safeRecordHistory(
                 prayerName,
                 prayerKey,
                 AzanHistoryLogger.STATUS_FAILED,
-                "startForeground gagal: " + t.getMessage()
+                "Amaran startForeground: " + t.getClass().getSimpleName() + " - " + t.getMessage()
             );
-            stopSelfSafely();
-            return START_NOT_STICKY;
         }
 
-        // 2. Semakan Debounce 90 saat selepas startForeground() dipanggil
+        // 2. Semakan Debounce 90 saat
         long now = System.currentTimeMillis();
         if (!isTest && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
             Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu.");
             if (mediaPlayer == null || !isMediaPlayerPlayingSafely()) {
-                stopAzan();
-                stopSelfSafely();
+                stopServiceAfterGracePeriod();
             }
             return START_NOT_STICKY;
         }
@@ -136,13 +133,11 @@ public class AzanAudioService extends Service {
 
         Log.i(TAG, "Menerima permintaan azan untuk: " + prayerName + " (Suara: " + voice + ", Ujian: " + isTest + ", AutoStop: " + autoStopSeconds + "s)");
 
-        // Batalkan pemasa lama jika wujud
         if (autoStopRunnable != null) {
             autoStopHandler.removeCallbacks(autoStopRunnable);
             autoStopRunnable = null;
         }
 
-        // Tetapkan pemasa henti automatik HANYA jika nilainya lebih daripada 0
         if (autoStopSeconds > 0) {
             final int sec = autoStopSeconds;
             autoStopRunnable = () -> {
@@ -157,6 +152,19 @@ public class AzanAudioService extends Service {
         playAzanAudio(prayerName, prayerKey, voice);
 
         return START_NOT_STICKY;
+    }
+
+    /**
+     * Tangguhkan penutupan servis selama 600ms supaya kitaran onStartCommand() selesai
+     * terlebih dahulu sebelum stopForeground() dipanggil (mengelak ForegroundServiceDidNotStartInTimeException).
+     */
+    private void stopServiceAfterGracePeriod() {
+        stopAzanPlayerOnly();
+        releaseWakeLock();
+        autoStopHandler.postDelayed(() -> {
+            stopAzan();
+            stopSelfSafely();
+        }, 600L);
     }
 
     private boolean isMediaPlayerPlayingSafely() {
@@ -282,7 +290,6 @@ public class AzanAudioService extends Service {
                 .build();
             mediaPlayer.setAudioAttributes(audioAttributes);
 
-            // Semak dan pastikan kelantangan STREAM_ALARM sekurang-kurangnya 80%
             if (audioManager != null) {
                 try {
                     int currentVol = audioManager.getStreamVolume(AudioManager.STREAM_ALARM);
@@ -321,7 +328,6 @@ public class AzanAudioService extends Service {
 
             boolean loaded = false;
 
-            // 1. Semak fail muat turun tempatan / tersuai dalam getFilesDir()
             List<File> localFiles = new ArrayList<>();
             if ("custom".equalsIgnoreCase(voice) || "custom_azan".equalsIgnoreCase(voice)) {
                 localFiles.add(new File(getFilesDir(), "custom_azan.mp3"));
@@ -345,7 +351,6 @@ public class AzanAudioService extends Service {
                 }
             }
 
-            // 2. Muat daripada folder assets (public/audio/azan/*.mp3) sahaja tanpa res/raw
             if (!loaded) {
                 String[] candidatePaths = new String[]{
                     "public/audio/azan/" + mappedVoice + ".mp3",
@@ -373,8 +378,7 @@ public class AzanAudioService extends Service {
                     AzanHistoryLogger.STATUS_FAILED,
                     "Gagal: Fail audio (" + voice + ") tidak ditemui di public/audio/azan/."
                 );
-                stopAzan();
-                stopSelfSafely();
+                stopServiceAfterGracePeriod();
                 return;
             }
 
@@ -395,8 +399,7 @@ public class AzanAudioService extends Service {
                     AzanHistoryLogger.STATUS_FAILED,
                     "MediaPlayer error: what=" + what + ", extra=" + extra
                 );
-                stopAzan();
-                stopSelfSafely();
+                stopServiceAfterGracePeriod();
                 return true;
             });
 
@@ -424,8 +427,7 @@ public class AzanAudioService extends Service {
                 "Ralat pengecualian: " + t.getMessage()
             );
             closeCurrentAfd();
-            stopAzan();
-            stopSelfSafely();
+            stopServiceAfterGracePeriod();
         }
     }
 
@@ -447,7 +449,6 @@ public class AzanAudioService extends Service {
     }
 
     private boolean loadAudioFromAssets(String assetRelativePath, AudioAttributes audioAttributes) {
-        // 1. Cuba openFd secara terus dahulu (pantas & jimat storan kerana noCompress 'mp3' aktif dalam build.gradle)
         try {
             closeCurrentAfd();
             currentAfd = getAssets().openFd(assetRelativePath);
@@ -460,7 +461,6 @@ public class AzanAudioService extends Service {
             resetMediaPlayerForNextSource(audioAttributes);
         }
 
-        // 2. Sandaran: Salin dari assets ke fail cache unik jika openFd tidak disokong
         try {
             String fileNameOnly = new File(assetRelativePath).getName().replaceAll("[^a-zA-Z0-9._-]", "_");
             File cacheDir = getCacheDir();
@@ -570,7 +570,7 @@ public class AzanAudioService extends Service {
 
     private void safeRecordHistory(String prayerName, String prayerKey, String status, String message) {
         try {
-            AzanHistoryLogger.record(this, prayerName, prayerKey, status, message);
+            AzanHistoryLogger.recordSync(this, prayerName, prayerKey, status, message);
         } catch (Throwable t) {
             Log.w(TAG, "Gagal merekod sejarah azan: " + t.getMessage());
         }
