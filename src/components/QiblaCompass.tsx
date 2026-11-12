@@ -1,13 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Compass,
-  RotateCw,
   CheckCircle2,
-  AlertTriangle,
-  Navigation,
   Sparkles,
   Info,
-  Maximize2
 } from 'lucide-react';
 import { JakimZone } from '../types/prayer';
 
@@ -32,31 +27,38 @@ function calculateQiblaBearing(lat: number, lng: number): number {
   const y = Math.sin(deltaLambda);
   const x = Math.cos(phi) * Math.tan(phiK) - Math.sin(phi) * Math.cos(deltaLambda);
 
-  let qibla = (Math.atan2(y, x) * 180) / Math.PI;
+  const qibla = (Math.atan2(y, x) * 180) / Math.PI;
   return (qibla + 360) % 360;
 }
 
 export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
   // Sudut arah kompas peranti (0° = Utara Sebenar)
   const [deviceHeading, setDeviceHeading] = useState<number>(0);
-  // Sudut bearing Kiblat dari lokasi semasa (cth: ~292° di Sabah)
-  const [qiblaAngle, setQiblaAngle] = useState<number>(292.5);
 
-  // Status sensor & kebenaran
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  // Kira sudut bearing Kiblat awal terus daripada koordinat zon semasa
+  const [qiblaAngle, setQiblaAngle] = useState<number>(() => {
+    const initLat = (currentZone as any)?.lat ?? 5.347;
+    const initLng = (currentZone as any)?.lng ?? 115.743;
+    return Math.round(calculateQiblaBearing(initLat, initLng) * 10) / 10;
+  });
+
+  // Status sensor & ketepatan
   const [sensorAccuracy, setSensorAccuracy] = useState<'high' | 'medium' | 'unreliable'>('medium');
-  const [isSupported, setIsSupported] = useState<boolean>(true);
-  const [needsCalibration, setNeedsCalibration] = useState<boolean>(false);
 
   // Nilai sasaran dan penapis getaran (Smoothing Filter Refs)
   const targetHeadingRef = useRef<number>(0);
   const currentHeadingRef = useRef<number>(0);
+  const lastRenderedHeadingRef = useRef<number>(0);
   const animationFrameRef = useRef<number | null>(null);
   const lastVibrateRef = useRef<number>(0);
   const sampleCountRef = useRef<number>(0);
 
-  // 1. Kira sudut Kiblat mengikut zon JAKIM semasa atau koordinat GPS
+  // 1. Kira sudut Kiblat mengikut zon JAKIM semasa terlebih dahulu, kemudian haluskan dengan GPS jika aktif
   useEffect(() => {
+    const fallbackLat = (currentZone as any)?.lat ?? 5.347;
+    const fallbackLng = (currentZone as any)?.lng ?? 115.743;
+    setQiblaAngle(Math.round(calculateQiblaBearing(fallbackLat, fallbackLng) * 10) / 10);
+
     if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -64,19 +66,16 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           setQiblaAngle(Math.round(angle * 10) / 10);
         },
         () => {
-          // Sandaran: Jika GPS dimatikan, anggap koordinat purata zon (~292.5° di Sabah)
-          const fallbackLat = (currentZone as any)?.lat || 5.347;
-          const fallbackLng = (currentZone as any)?.lng || 115.743;
-          setQiblaAngle(Math.round(calculateQiblaBearing(fallbackLat, fallbackLng) * 10) / 10);
+          // Kekalkan sudut berasaskan koordinat zon jika GPS dimatikan
         },
-        { enableHighAccuracy: true, timeout: 6000 }
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 120000 }
       );
     }
   }, [currentZone]);
 
   // 2. Enjin Penapis Getaran Sudut Bulatan (Circular Exponential Smoothing Filter @ 60fps)
   useEffect(() => {
-    const SMOOTHING_FACTOR = 0.12; // Penapis getaran: ayunan lembut macam kompas minyak fizikal
+    const SMOOTHING_FACTOR = 0.14;
 
     const updateSmoothHeading = () => {
       const current = currentHeadingRef.current;
@@ -92,7 +91,15 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         currentHeadingRef.current = (current + diff * SMOOTHING_FACTOR + 360) % 360;
       }
 
-      setDeviceHeading(currentHeadingRef.current);
+      // Hanya kemas kini state React jika sudut berubah sekurang-kurangnya 0.1 darjah (jimat bateri & CPU)
+      let renderDiff = Math.abs(currentHeadingRef.current - lastRenderedHeadingRef.current);
+      if (renderDiff > 180) renderDiff = 360 - renderDiff;
+
+      if (renderDiff >= 0.1) {
+        lastRenderedHeadingRef.current = currentHeadingRef.current;
+        setDeviceHeading(currentHeadingRef.current);
+      }
+
       animationFrameRef.current = requestAnimationFrame(updateSmoothHeading);
     };
 
@@ -105,34 +112,46 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
     };
   }, []);
 
-  // 3. Pendengar Sensor Orientasi Asli Android (deviceorientationabsolute & webkitCompassHeading)
+  // 3. Pendengar Sensor Orientasi Asli Android & iOS (dengan sokongan fallback)
   useEffect(() => {
-    let orientationEventName = 'deviceorientation';
+    let hasAbsoluteEventFired = false;
 
-    const handleOrientation = (e: any) => {
+    const processOrientationEvent = (e: any, isAbsoluteEvent: boolean) => {
+      if (!isAbsoluteEvent && hasAbsoluteEventFired) {
+        return; // Utamakan deviceorientationabsolute jika peranti menyokongnya
+      }
+      if (isAbsoluteEvent) {
+        hasAbsoluteEventFired = true;
+      }
+
       let heading: number | null = null;
 
       // A. Sokongan iOS / Safari
-      if (typeof e.webkitCompassHeading === 'number') {
+      if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
         heading = e.webkitCompassHeading;
         if (typeof e.webkitCompassAccuracy === 'number') {
-          if (e.webkitCompassAccuracy > 0 && e.webkitCompassAccuracy <= 15) {
+          if (e.webkitCompassAccuracy >= 0 && e.webkitCompassAccuracy <= 15) {
             setSensorAccuracy('high');
-            setNeedsCalibration(false);
-          } else if (e.webkitCompassAccuracy > 15) {
+          } else if (e.webkitCompassAccuracy > 15 && e.webkitCompassAccuracy <= 35) {
             setSensorAccuracy('medium');
+          } else if (e.webkitCompassAccuracy > 35 || e.webkitCompassAccuracy < 0) {
+            setSensorAccuracy('unreliable');
           }
         }
       }
       // B. Sokongan Android Native (deviceorientationabsolute / alpha)
-      else if (e.alpha !== null && e.alpha !== undefined) {
-        heading = 360 - e.alpha;
+      else if (typeof e.alpha === 'number' && !isNaN(e.alpha)) {
+        const screenAngle =
+          typeof window !== 'undefined' && window.screen?.orientation?.angle
+            ? window.screen.orientation.angle
+            : 0;
+
+        heading = (360 - e.alpha + screenAngle) % 360;
 
         sampleCountRef.current += 1;
-        if (sampleCountRef.current > 20) {
-          if (e.absolute === true) {
+        if (sampleCountRef.current > 15) {
+          if (e.absolute === true || isAbsoluteEvent) {
             setSensorAccuracy('high');
-            setNeedsCalibration(false);
           } else {
             setSensorAccuracy('medium');
           }
@@ -141,24 +160,26 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
 
       if (heading !== null) {
         targetHeadingRef.current = (heading + 360) % 360;
-        setHasPermission(true);
       }
     };
 
+    const handleAbsolute = (e: Event) => processOrientationEvent(e, true);
+    const handleStandard = (e: Event) => processOrientationEvent(e, false);
+
     if ('ondeviceorientationabsolute' in window) {
-      orientationEventName = 'deviceorientationabsolute';
-    } else if (!('ondeviceorientation' in window)) {
-      setIsSupported(false);
+      window.addEventListener('deviceorientationabsolute', handleAbsolute as EventListener, true);
+    }
+    if ('ondeviceorientation' in window) {
+      window.addEventListener('deviceorientation', handleStandard as EventListener, true);
     }
 
-    window.addEventListener(orientationEventName, handleOrientation, true);
-
     return () => {
-      window.removeEventListener(orientationEventName, handleOrientation, true);
+      window.removeEventListener('deviceorientationabsolute', handleAbsolute as EventListener, true);
+      window.removeEventListener('deviceorientation', handleStandard as EventListener, true);
     };
   }, []);
 
-  // Sudut relatif dari kepala telefon ke arah Kiblat
+  // Sudut relatif dari kepala telefon ke arah Kiblat (-180° hingga +180°)
   const qiblaRelativeAngle = ((qiblaAngle - deviceHeading + 540) % 360) - 180;
   const isAligned = Math.abs(qiblaRelativeAngle) <= 3; // Toleransi tepat +-3 darjah
 
@@ -179,7 +200,6 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
 
   return (
     <div className="flex flex-col items-center justify-between min-h-[75vh] w-full max-w-md mx-auto px-4 py-2 select-none animate-in fade-in duration-300">
-      
       {/* 1. Header & Status Sensor Ketepatan */}
       <div className="w-full text-center space-y-2">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 shadow-inner">
@@ -211,7 +231,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
         </p>
       </div>
 
-      {/* 2. DAIL KOMPAS ISLAMIK (Fluid-damped smooth rotation) */}
+      {/* 2. DAIL KOMPAS ISLAMIK (Putaran 60fps tanpa konflik CSS transition di titik 0°/360°) */}
       <div className="relative w-72 h-72 sm:w-80 sm:h-80 my-6 flex items-center justify-center">
         {/* Glow Lingkaran Luar bila Kiblat Tepat */}
         <div
@@ -224,7 +244,7 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
 
         {/* Piring Dail Berpusing mengikut arah hadap telefon (-deviceHeading) */}
         <div
-          className="absolute inset-2 rounded-full border border-slate-800/80 flex items-center justify-center bg-gradient-to-b from-[#0a1410] to-[#040806] transition-transform duration-75 will-change-transform shadow-2xl"
+          className="absolute inset-2 rounded-full border border-slate-800/80 flex items-center justify-center bg-gradient-to-b from-[#0a1410] to-[#040806] will-change-transform shadow-2xl"
           style={{
             transform: `rotate(${-deviceHeading}deg)`,
           }}
@@ -350,7 +370,6 @@ export const QiblaCompass: React.FC<QiblaCompassProps> = ({ currentZone }) => {
           </p>
         </div>
       </div>
-
     </div>
   );
 };
