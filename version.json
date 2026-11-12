@@ -1,6 +1,6 @@
 {
-  "latestVersion": "3.2.4",
-  "versionCode": 324,
-  "releaseNotes": "Update build-apk.yml",
-  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.2.4/SolatKini-v3.2.4-signed.apk"
+  "latestVersion": "3.2.5",
+  "versionCode": 325,
+  "releaseNotes": "chore: kemaskini version.json ke v3.2.4 (build 324) [skip ci]",
+  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.2.5/SolatKini-v3.2.5-signed.apk"
 }
