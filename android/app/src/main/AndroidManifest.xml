@@ -11,9 +11,10 @@
     <uses-feature android:name="android.hardware.location.network" android:required="false" />
 
     <!-- ======================================================== -->
-    <!-- 2. KEBENARAN NOTIFIKASI & PENGGERA AZAN TEPAT            -->
+    <!-- 2. KEBENARAN NOTIFIKASI, SKRIN KUNCI & PENGGERA TEPAT    -->
     <!-- ======================================================== -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -52,6 +53,8 @@
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
             android:exported="true">
 
             <intent-filter>
@@ -83,29 +86,29 @@
             </intent-filter>
         </receiver>
 
-        <!-- Receiver penerima cetusan waktu solat -->
+        <!-- Receiver penerima cetusan waktu solat (Dalaman sahaja: exported="false") -->
         <receiver
             android:name=".AzanAlarmReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.solatkini.app.TRIGGER_AZAN_ALARM" />
             </intent-filter>
         </receiver>
 
         <!-- Daftarkan Home Screen Widget Provider -->
-<receiver
-    android:name=".SolatWidgetProvider"
-    android:exported="true">
-    <intent-filter>
-        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-        <action android:name="com.solatkini.app.ACTION_UPDATE_PRAYER_TIMES" />
-    </intent-filter>
-    <meta-data
-        android:name="android.appwidget.provider"
-        android:resource="@xml/solat_widget_info" />
-</receiver>
-        
+        <receiver
+            android:name=".SolatWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.solatkini.app.ACTION_UPDATE_PRAYER_TIMES" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/solat_widget_info" />
+        </receiver>
+
         <!-- Servis audio azan pada saluran STREAM_ALARM -->
         <service
             android:name=".AzanAudioService"
