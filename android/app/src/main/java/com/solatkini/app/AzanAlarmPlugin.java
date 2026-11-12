@@ -23,6 +23,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import java.util.Locale;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -323,9 +324,9 @@ public class AzanAlarmPlugin extends Plugin {
             ret.put("success", true);
             ret.put("scheduledCount", scheduledCount);
             call.resolve(ret);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "Ralat menjadualkan penggera solat asli", e);
-            call.reject("Gagal menjadualkan penggera azan: " + e.getMessage(), e);
+            call.reject("Gagal menjadualkan penggera azan: " + e.getMessage());
         }
     }
 
@@ -342,8 +343,8 @@ public class AzanAlarmPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal membatalkan penggera azan: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal membatalkan penggera azan: " + e.getMessage());
         }
     }
 
@@ -369,13 +370,21 @@ public class AzanAlarmPlugin extends Plugin {
                 serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
                 try {
-                    ContextCompat.startForegroundService(context, serviceIntent);
-                } catch (Exception e) {
-                    Log.w(TAG, "ContextCompat.startForegroundService gagal, mencuba startService biasa: " + e.getMessage());
+                    // Guna startService biasa masa app sedang terbuka di skrin (elak ForegroundServiceDidNotStartInTimeException)
+                    context.startService(serviceIntent);
+                } catch (Throwable e) {
+                    Log.w(TAG, "startService gagal, mencuba startForegroundService: " + e.getMessage());
                     try {
-                        context.startService(serviceIntent);
-                    } catch (Exception ex) {
+                        ContextCompat.startForegroundService(context, serviceIntent);
+                    } catch (Throwable ex) {
                         Log.e(TAG, "Gagal memulakan service audio: " + ex.getMessage(), ex);
+                        AzanHistoryLogger.record(
+                            context,
+                            prayerName,
+                            prayerKey,
+                            AzanHistoryLogger.STATUS_FAILED,
+                            "Gagal memulakan service audio: " + ex.getMessage()
+                        );
                     }
                 }
             } else {
@@ -418,8 +427,9 @@ public class AzanAlarmPlugin extends Plugin {
             ret.put("delaySeconds", delaySeconds);
             ret.put("autoStopSeconds", autoStopSeconds);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal menguji penggera azan: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            Log.e(TAG, "Gagal menguji penggera azan", e);
+            call.reject("Gagal menguji penggera azan: " + e.getMessage());
         }
     }
 
@@ -444,16 +454,18 @@ public class AzanAlarmPlugin extends Plugin {
             stopIntent.setAction(AzanAudioService.ACTION_STOP_AZAN);
             try {
                 context.startService(stopIntent);
-            } catch (IllegalStateException e) {
+            } catch (Throwable e) {
                 // Sandaran jika servis tidak berada dalam keadaan aktif pada Android 8+
-                context.stopService(new Intent(context, AzanAudioService.class));
+                try {
+                    context.stopService(new Intent(context, AzanAudioService.class));
+                } catch (Throwable ignored) {}
             }
 
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal menghentikan audio azan: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal menghentikan audio azan: " + e.getMessage());
         }
     }
 
@@ -505,7 +517,7 @@ public class AzanAlarmPlugin extends Plugin {
     @PluginMethod
     public void openAutostartSettings(PluginCall call) {
         Context context = getContext();
-        String brand = Build.MANUFACTURER.toLowerCase();
+        String brand = Build.MANUFACTURER.toLowerCase(Locale.ROOT);
         Intent intent = new Intent();
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
@@ -579,8 +591,8 @@ public class AzanAlarmPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("logsJson", logsJson);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal mengambil log diagnostik azan: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal mengambil log diagnostik azan: " + e.getMessage());
         }
     }
 
@@ -591,8 +603,8 @@ public class AzanAlarmPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal mengosongkan log diagnostik: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal mengosongkan log diagnostik: " + e.getMessage());
         }
     }
 }
