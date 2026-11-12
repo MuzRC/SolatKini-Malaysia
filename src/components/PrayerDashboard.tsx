@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   MapPin,
   Bell,
@@ -108,64 +108,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     return true;
   });
 
-  const hijri = getHijriDate(currentTime);
-  const recommendation = getFastingRecommendation(currentTime, hijri);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  useEffect(() => {
-    const checkPermsAndState = () => {
-      nativeAlarmService.checkPermissions().then((res) => {
-        setNotificationsGranted(res.notificationsGranted);
-      });
-      if (typeof nativeAlarmService.checkAutoTime === 'function') {
-        nativeAlarmService.checkAutoTime().then((enabled) => {
-          setIsAutoTimeEnabled(enabled);
-        });
-      }
-      if (typeof navigator !== 'undefined') {
-        setIsOnline(navigator.onLine ?? true);
-      }
-      const now = new Date();
-      setCurrentTime(now);
-      setNextPrayerInfo(determineNextPrayer(prayerTimes, now));
-
-      const todayStr = getLocalDateString(now);
-      if (prayerTimes && prayerTimes.date !== todayStr && onLiveSync) {
-        onLiveSync();
-      }
-
-      if (prayerTimes && currentZone) {
-        const currentHijri = getHijriDate(now);
-        const isPersistentEnabled = notificationSettings.persistentNotification ?? true;
-        widgetService.syncPersistentNotification(
-          prayerTimes,
-          currentZone,
-          currentHijri.formatted,
-          isPersistentEnabled
-        );
-      }
-    };
-
-    checkPermsAndState();
-    window.addEventListener('focus', checkPermsAndState);
-    document.addEventListener('visibilitychange', checkPermsAndState);
-    return () => {
-      window.removeEventListener('focus', checkPermsAndState);
-      document.removeEventListener('visibilitychange', checkPermsAndState);
-    };
-  }, [prayerTimes, onLiveSync, currentZone]);
-
   const [selectedVoice, setSelectedVoice] = useState<AzanVoice>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('solatkini_azan_voice') as AzanVoice) || 'jakim';
@@ -197,13 +139,83 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           return {
             ...defaultSettings,
             ...parsed,
-            persistentNotification: parsed.persistentNotification !== undefined ? parsed.persistentNotification : true,
+            preferences: {
+              ...defaultSettings.preferences,
+              ...(parsed.preferences || {}),
+            },
+            persistentNotification:
+              parsed.persistentNotification !== undefined ? parsed.persistentNotification : true,
           };
         }
       } catch {}
     }
     return defaultSettings;
   });
+
+  const hijri = getHijriDate(currentTime);
+  const recommendation = getFastingRecommendation(currentTime, hijri);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const checkPermsAndState = useCallback(() => {
+    nativeAlarmService.checkPermissions().then((res) => {
+      setNotificationsGranted(res.notificationsGranted);
+    });
+    if (typeof nativeAlarmService.checkAutoTime === 'function') {
+      nativeAlarmService.checkAutoTime().then((enabled) => {
+        setIsAutoTimeEnabled(enabled);
+      });
+    }
+    if (typeof navigator !== 'undefined') {
+      setIsOnline(navigator.onLine ?? true);
+    }
+    if (typeof window !== 'undefined') {
+      const savedVoice = localStorage.getItem('solatkini_azan_voice') as AzanVoice | null;
+      if (savedVoice) {
+        setSelectedVoice(savedVoice);
+      }
+    }
+
+    const now = new Date();
+    setCurrentTime(now);
+    setNextPrayerInfo(determineNextPrayer(prayerTimes, now));
+
+    const todayStr = getLocalDateString(now);
+    if (prayerTimes && prayerTimes.date !== todayStr && onLiveSync && !isLiveSyncing) {
+      onLiveSync();
+    }
+
+    if (prayerTimes && currentZone) {
+      const currentHijri = getHijriDate(now);
+      const isPersistentEnabled = notificationSettings.persistentNotification ?? true;
+      widgetService.syncPersistentNotification(
+        prayerTimes,
+        currentZone,
+        currentHijri.formatted,
+        isPersistentEnabled
+      );
+    }
+  }, [prayerTimes, onLiveSync, isLiveSyncing, currentZone, notificationSettings.persistentNotification]);
+
+  useEffect(() => {
+    checkPermsAndState();
+    window.addEventListener('focus', checkPermsAndState);
+    document.addEventListener('visibilitychange', checkPermsAndState);
+    return () => {
+      window.removeEventListener('focus', checkPermsAndState);
+      document.removeEventListener('visibilitychange', checkPermsAndState);
+    };
+  }, [checkPermsAndState]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -220,7 +232,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   }, [prayerTimes, currentZone]);
 
-  // Penjadualan automatik ke Android AlarmManager
+  // Penjadualan automatik ke Android AlarmManager apabila jadual, suara, atau suis waktu solat berubah
   useEffect(() => {
     if (prayerTimes && prayerTimes.times) {
       const list = PRAYER_KEYS_ORDER.map((k) => ({
@@ -228,7 +240,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         label: PRAYER_LABELS[k],
         time: prayerTimes.times[k],
         displayTime: formatDisplayTime(prayerTimes.times[k]),
-        voice: (k === 'subuh' ? 'subuh_special' : selectedVoice) as AzanVoice,
+        voice: (k === 'subuh' && selectedVoice === 'jakim' ? 'subuh_special' : selectedVoice) as AzanVoice,
       }));
 
       const enabledMap: Record<PrayerKey, boolean> = {
@@ -260,16 +272,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       );
     }
   }, [prayerTimes, currentZone, notificationSettings.persistentNotification, hijri.formatted, nextPrayerInfo.nextKey]);
-
-  useEffect(() => {
-    const handleRemoteSync = () => {
-      if (onLiveSync) {
-        onLiveSync();
-      }
-    };
-    window.addEventListener('solatSyncRequested', handleRemoteSync);
-    return () => window.removeEventListener('solatSyncRequested', handleRemoteSync);
-  }, [onLiveSync]);
 
   const [isUserFastingToday, setIsUserFastingToday] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -348,7 +350,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
   };
 
-  const handleVoiceSelect = async (voice: AzanVoice) => {
+  const handleVoiceSelect = (voice: AzanVoice) => {
     setSelectedVoice(voice);
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_azan_voice', voice);
@@ -356,12 +358,19 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     }
     nativeAlarmService.setActiveVoice(voice);
 
+    // Kemas kini state notificationSettings; useEffect akan menjadualkan semula penggera secara tunggal & selamat
     setNotificationSettings((prev) => {
       const updated: AppNotificationSettings = {
         ...prev,
         preferences: {
           ...prev.preferences,
-          subuh: { ...(prev.preferences?.subuh || {}), voice: 'subuh_special', enabled: prev.preferences?.subuh?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
+          subuh: {
+            ...(prev.preferences?.subuh || {}),
+            voice: voice === 'jakim' ? 'subuh_special' : voice,
+            enabled: prev.preferences?.subuh?.enabled ?? true,
+            beforeMinutes: 0,
+            bypassSilentTone: true,
+          },
           zohor: { ...(prev.preferences?.zohor || {}), voice, enabled: prev.preferences?.zohor?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           asar: { ...(prev.preferences?.asar || {}), voice, enabled: prev.preferences?.asar?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
           maghrib: { ...(prev.preferences?.maghrib || {}), voice, enabled: prev.preferences?.maghrib?.enabled ?? true, beforeMinutes: 0, bypassSilentTone: true },
@@ -373,26 +382,6 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
       }
       return updated;
     });
-
-    if (prayerTimes && prayerTimes.times && notificationSettings.masterEnabled) {
-      const list = PRAYER_KEYS_ORDER.map((k) => ({
-        key: k,
-        label: PRAYER_LABELS[k],
-        time: prayerTimes.times[k],
-        displayTime: formatDisplayTime(prayerTimes.times[k]),
-        voice: (k === 'subuh' ? 'subuh_special' : voice) as AzanVoice,
-      }));
-      const enabledMap: Record<PrayerKey, boolean> = {
-        imsak: false,
-        subuh: notificationSettings.preferences.subuh?.enabled ?? true,
-        syuruk: false,
-        zohor: notificationSettings.preferences.zohor?.enabled ?? true,
-        asar: notificationSettings.preferences.asar?.enabled ?? true,
-        maghrib: notificationSettings.preferences.maghrib?.enabled ?? true,
-        isyak: notificationSettings.preferences.isyak?.enabled ?? true,
-      };
-      nativeAlarmService.schedulePrayers(list, voice, enabledMap);
-    }
   };
 
   const handleTogglePrayerNotif = async (key: PrayerKey) => {
@@ -400,7 +389,8 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
     if (!isCurrentlyEnabled) {
       const perms = await nativeAlarmService.checkPermissions();
       if (!perms.notificationsGranted) {
-        await nativeAlarmService.requestNotificationPermission();
+        const granted = await nativeAlarmService.requestNotificationPermission();
+        setNotificationsGranted(granted);
       }
     }
 
@@ -443,7 +433,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
         setIsLocating(false);
         if (err.code === 1) {
           setLocationError({
-            message: 'Kebenaran lokasi telah disekat oleh Android. Sila buka Tetapan Telefon untuk membenarkan akses Lokasi.',
+            message: 'Kebenaran lokasi telah disekat oleh Android. Sila benarkan akses Lokasi pada menu Keizinan Aplikasi (App Info > Permissions) di Tetapan Telefon.',
             isDenied: true,
           });
         } else if (err.code === 2) {
@@ -568,13 +558,11 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               {locationError.isDenied && (
                 <button
                   type="button"
-                  onClick={async () => {
-                    await nativeAlarmService.openNotificationSettings();
-                  }}
+                  onClick={() => setIsZoneModalOpen(true)}
                   className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 font-bold text-[11px] flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
                 >
-                  <Settings className="w-3.5 h-3.5" />
-                  <span>Buka Tetapan</span>
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Pilih Zon Manual</span>
                 </button>
               )}
               <button
@@ -668,7 +656,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
               }}
               className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs border border-slate-700 transition cursor-pointer"
             >
-              Buka Tetapan Telefon (App Info)
+              Buka Tetapan Notifikasi
             </button>
           </div>
         </div>
@@ -739,7 +727,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
           <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0">
             <button
               onClick={() => {
-                const testVoice = (nextPrayerInfo.nextKey === 'subuh' ? 'subuh_special' : selectedVoice) as AzanVoice;
+                const testVoice = (nextPrayerInfo.nextKey === 'subuh' && selectedVoice === 'jakim' ? 'subuh_special' : selectedVoice) as AzanVoice;
                 onTriggerTestAlarm(nextPrayerInfo.nextKey, nextPrayerInfo.nextLabel, testVoice);
               }}
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-emerald-900/40 transition active:scale-95 cursor-pointer"
@@ -850,7 +838,7 @@ export const PrayerDashboard: React.FC<PrayerDashboardProps> = ({
                         </span>
                       )}
                     </span>
-                    
+
                     <button
                       onClick={() => handleTogglePrayerNotif(key)}
                       title={isAlertEnabled ? 'Azan Aktif' : 'Azan Senyap'}
