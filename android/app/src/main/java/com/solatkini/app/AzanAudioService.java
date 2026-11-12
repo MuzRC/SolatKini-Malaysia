@@ -24,6 +24,8 @@ import androidx.core.app.NotificationCompat;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 public class AzanAudioService extends Service {
     private static final String TAG = "AzanAudioService";
@@ -74,24 +76,39 @@ public class AzanAudioService extends Service {
             autoStopSeconds = 20; // 20 saat henti automatik untuk ujian audio azan
         }
 
-        long now = System.currentTimeMillis();
-        if (!isTest && prayerKey != null && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
-            Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu.");
-            return START_NOT_STICKY;
-        }
-
-        if (!isTest) {
-            sLastAzanTimestamp = now;
-            sLastPrayerKey = prayerKey != null ? prayerKey : "";
-        }
-
         if (voice == null || voice.isEmpty()) {
             SharedPreferences prefs = getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
             voice = prefs.getString("selected_azan_voice", "jakim");
         }
 
         if (prayerName == null || prayerName.isEmpty()) prayerName = isTest ? "Ujian Azan" : "Solat";
+        if (prayerKey == null || prayerKey.isEmpty()) prayerKey = "solat";
         if (voice == null || voice.isEmpty()) voice = "jakim";
+
+        // 1. Wajib panggil startForeground() dahulu bagi memenuhi kontrak startForegroundService() Android 8+
+        Notification notification = buildForegroundNotification(prayerName, prayerKey, voice);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
+
+        // 2. Semakan Debounce 90 saat selepas startForeground() dipanggil
+        long now = System.currentTimeMillis();
+        if (!isTest && prayerKey.equals(sLastPrayerKey) && (now - sLastAzanTimestamp < 90_000L)) {
+            Log.w(TAG, "Penggera solat " + prayerKey + " baru sahaja dilaungkan kurang 90 saat yang lalu.");
+            // Jika audio tidak sedang bermain (contohnya telah dihentikan pengguna), tutup servis dengan selamat
+            if (mediaPlayer == null || !mediaPlayer.isPlaying()) {
+                stopAzan();
+                stopSelf();
+            }
+            return START_NOT_STICKY;
+        }
+
+        if (!isTest) {
+            sLastAzanTimestamp = now;
+            sLastPrayerKey = prayerKey;
+        }
 
         Log.i(TAG, "Menerima permintaan azan untuk: " + prayerName + " (Suara: " + voice + ", Ujian: " + isTest + ", AutoStop: " + autoStopSeconds + "s)");
 
@@ -113,15 +130,6 @@ public class AzanAudioService extends Service {
         }
 
         acquireWakeLock();
-
-        // Mulakan notifikasi foreground berformat rasmi
-        Notification notification = buildForegroundNotification(prayerName, prayerKey, voice);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK);
-        } else {
-            startForeground(NOTIFICATION_ID, notification);
-        }
-
         playAzanAudio(prayerName, prayerKey, voice);
 
         return START_NOT_STICKY;
@@ -130,12 +138,17 @@ public class AzanAudioService extends Service {
     private void acquireWakeLock() {
         try {
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (powerManager != null && (wakeLock == null || !wakeLock.isHeld())) {
-                wakeLock = powerManager.newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK | PowerManager.ACQUIRE_CAUSES_WAKEUP,
-                    "SolatKini::AzanAudioServiceWakeLock"
-                );
-                wakeLock.acquire(7 * 60 * 1000L);
+            if (powerManager != null) {
+                if (wakeLock == null) {
+                    wakeLock = powerManager.newWakeLock(
+                        PowerManager.PARTIAL_WAKE_LOCK,
+                        "SolatKini::AzanAudioServiceWakeLock"
+                    );
+                    wakeLock.setReferenceCounted(false);
+                }
+                if (!wakeLock.isHeld()) {
+                    wakeLock.acquire(7 * 60 * 1000L);
+                }
             }
         } catch (Exception e) {
             Log.e(TAG, "Gagal mengaktifkan WakeLock", e);
@@ -219,11 +232,10 @@ public class AzanAudioService extends Service {
         try {
             mediaPlayer = new MediaPlayer();
 
-            // Tetapkan AudioAttributes rasmi bagi saluran STREAM_ALARM
+            // Tetapkan AudioAttributes rasmi bagi saluran STREAM_ALARM tanpa FLAG_AUDIBILITY_ENFORCED
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .setFlags(AudioAttributes.FLAG_AUDIBILITY_ENFORCED)
                 .build();
             mediaPlayer.setAudioAttributes(audioAttributes);
 
@@ -263,14 +275,16 @@ public class AzanAudioService extends Service {
 
             boolean loaded = false;
 
-            // 1. Semak fail muat turun tempatan / tersuai dalam getFilesDir()
-            File[] localFiles = new File[]{
-                new File(getFilesDir(), "custom_azan.mp3"),
-                new File(getFilesDir(), voice + ".mp3"),
-                new File(getFilesDir(), mappedVoice + ".mp3"),
-                new File(getFilesDir(), "azan_" + voice + ".mp3"),
-                new File(getFilesDir(), "azan_" + mappedVoice + ".mp3")
-            };
+            // 1. Semak fail muat turun tempatan / tersuai dalam getFilesDir() mengikut keutamaan suara
+            List<File> localFiles = new ArrayList<>();
+            if ("custom".equalsIgnoreCase(voice) || "custom_azan".equalsIgnoreCase(voice)) {
+                localFiles.add(new File(getFilesDir(), "custom_azan.mp3"));
+            }
+            localFiles.add(new File(getFilesDir(), voice + ".mp3"));
+            localFiles.add(new File(getFilesDir(), mappedVoice + ".mp3"));
+            localFiles.add(new File(getFilesDir(), "azan_" + voice + ".mp3"));
+            localFiles.add(new File(getFilesDir(), "azan_" + mappedVoice + ".mp3"));
+            localFiles.add(new File(getFilesDir(), "custom_azan.mp3"));
 
             for (File file : localFiles) {
                 if (file.exists() && file.length() > 0) {
