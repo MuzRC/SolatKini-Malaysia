@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Check, CheckCircle2, Sparkles } from 'lucide-react';
 import { DayPrayerTimes, FardPrayerKey, FARD_PRAYERS_ORDER } from '../types/prayer';
 import { PRAYER_LABELS } from '../services/prayerService';
@@ -19,8 +19,20 @@ export const DailyFardChecklist: React.FC<DailyFardChecklistProps> = ({
   onResetChecklist,
   currentTime,
 }) => {
+  const [confirmReset, setConfirmReset] = useState(false);
+
   const completedFardCount = FARD_PRAYERS_ORDER.filter((k) => prayerChecklist[k]).length;
   const fardPercentage = Math.round((completedFardCount / 5) * 100);
+
+  const handleResetClick = () => {
+    if (!confirmReset) {
+      setConfirmReset(true);
+      setTimeout(() => setConfirmReset(false), 3500);
+      return;
+    }
+    setConfirmReset(false);
+    onResetChecklist();
+  };
 
   return (
     <div className="rounded-3xl bg-gradient-to-br from-[#0a1612] via-[#0e2119] to-[#08120e] border border-emerald-500/30 p-5 sm:p-6 shadow-xl space-y-4 select-none">
@@ -45,10 +57,14 @@ export const DailyFardChecklist: React.FC<DailyFardChecklistProps> = ({
         {completedFardCount > 0 && (
           <button
             type="button"
-            onClick={onResetChecklist}
-            className="text-xs text-slate-400 hover:text-red-400 transition self-start sm:self-center px-2.5 py-1 rounded-xl border border-slate-800 hover:border-red-900/50 bg-slate-900/60 cursor-pointer"
+            onClick={handleResetClick}
+            className={`text-xs transition self-start sm:self-center px-2.5 py-1 rounded-xl border cursor-pointer ${
+              confirmReset
+                ? 'bg-red-600 text-white border-red-400 font-bold'
+                : 'text-slate-400 hover:text-red-400 border-slate-800 hover:border-red-900/50 bg-slate-900/60'
+            }`}
           >
-            Set Semula
+            {confirmReset ? 'Sahkan Set Semula?' : 'Set Semula'}
           </button>
         )}
       </div>
