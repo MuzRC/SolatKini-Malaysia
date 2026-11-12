@@ -37,6 +37,26 @@ interface SolatWidgetPluginInterface {
 
 const SolatWidget = registerPlugin<SolatWidgetPluginInterface>('SolatWidget');
 
+function parseTimeParts(timeStr: string): { hours: number; minutes: number } | null {
+  if (!timeStr) return null;
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes('PM');
+  const isAM = cleaned.includes('AM');
+
+  const timeOnly = cleaned.replace(/[A-Z\s]/g, '');
+  const parts = timeOnly.split(':');
+  if (parts.length < 2) return null;
+
+  let hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+
+  if (isPM && hours < 12) hours += 12;
+  else if (isAM && hours === 12) hours = 0;
+
+  return { hours, minutes };
+}
+
 export class WidgetService {
   private lastSyncedWidgetPayload: string | null = null;
   private lastSyncedNotifPayload: string | null = null;
@@ -46,7 +66,16 @@ export class WidgetService {
     return Capacitor.getPlatform() === 'android';
   }
 
-  public async syncWidget(prayerTimes: DayPrayerTimes, zone: JakimZone): Promise<void> {
+  private formatZoneLabel(zone: JakimZone): string {
+    const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
+    return daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
+  }
+
+  public async syncWidget(
+    prayerTimes: DayPrayerTimes,
+    zone: JakimZone,
+    force: boolean = false
+  ): Promise<void> {
     try {
       if (!prayerTimes?.times) return;
 
@@ -54,9 +83,10 @@ export class WidgetService {
       const nextPrayer = determineNextPrayer(prayerTimes, now);
       const nextLabel = nextPrayer ? nextPrayer.nextLabel : 'Waktu Solat';
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
+      const zoneLabel = this.formatZoneLabel(zone);
 
       const payload = {
-        zone: zone?.code || 'WLY01',
+        zone: zoneLabel,
         next_label: nextLabel,
         next_time: nextTime,
         imsak: formatDisplayTime(prayerTimes.times.imsak),
@@ -69,11 +99,9 @@ export class WidgetService {
       };
 
       const payloadStr = JSON.stringify(payload);
-      if (payloadStr === this.lastSyncedWidgetPayload) {
+      if (!force && payloadStr === this.lastSyncedWidgetPayload) {
         return;
       }
-
-      this.lastSyncedWidgetPayload = payloadStr;
 
       if (typeof window !== 'undefined') {
         localStorage.setItem('solatkini_widget_latest', payloadStr);
@@ -83,6 +111,8 @@ export class WidgetService {
         await SolatWidget.updateWidget(payload);
         console.info('[WidgetService] Widget Android berjaya dikemaskini:', payload.zone);
       }
+
+      this.lastSyncedWidgetPayload = payloadStr;
     } catch (err) {
       console.warn('[WidgetService] Tidak dapat mengemaskini widget natif Android:', err);
     }
@@ -92,7 +122,8 @@ export class WidgetService {
     prayerTimes: DayPrayerTimes,
     zone: JakimZone,
     hijriFormatted?: string,
-    enabled: boolean = true
+    enabled: boolean = true,
+    force: boolean = false
   ): Promise<void> {
     try {
       if (!enabled) {
@@ -120,23 +151,22 @@ export class WidgetService {
           }
         }
 
-        // Sandaran tambahan jika pengiraan masa terlepas
+        // Sandaran tambahan jika pengiraan masa terlepas (menyokong format 12j/24j)
         if (!nextTimestamp && nextPrayer.nextTime) {
-          const parts = nextPrayer.nextTime.split(':');
-          if (parts.length >= 2) {
+          const parsedTime = parseTimeParts(nextPrayer.nextTime);
+          if (parsedTime) {
             const target = new Date();
-            target.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+            target.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
             if (target.getTime() <= now.getTime()) {
-              target.setDate(target.getDate() + 1); // Anjak ke Imsak hari esok
+              target.setDate(target.getDate() + 1); // Anjak ke hari esok
             }
             nextTimestamp = target.getTime();
           }
         }
       }
 
-      // 2. Ekstrak nama daerah secara defensif
-      const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
-      const zoneLabel = daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
+      // 2. Gunakan format zon yang konsisten dengan Widget Skrin Utama
+      const zoneLabel = this.formatZoneLabel(zone);
 
       // 3. Bentuk payload lengkap merangkumi kesemua 7 waktu solat dan checkpoint
       const payload = {
@@ -156,24 +186,25 @@ export class WidgetService {
         isyak: formatDisplayTime(prayerTimes.times.isyak),
       };
 
-      const payloadStr = JSON.stringify(payload);
+      // Kunci semakan tanpa medan 'countdown' yang berubah setiap saat/minit
+      const dedupeKey = JSON.stringify({ ...payload, countdown: '' });
 
-      // Sekat jika payload sama atau masih dalam proses penghantaran
-      if (payloadStr === this.lastSyncedNotifPayload || this.isUpdatingNotif) {
+      if ((!force && dedupeKey === this.lastSyncedNotifPayload) || this.isUpdatingNotif) {
         return;
       }
 
       this.isUpdatingNotif = true;
-      this.lastSyncedNotifPayload = payloadStr;
 
       if (typeof window !== 'undefined') {
-        localStorage.setItem('solatkini_persistent_notif_payload', payloadStr);
+        localStorage.setItem('solatkini_persistent_notif_payload', JSON.stringify(payload));
       }
 
       if (this.isAndroid()) {
         await SolatWidget.updatePersistentNotification(payload);
         console.info('[WidgetService] Notifikasi tetap dihantar bersama 7 waktu & pemasa undur:', nextTimestamp);
       }
+
+      this.lastSyncedNotifPayload = dedupeKey;
     } catch (err) {
       console.warn('[WidgetService] Ralat mengemaskini notifikasi tetap:', err);
     } finally {
