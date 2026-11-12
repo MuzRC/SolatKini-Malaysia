@@ -177,7 +177,7 @@ public class SolatWidgetPlugin extends Plugin {
             );
 
             // 1. Tajuk Padat: Buang pengulangan nama app supaya tarikh Hijri muat penuh tanpa terpotong (...)
-            String cleanZone = zone.replace("SolatKini · ", "").trim();
+            String cleanZone = zone != null ? zone.replace("SolatKini · ", "").trim() : "Beaufort";
             String titleText = (hijri != null && !hijri.isEmpty())
                 ? cleanZone + " • " + hijri
                 : cleanZone;
@@ -236,51 +236,78 @@ public class SolatWidgetPlugin extends Plugin {
 
     public static void advanceToNextPrayer(Context context) {
         try {
+            SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
             SharedPreferences alarmPrefs = context.getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
             String alarmsJson = alarmPrefs.getString("scheduled_alarms_json", null);
-            if (alarmsJson == null || alarmsJson.isEmpty()) return;
 
-            JSONArray alarmsArray = new JSONArray(alarmsJson);
             long now = System.currentTimeMillis();
-
             JSONObject nextUpcoming = null;
             long nearestTimestamp = Long.MAX_VALUE;
 
-            for (int i = 0; i < alarmsArray.length(); i++) {
-                JSONObject obj = alarmsArray.getJSONObject(i);
-                long ts = obj.optLong("timestamp", 0);
-                if (ts > now && ts < nearestTimestamp) {
-                    nearestTimestamp = ts;
-                    nextUpcoming = obj;
+            if (alarmsJson != null && !alarmsJson.isEmpty()) {
+                JSONArray alarmsArray = new JSONArray(alarmsJson);
+                for (int i = 0; i < alarmsArray.length(); i++) {
+                    JSONObject obj = alarmsArray.getJSONObject(i);
+                    long ts = obj.optLong("timestamp", 0);
+                    if (ts > now && ts < nearestTimestamp) {
+                        nearestTimestamp = ts;
+                        nextUpcoming = obj;
+                    }
                 }
             }
 
+            String zone = widgetPrefs.getString("zone", "Beaufort");
+            String hijri = widgetPrefs.getString("hijri", "");
+            String imsak = widgetPrefs.getString("imsak", "--:--");
+            String subuh = widgetPrefs.getString("subuh", "--:--");
+            String syuruk = widgetPrefs.getString("syuruk", "--:--");
+            String zohor = widgetPrefs.getString("zohor", "--:--");
+            String asar = widgetPrefs.getString("asar", "--:--");
+            String maghrib = widgetPrefs.getString("maghrib", "--:--");
+            String isyak = widgetPrefs.getString("isyak", "--:--");
+
+            String nextLabel;
+            String nextTime;
+            long targetTimestamp;
+
             if (nextUpcoming != null) {
-                SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
-                if (!widgetPrefs.getBoolean("is_persistent_enabled", false)) return;
-
-                String zone = widgetPrefs.getString("zone", "Beaufort");
-                String hijri = widgetPrefs.getString("hijri", "");
-                String nextLabel = nextUpcoming.optString("prayerName", "Solat");
-
+                nextLabel = nextUpcoming.optString("prayerName", "Solat");
                 SimpleDateFormat timeFmt = new SimpleDateFormat("h:mm a", Locale.getDefault());
-                String nextTime = timeFmt.format(new Date(nearestTimestamp));
+                nextTime = timeFmt.format(new Date(nearestTimestamp));
+                targetTimestamp = nearestTimestamp;
+            } else {
+                // Sandaran selepas Isyak jika jadual esok belum disegerakkan
+                nextLabel = "Subuh";
+                nextTime = subuh;
+                targetTimestamp = 0L;
+            }
 
-                String imsak = widgetPrefs.getString("imsak", "--:--");
-                String subuh = widgetPrefs.getString("subuh", "--:--");
-                String syuruk = widgetPrefs.getString("syuruk", "--:--");
-                String zohor = widgetPrefs.getString("zohor", "--:--");
-                String asar = widgetPrefs.getString("asar", "--:--");
-                String maghrib = widgetPrefs.getString("maghrib", "--:--");
-                String isyak = widgetPrefs.getString("isyak", "--:--");
+            widgetPrefs.edit()
+                .putString("next_label", nextLabel)
+                .putString("next_time", nextTime)
+                .putLong("next_timestamp", targetTimestamp)
+                .apply();
 
-                widgetPrefs.edit()
-                    .putString("next_label", nextLabel)
-                    .putString("next_time", nextTime)
-                    .putLong("next_timestamp", nearestTimestamp)
-                    .apply();
+            // Segerakkan juga paparan widget skrin utama
+            SolatWidgetProvider.updateAllWidgets(context);
 
-                buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nearestTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
+            // Kemas kini notifikasi kekal jika diaktifkan
+            if (widgetPrefs.getBoolean("is_persistent_enabled", false)) {
+                buildAndShowNotification(
+                    context,
+                    zone,
+                    hijri,
+                    nextLabel,
+                    nextTime,
+                    targetTimestamp,
+                    imsak,
+                    subuh,
+                    syuruk,
+                    zohor,
+                    asar,
+                    maghrib,
+                    isyak
+                );
             }
         } catch (Exception e) {
             Log.w(TAG, "Ralat menganjak waktu solat", e);
