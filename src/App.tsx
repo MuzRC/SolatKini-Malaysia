@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Clock,
   Compass,
@@ -136,10 +136,10 @@ export default function App() {
   });
 
   // Fungsi pembantu untuk menjadualkan penggera ke AlarmManager Android
-  const syncAlarmsToNative = (times: DayPrayerTimes, voice: AzanVoice) => {
+  const syncAlarmsToNative = useCallback((times: DayPrayerTimes, voice: AzanVoice) => {
     if (!times) return;
     try {
-      let enabledMap: Record<PrayerKey, boolean> = {
+      const enabledMap: Record<PrayerKey, boolean> = {
         imsak: false,
         subuh: true,
         syuruk: false,
@@ -170,17 +170,17 @@ export default function App() {
         label: PRAYER_LABELS[k] || k,
         time: (timeSource as any)[k] || '00:00',
         displayTime: formatDisplayTime((timeSource as any)[k] || '00:00'),
-        voice: (k === 'subuh' ? 'subuh_special' : voice) as AzanVoice,
+        voice: (k === 'subuh' && voice === 'jakim' ? 'subuh_special' : voice) as AzanVoice,
       }));
 
       nativeAlarmService.schedulePrayers(list, voice, enabledMap);
     } catch (e) {
       console.warn('Gagal menjadualkan penggera dari App:', e);
     }
-  };
+  }, []);
 
   // Fungsi segerak penuh ke Widget Skrin & Pemasa Notifikasi Tetap Android
-  const syncWidgetsAndNotifications = async (
+  const syncWidgetsAndNotifications = useCallback(async (
     times: DayPrayerTimes,
     zone: JakimZone,
     isPersistentEnabled: boolean
@@ -205,7 +205,26 @@ export default function App() {
     } catch (e) {
       console.warn('Gagal segerak widget/notifikasi dari App:', e);
     }
-  };
+  }, []);
+
+  const handleLiveSync = useCallback(async () => {
+    setIsLiveSyncing(true);
+    try {
+      const safeZone = currentZone || DEFAULT_ZONE;
+      const data = await fetchDayPrayerTimes(safeZone, new Date(), true);
+      if (data) {
+        setPrayerData(data);
+        if (data.times) {
+          syncAlarmsToNative(data.times, selectedVoice);
+          await syncWidgetsAndNotifications(data.times, safeZone, persistentNotification);
+        }
+      }
+    } catch (e) {
+      console.warn('Gagal segerak secara langsung:', e);
+    } finally {
+      setIsLiveSyncing(false);
+    }
+  }, [currentZone, selectedVoice, persistentNotification, syncAlarmsToNative, syncWidgetsAndNotifications]);
 
   // 1. Pengesanan GPS automatik dengan pelindung sekatan Permissions Policy
   useEffect(() => {
@@ -215,6 +234,8 @@ export default function App() {
 
     try {
       if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+        const hadSavedZone = !!localStorage.getItem('solatkini_active_zone');
+
         navigator.geolocation.getCurrentPosition(
           (position) => {
             try {
@@ -222,19 +243,24 @@ export default function App() {
               const nearest = findNearestZone(latitude, longitude);
 
               if (nearest && nearest.code) {
-                setCurrentZone(nearest);
-                localStorage.setItem('solatkini_active_zone', nearest.code);
+                setCurrentZone((prevZone) => {
+                  const isDifferentZone = !prevZone || prevZone.code !== nearest.code;
+                  if (isDifferentZone || !hadSavedZone) {
+                    localStorage.setItem('solatkini_active_zone', nearest.code);
+                    const daerahLabel = nearest.daerah ? nearest.daerah.split(',')[0] : nearest.negeri;
+                    setGeoStatus({
+                      type: 'detected',
+                      message: 'Zon waktu solat JAKIM diselaraskan secara automatik mengikut koordinat GPS anda.',
+                      zoneName: `${daerahLabel} (${nearest.code})`,
+                    });
 
-                const daerahLabel = nearest.daerah ? nearest.daerah.split(',')[0] : nearest.negeri;
-                setGeoStatus({
-                  type: 'detected',
-                  message: 'Zon waktu solat JAKIM diselaraskan secara automatik mengikut koordinat GPS anda.',
-                  zoneName: `${daerahLabel} (${nearest.code})`,
+                    setTimeout(() => {
+                      setGeoStatus(null);
+                    }, 5000);
+                    return nearest;
+                  }
+                  return prevZone;
                 });
-
-                setTimeout(() => {
-                  setGeoStatus(null);
-                }, 5000);
               }
             } catch (err) {
               console.warn('Ralat menentukan zon terdekat:', err);
@@ -287,7 +313,7 @@ export default function App() {
     return () => {
       isMounted = false;
     };
-  }, [currentZone, selectedVoice, persistentNotification]);
+  }, [currentZone, selectedVoice, persistentNotification, syncAlarmsToNative, syncWidgetsAndNotifications]);
 
   // 3. Semakan anjakan hari tengah malam (00:00 Auto-Refresh)
   useEffect(() => {
@@ -311,26 +337,7 @@ export default function App() {
       }
     }, 30000);
     return () => clearInterval(interval);
-  }, [currentZone, selectedVoice, persistentNotification]);
-
-  const handleLiveSync = async () => {
-    setIsLiveSyncing(true);
-    try {
-      const safeZone = currentZone || DEFAULT_ZONE;
-      const data = await fetchDayPrayerTimes(safeZone, new Date(), true);
-      if (data) {
-        setPrayerData(data);
-        if (data.times) {
-          syncAlarmsToNative(data.times, selectedVoice);
-          await syncWidgetsAndNotifications(data.times, safeZone, persistentNotification);
-        }
-      }
-    } catch (e) {
-      console.warn('Gagal segerak secara langsung:', e);
-    } finally {
-      setIsLiveSyncing(false);
-    }
-  };
+  }, [currentZone, selectedVoice, persistentNotification, syncAlarmsToNative, syncWidgetsAndNotifications]);
 
   // 4. Semak kebenaran notifikasi Android 13+ HANYA jika onboarding sudah selesai
   useEffect(() => {
@@ -343,7 +350,7 @@ export default function App() {
     }).catch(() => {});
   }, [showOnboarding]);
 
-  // 5. Tangani acara pemicu azan asli (Event Listener Android)
+  // 5. Tangani acara pemicu azan asli & pintasan segerak notifikasi (Event Listener Android)
   useEffect(() => {
     const handleNativeAzanTrigger = (event: any) => {
       try {
@@ -352,12 +359,15 @@ export default function App() {
           data = JSON.parse(event.detail);
         } else if (event.detail) {
           data = event.detail;
+        } else if (event && typeof event === 'object') {
+          data = event;
         }
-        audioNotificationService.stopAudio();
 
+        // JANGAN panggil audioNotificationService.stopAudio() di sini kerana ia akan mematikan
+        // AzanAudioService yang sedang berkumandang di latar belakang Android!
         setAlarmModalState({
           isOpen: true,
-          prayerKey: (data.prayerKey as PrayerKey) || ('solat' as PrayerKey),
+          prayerKey: (data.prayerKey as PrayerKey) || ('subuh' as PrayerKey),
           prayerName: data.prayerName || 'Solat',
           voice: data.voice || 'jakim',
         });
@@ -366,11 +376,19 @@ export default function App() {
       }
     };
 
-    window.addEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
-    return () => window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
-  }, []);
+    const handleNativeSyncRequested = () => {
+      handleLiveSync();
+    };
 
-  // 6. Listener azan untuk peramban web
+    window.addEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
+    window.addEventListener('solatSyncRequested', handleNativeSyncRequested);
+    return () => {
+      window.removeEventListener('azanAlarmTriggered', handleNativeAzanTrigger);
+      window.removeEventListener('solatSyncRequested', handleNativeSyncRequested);
+    };
+  }, [handleLiveSync]);
+
+  // 6. Listener azan untuk pelayar web
   useEffect(() => {
     const unsubscribe = audioNotificationService.registerAzanTriggerListener(
       (prayerKey, prayerName, voice) => {
@@ -392,12 +410,22 @@ export default function App() {
   };
 
   const handleTriggerTestAlarm = (key: PrayerKey, name: string, voice: AzanVoice) => {
+    const effectiveVoice: AzanVoice =
+      key === 'subuh' && (!voice || voice === 'jakim') ? 'subuh_special' : voice;
+
     if (nativeAlarmService.getIsNative()) {
-      audioNotificationService.stopAudio();
-      nativeAlarmService.testAlarm(name, voice, 1);
+      // Buka modal supaya pengguna boleh melihat status & menekan 'Hentikan Azan' bila-bila masa
+      setAlarmModalState({
+        isOpen: true,
+        prayerKey: key,
+        prayerName: name,
+        voice: effectiveVoice,
+      });
+      // Mulakan AzanAudioService serta-merta (delay = 0) dengan had ujian 20 saat
+      nativeAlarmService.testAlarm(name, effectiveVoice, 0, 20);
     } else {
       audioNotificationService.unlockAudio();
-      audioNotificationService.triggerAzan(key, name, voice);
+      audioNotificationService.triggerAzan(key, name, effectiveVoice);
     }
   };
 
