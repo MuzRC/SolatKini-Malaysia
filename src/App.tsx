@@ -20,7 +20,7 @@ import { audioNotificationService } from './services/audioNotificationService';
 import { nativeAlarmService } from './services/nativeAlarmService';
 import { widgetService } from './services/widgetService';
 import { checkForAppUpdate, AppUpdateInfo } from './services/updateCheckerService';
-import { PrayerDashboard } from './components/PrayerDashboard';
+import { PrayerDashboard } from './components/dashboard';
 import { QiblaCompass } from './components/QiblaCompass';
 import { FastingTracker } from './components/FastingTracker';
 import { TasbihWirid } from './components/TasbihWirid';
