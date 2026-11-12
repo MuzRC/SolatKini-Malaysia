@@ -410,10 +410,10 @@ export default function App() {
   useEffect(() => {
     if (showOnboarding) return;
     const timer = setTimeout(() => {
-      checkForAppUpdate()
-        .then((info) => {
-          if (info && info.hasUpdate) {
-            setUpdateInfo(info);
+      checkForAppUpdate(false)
+        .then((res) => {
+          if (res && res.status === 'update_available' && res.info) {
+            setUpdateInfo(res.info);
           }
         })
         .catch(() => {});
@@ -540,12 +540,14 @@ export default function App() {
                   {updateInfo.releaseNotes}
                 </p>
                 <div className="pt-1 flex items-center gap-2">
-                  <button
-                    onClick={() => window.open(updateInfo.downloadUrl, '_blank')}
+                  <a
+                    href={updateInfo.downloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition cursor-pointer"
                   >
                     Muat Turun APK
-                  </button>
+                  </a>
                   <button
                     onClick={() => setUpdateInfo(null)}
                     className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] transition cursor-pointer"
