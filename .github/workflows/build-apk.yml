@@ -54,12 +54,25 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
-            # 5. Pasang dependensi
+      # 5. Pasang dependensi
       - name: 5. Pasang Dependensi Projek
         run: |
           npm install --legacy-peer-deps
           npm install react-is --legacy-peer-deps
 
+      # 5b. Suntik Versi Dinamik ke Kod React Sebelum Compile Vite
+      - name: 5b. Segerak Versi ke UpdateChecker & Footer App
+        run: |
+          if [ -f "src/services/updateCheckerService.ts" ]; then
+            sed -i "s/export const CURRENT_APP_VERSION = '.*';/export const CURRENT_APP_VERSION = '$APP_VERSION';/g" src/services/updateCheckerService.ts
+            sed -i "s/export const CURRENT_VERSION_CODE = [0-9]*;/export const CURRENT_VERSION_CODE = $VERSION_CODE;/g" src/services/updateCheckerService.ts
+            sed -i "s|https://raw.githubusercontent.com/.*/main/version.json|https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/version.json|g" src/services/updateCheckerService.ts
+            echo "updateCheckerService.ts dikemaskini ke v$APP_VERSION (code: $VERSION_CODE)"
+          fi
+
+          if [ -f "src/App.tsx" ]; then
+            sed -i "s/Versi [0-9.]* APK Android/Versi $APP_VERSION APK Android/g" src/App.tsx
+          fi
 
       # 6. Build Web Assets (Vite akan bungkus fail audio yang sudah kurus)
       - name: 6. Build Web Assets (Vite)
@@ -171,8 +184,38 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 14. Simpan ke Actions Artifacts
-      - name: 14. Simpan ke Artifacts
+      # 14. Kemaskini & Push version.json Secara Automatik ke Repo
+      - name: 14. Kemaskini version.json di GitHub
+        run: |
+          node -e '
+            const fs = require("fs");
+            const { execSync } = require("child_process");
+            const latestMsg = execSync("git log -1 --pretty=%s").toString().trim();
+            const appVer = process.env.APP_VERSION;
+            const verCode = parseInt(process.env.VERSION_CODE, 10);
+            const repo = process.env.GITHUB_REPOSITORY;
+
+            const payload = {
+              latestVersion: appVer,
+              versionCode: verCode,
+              releaseNotes: latestMsg || `Kemaskini baharu SolatKini Malaysia v${appVer}`,
+              downloadUrl: `https://github.com/${repo}/releases/download/v${appVer}/SolatKini-v${appVer}-signed.apk`
+            };
+
+            fs.writeFileSync("version.json", JSON.stringify(payload, null, 2) + "\n");
+            console.log("Kandungan version.json baharu:\n", JSON.stringify(payload, null, 2));
+          '
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          if ! git diff --staged --quiet; then
+            git commit -m "chore: kemaskini version.json ke v${APP_VERSION} (build ${VERSION_CODE}) [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
+
+      # 15. Simpan ke Actions Artifacts
+      - name: 15. Simpan ke Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SolatKini-v${{ env.APP_VERSION }}-APK
