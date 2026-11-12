@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Volume2,
   Play,
@@ -37,14 +37,28 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
   onTriggerTestAlarm,
 }) => {
   const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState<AzanVoice | null>(null);
   const [cachedVoiceIds, setCachedVoiceIds] = useState<string[]>([]);
   const [downloadingVoiceId, setDownloadingVoiceId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [audioToast, setAudioToast] = useState<string | null>(null);
   const [activeDeviceVoice, setActiveDeviceVoice] = useState<string | null>(() => {
-    return audioStorageService.getActiveDeviceVoice();
+    return audioStorageService.getActiveDeviceVoice() || selectedVoice;
   });
-  const previewTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const customObjectUrlRef = useRef<string | null>(null);
+
+  const handleStopAll = useCallback(() => {
+    if (previewTimerRef.current) {
+      clearTimeout(previewTimerRef.current);
+      previewTimerRef.current = null;
+    }
+    audioNotificationService.stopAudio();
+    nativeAlarmService.stopNativeAzan();
+    setIsPlayingPreview(false);
+    setPreviewingVoiceId(null);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,19 +66,23 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
         setCachedVoiceIds(ids);
       });
       const devVoice = audioStorageService.getActiveDeviceVoice();
-      if (devVoice) setActiveDeviceVoice(devVoice);
+      setActiveDeviceVoice(devVoice || selectedVoice);
+    } else {
+      handleStopAll();
     }
-  }, [isOpen]);
+  }, [isOpen, selectedVoice, handleStopAll]);
 
-  const handleStopAll = () => {
-    audioNotificationService.stopAudio();
-    nativeAlarmService.stopNativeAzan();
-    setIsPlayingPreview(false);
-    if (previewTimerRef.current) {
-      clearTimeout(previewTimerRef.current);
-      previewTimerRef.current = null;
-    }
-  };
+  useEffect(() => {
+    return () => {
+      handleStopAll();
+      if (customObjectUrlRef.current) {
+        try {
+          URL.revokeObjectURL(customObjectUrlRef.current);
+        } catch {}
+        customObjectUrlRef.current = null;
+      }
+    };
+  }, [handleStopAll]);
 
   if (!isOpen) return null;
 
@@ -74,29 +92,37 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
   };
 
   const handlePlayPreview = (voice: AzanVoice) => {
-    if (isPlayingPreview && selectedVoice === voice) {
+    if (isPlayingPreview && previewingVoiceId === voice) {
       handleStopAll();
     } else {
       handleStopAll();
-      onVoiceSelect(voice);
       setIsPlayingPreview(true);
+      setPreviewingVoiceId(voice);
 
       if (nativeAlarmService.getIsNative()) {
         // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM (henti automatik 20 saat)
         nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 20);
+        // Kekalkan suara aktif sebenar pilihan pengguna di dalam SharedPreferences
+        const currentSavedVoice = (activeDeviceVoice || selectedVoice) as string;
+        if (currentSavedVoice) {
+          nativeAlarmService.setActiveVoice(currentSavedVoice);
+        }
         previewTimerRef.current = setTimeout(() => {
           setIsPlayingPreview(false);
+          setPreviewingVoiceId(null);
         }, 20000);
       } else {
         audioNotificationService.unlockAudio();
-        audioNotificationService.playAzan(voice, () => setIsPlayingPreview(false));
+        audioNotificationService.playAzan(voice, () => {
+          setIsPlayingPreview(false);
+          setPreviewingVoiceId(null);
+        });
       }
     }
   };
 
   const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
-    audioNotificationService.stopAudio();
-    setIsPlayingPreview(false);
+    handleStopAll();
 
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
@@ -168,7 +194,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
           (p) => setDownloadProgress(p),
           opt.fallbackUrl
         );
-        setCachedVoiceIds((prev) => [...prev, opt.id]);
+        setCachedVoiceIds((prev) => Array.from(new Set([...prev, opt.id])));
         setAudioToast(`Audio ${opt.title} berjaya disimpan ke memori luar talian.`);
         setTimeout(() => setAudioToast(null), 3000);
       } catch (err: any) {
@@ -182,8 +208,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
 
   const handleClearAllAudioCache = async () => {
     try {
-      audioNotificationService.stopAudio();
-      setIsPlayingPreview(false);
+      handleStopAll();
       await audioStorageService.clearAllAudioCache();
       setCachedVoiceIds([]);
       setAudioToast('Memori cache berjaya dikosongkan! Vokal azan MP3 rasmi sedia dimainkan secara lancar.');
@@ -224,7 +249,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
         <div className="mt-4 space-y-3.5 max-h-[60vh] overflow-y-auto pr-1 text-left">
           <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-xs text-emerald-300 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-300 shrink-0" />
-            <span>Pilihan di bawah digunakan untuk Zohor, Asar, Maghrib & Isyak. Waktu Subuh kekal automatik menggunakan alunan Azan Subuh khas.</span>
+            <span>Pilihan di bawah digunakan untuk Zohor, Asar, Maghrib & Isyak. Waktu Subuh menggunakan alunan Azan Subuh khas secara lalai.</span>
           </div>
 
           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/80 to-[#0e241c] border border-emerald-500/40 shadow-lg flex items-center justify-between gap-3">
@@ -252,7 +277,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
               }}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shrink-0 shadow-md transition active:scale-95 cursor-pointer"
             >
-              {isPlayingPreview ? 'Henti' : 'Uji Bunyi'}
+              {isPlayingPreview && previewingVoiceId === (activeDeviceVoice || selectedVoice) ? 'Henti' : 'Uji Bunyi'}
             </button>
           </div>
 
@@ -265,7 +290,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                 </h4>
               </div>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/30">
-                TargetSDK 33+
+                TargetSDK 34
               </span>
             </div>
             <p className="text-[11px] text-slate-300 leading-relaxed">
@@ -274,10 +299,14 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
             <div className="pt-1 flex flex-wrap items-center gap-2">
               <button
                 onClick={async () => {
-                  const testVoice = (nextPrayerKey === 'subuh' ? 'subuh_special' : selectedVoice) as AzanVoice;
-                  const res = await nativeAlarmService.testAlarm(nextPrayerLabel, testVoice, 3);
+                  handleStopAll();
+                  const activeVoice = (activeDeviceVoice || selectedVoice) as AzanVoice;
+                  const testVoice = (nextPrayerKey === 'subuh' && activeVoice === 'jakim' ? 'subuh_special' : activeVoice) as AzanVoice;
+                  const res = await nativeAlarmService.testAlarm(nextPrayerLabel, testVoice, 3, 20);
                   if (res) {
-                    setAudioToast('Penggera azan asli dijadualkan! Kunci skrin telefon anda sekarang untuk menguji.');
+                    // Kekalkan suara pilihan harian dalam SharedPreferences
+                    await nativeAlarmService.setActiveVoice(activeVoice);
+                    setAudioToast('Penggera azan asli dijadualkan (3 saat)! Kunci skrin telefon anda sekarang untuk menguji.');
                   } else if (onTriggerTestAlarm) {
                     onTriggerTestAlarm(nextPrayerKey, nextPrayerLabel, testVoice);
                     setAudioToast('Ujian azan dimulakan.');
@@ -311,13 +340,14 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
           {AZAN_OPTIONS.map((opt) => {
             const isCurrent = opt.id === selectedVoice;
             const isDeviceActive = (activeDeviceVoice || selectedVoice) === opt.id;
+            const isThisPreviewing = isPlayingPreview && previewingVoiceId === opt.id;
             const isCached = cachedVoiceIds.includes(opt.id);
             const isDownloading = downloadingVoiceId === opt.id;
 
             return (
               <div
                 key={opt.id}
-                onClick={() => onVoiceSelect(opt.id)}
+                onClick={() => handleSetAsDeviceVoice(opt)}
                 className={`p-4 rounded-2xl cursor-pointer border transition flex flex-col gap-3 ${
                   isDeviceActive
                     ? 'bg-emerald-950/70 border-emerald-400/60 shadow-lg shadow-emerald-950/40 ring-1 ring-emerald-400/40'
@@ -355,10 +385,14 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                       e.stopPropagation();
                       handlePlayPreview(opt.id);
                     }}
-                    className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shrink-0 transition shadow-md shadow-emerald-950/40 cursor-pointer"
-                    title={isPlayingPreview && selectedVoice === opt.id ? 'Henti Pratonton' : 'Dengar Alunan Azan'}
+                    className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-white shrink-0 transition shadow-md cursor-pointer ${
+                      isThisPreviewing
+                        ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/40'
+                        : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/40'
+                    }`}
+                    title={isThisPreviewing ? 'Henti Pratonton' : 'Dengar Alunan Azan'}
                   >
-                    {isPlayingPreview && selectedVoice === opt.id ? (
+                    {isThisPreviewing ? (
                       <Square className="w-4 h-4 fill-white" />
                     ) : (
                       <Play className="w-4 h-4 fill-white" />
@@ -436,7 +470,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                 Muat Naik Fail Audio Azan Sendiri
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Pilih fail .mp3 atau .wav dari peranti anda untuk dijadikan azan solat harian
+                Pilih fail .mp3 atau .wav dari peranti anda untuk pratonton azan tersuai
               </p>
             </div>
             <label className="cursor-pointer px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold text-center border border-slate-700 shrink-0 transition active:scale-95">
@@ -448,10 +482,23 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    handleStopAll();
+                    if (customObjectUrlRef.current) {
+                      try {
+                        URL.revokeObjectURL(customObjectUrlRef.current);
+                      } catch {}
+                    }
                     const url = URL.createObjectURL(file);
+                    customObjectUrlRef.current = url;
                     audioNotificationService.setCustomAudio(url);
-                    audioNotificationService.playAzan(selectedVoice, () => setIsPlayingPreview(false));
                     setIsPlayingPreview(true);
+                    setPreviewingVoiceId('custom' as AzanVoice);
+                    audioNotificationService.playAzan('custom' as AzanVoice, () => {
+                      setIsPlayingPreview(false);
+                      setPreviewingVoiceId(null);
+                    });
+                    setAudioToast(`Memainkan fail audio tersuai: ${file.name}`);
+                    setTimeout(() => setAudioToast(null), 3500);
                   }
                 }}
               />
@@ -481,7 +528,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
 
         <div className="mt-6 pt-4 border-t border-slate-800 flex items-center justify-between">
           <div className="text-[11px] text-slate-400">
-            Tekan mana-mana laungan azan untuk mendengar alunan
+            Tekan ikon main untuk mendengar pratonton atau pilih kad untuk menetapkan suara
           </div>
           <button
             onClick={handleClose}
