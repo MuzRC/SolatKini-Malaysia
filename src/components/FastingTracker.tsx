@@ -9,7 +9,6 @@ import {
   Copy,
   BarChart3,
   TrendingUp,
-  Award,
   Flame,
   RotateCcw,
 } from 'lucide-react';
@@ -27,7 +26,7 @@ import {
   Cell,
 } from 'recharts';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
-import { getFastingCountdown } from '../services/prayerService';
+import { getFastingCountdown, getLocalDateString } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
 import { getHijriDate, getFastingRecommendation } from '../utils/hijriCalendar';
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
@@ -72,6 +71,8 @@ const CustomChartTooltip = ({
 export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, currentZone }) => {
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [confirmResetRamadan, setConfirmResetRamadan] = useState<boolean>(false);
+  const [confirmResetGanti, setConfirmResetGanti] = useState<boolean>(false);
 
   // Jam masa nyata berdetik setiap saat untuk kiraan waktu berbuka puasa
   useEffect(() => {
@@ -92,14 +93,16 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   // Simpanan data puasa ganti
   const [completedGantiCount, setCompletedGantiCount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('solatkini_ganti_completed') || '0');
+      const val = Number(localStorage.getItem('solatkini_ganti_completed') || '0');
+      return isNaN(val) ? 0 : Math.max(0, val);
     }
     return 0;
   });
 
   const [targetGantiCount, setTargetGantiCount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      return Number(localStorage.getItem('solatkini_ganti_target') || '7');
+      const val = Number(localStorage.getItem('solatkini_ganti_target') || '7');
+      return isNaN(val) ? 7 : Math.max(0, val);
     }
     return 7;
   });
@@ -113,22 +116,23 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     otherSunnahCompleted: number;
     otherSunnahTarget: number;
   }>(() => {
+    const defaults = {
+      isninKhamisCompleted: 0,
+      isninKhamisTarget: 8,
+      ayyamulBidhCompleted: 0,
+      ayyamulBidhTarget: 3,
+      otherSunnahCompleted: 0,
+      otherSunnahTarget: 6,
+    };
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('solatkini_sunnah_fasts_v1');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          return { ...defaults, ...JSON.parse(saved) };
         } catch {}
       }
     }
-    return {
-      isninKhamisCompleted: 4,
-      isninKhamisTarget: 8,
-      ayyamulBidhCompleted: 2,
-      ayyamulBidhTarget: 3,
-      otherSunnahCompleted: 1,
-      otherSunnahTarget: 6,
-    };
+    return defaults;
   });
 
   // Data Puasa Ramadan (senarai nombor hari 1 hingga 30 yang telah berpuasa)
@@ -137,12 +141,12 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
       const saved = localStorage.getItem('solatkini_ramadan_completed_days');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
         } catch {}
       }
     }
-    // Default data sampel awal
-    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+    return [];
   });
 
   // Simpan data sunnah bila berubah
@@ -180,9 +184,13 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   };
 
   const resetRamadanDays = () => {
-    if (window.confirm('Tetapkan semula semua rekod puasa Ramadan kepada 0 hari?')) {
-      setRamadanCompletedDays([]);
+    if (!confirmResetRamadan) {
+      setConfirmResetRamadan(true);
+      setTimeout(() => setConfirmResetRamadan(false), 3500);
+      return;
     }
+    setRamadanCompletedDays([]);
+    setConfirmResetRamadan(false);
   };
 
   const updateSunnahCount = (
@@ -195,11 +203,12 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     }));
   };
 
+  // Gunakan getLocalDateString() supaya selaras dengan PrayerDashboard.tsx dan bebas ralat UTC pada waktu Sahur/Subuh
   const [isUserFastingToday, setIsUserFastingToday] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const savedDate = localStorage.getItem('solatkini_fasting_date');
       const savedActive = localStorage.getItem('solatkini_fasting_active');
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString(new Date());
       return savedDate === today && savedActive === 'true';
     }
     return false;
@@ -209,7 +218,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     setIsUserFastingToday((prev) => {
       const next = !prev;
       if (typeof window !== 'undefined') {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString(new Date());
         localStorage.setItem('solatkini_fasting_date', today);
         localStorage.setItem('solatkini_fasting_active', next ? 'true' : 'false');
       }
@@ -245,17 +254,21 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   };
 
   const handleResetGanti = () => {
-    if (window.confirm('Adakah anda pasti ingin menetapkan semula rekod puasa ganti?')) {
-      setCompletedGantiCount(0);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('solatkini_ganti_completed', '0');
-      }
+    if (!confirmResetGanti) {
+      setConfirmResetGanti(true);
+      setTimeout(() => setConfirmResetGanti(false), 3500);
+      return;
+    }
+    setCompletedGantiCount(0);
+    setConfirmResetGanti(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_ganti_completed', '0');
     }
   };
 
   const handleCopyText = (id: string, text: string) => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
+      navigator.clipboard.writeText(text).catch(() => {});
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 2000);
     }
@@ -333,11 +346,6 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     sunnahData.ayyamulBidhCompleted +
     completedGantiCount +
     sunnahData.otherSunnahCompleted;
-  const totalSunnahTarget =
-    sunnahData.isninKhamisTarget +
-    sunnahData.ayyamulBidhTarget +
-    targetGantiCount +
-    sunnahData.otherSunnahTarget;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
@@ -469,7 +477,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             >
               <Moon className="w-3.5 h-3.5" />
               <span>Puasa Ramadan</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
                 {ramadanCompletedDays.length}/30
               </span>
             </button>
@@ -483,7 +491,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Puasa Sunat & Qadha</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
                 {totalSunnahCompleted} Hari
               </span>
             </button>
@@ -672,17 +680,22 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                   {ramadanCompletedDays.length > 0 && (
                     <button
                       onClick={resetRamadanDays}
-                      className="p-1 rounded-lg bg-slate-800 text-slate-400 hover:text-red-400 transition cursor-pointer"
+                      className={`px-2 py-1 rounded-lg text-[11px] font-medium flex items-center gap-1 transition cursor-pointer ${
+                        confirmResetRamadan
+                          ? 'bg-red-600 text-white font-bold'
+                          : 'bg-slate-800 text-slate-400 hover:text-red-400'
+                      }`}
                       title="Tetapkan Semula Rekod Ramadan"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
+                      {confirmResetRamadan && <span>Sahkan Reset?</span>}
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Grid 30 Petak Hari */}
-              <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-15 gap-1.5">
+              {/* Grid 30 Petak Hari (menggunakan repeat(15) yang sah pada skrin sederhana/besar) */}
+              <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-[repeat(15,minmax(0,1fr))] gap-1.5">
                 {Array.from({ length: 30 }, (_, i) => i + 1).map((dayNum) => {
                   const isDone = ramadanCompletedDays.includes(dayNum);
                   return (
@@ -1043,9 +1056,13 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
             {completedGantiCount > 0 && (
               <button
                 onClick={handleResetGanti}
-                className="px-3 py-2.5 rounded-2xl bg-slate-800 text-slate-400 hover:text-red-400 text-xs transition cursor-pointer"
+                className={`px-3 py-2.5 rounded-2xl text-xs transition cursor-pointer ${
+                  confirmResetGanti
+                    ? 'bg-red-600 text-white font-bold'
+                    : 'bg-slate-800 text-slate-400 hover:text-red-400'
+                }`}
               >
-                Reset
+                {confirmResetGanti ? 'Sahkan Reset?' : 'Reset'}
               </button>
             )}
           </div>
@@ -1081,7 +1098,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                     </button>
                   </div>
 
-                  <p className="font-arabic text-xl sm:text-2xl text-right text-emerald-200 leading-loose mb-3">
+                  <p className="font-arabic text-xl sm:text-2xl text-right text-emerald-200 leading-loose mb-3" dir="rtl">
                     {item.arabic}
                   </p>
 
