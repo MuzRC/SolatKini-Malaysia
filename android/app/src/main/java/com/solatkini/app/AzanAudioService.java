@@ -330,7 +330,6 @@ public class AzanAudioService extends Service {
             localFiles.add(new File(getFilesDir(), mappedVoice + ".mp3"));
             localFiles.add(new File(getFilesDir(), "azan_" + voice + ".mp3"));
             localFiles.add(new File(getFilesDir(), "azan_" + mappedVoice + ".mp3"));
-            localFiles.add(new File(getFilesDir(), "custom_azan.mp3"));
 
             for (File file : localFiles) {
                 if (file.exists() && file.length() > 5000) {
