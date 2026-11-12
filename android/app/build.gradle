@@ -8,19 +8,20 @@ android {
         applicationId "com.solatkini.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 25
+        versionName "2.5.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        
+
         aaptOptions {
-             // Elak fail audio azan dikompres sekali lagi oleh AAPT yang boleh rosakkan seek audio
-             noCompress 'mp3', 'wav', 'ogg'
+            // Elak fail tersembunyi daripada termasuk ke dalam binaan APK
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            // Elak fail audio azan dimampatkan oleh AAPT supaya AssetManager.openFd() berfungsi pantas
+            noCompress 'mp3', 'wav', 'ogg'
         }
 
         // ========================================================
         // 1. ABI FILTERS (Potong 15MB - 25MB serta-merta)
         // Hadkan binaan untuk cip telefon fizikal sahaja (ARM)
-        // Buang binaan x86 & x86_64 (emulator PC) yang berat
         // ========================================================
         ndk {
             abiFilters 'armeabi-v7a', 'arm64-v8a'
@@ -31,11 +32,10 @@ android {
         release {
             // ========================================================
             // 2. R8 MINIFICATION & SHRINK RESOURCES
-            // Buang kod Java/Kotlin & fail XML/imej yang ndak diguna
             // ========================================================
             minifyEnabled true
             shrinkResources true
-            
+
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
@@ -52,7 +52,6 @@ android {
 
     packagingOptions {
         resources {
-            // Buang fail metadata lesen yang bertimbun dalam perpustakaan
             excludes += [
                 'META-INF/DEPENDENCIES',
                 'META-INF/LICENSE',
@@ -69,7 +68,7 @@ android {
 }
 
 repositories {
-    flatDir{
+    flatDir {
         dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
     }
 }
