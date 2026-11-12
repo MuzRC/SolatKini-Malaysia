@@ -7,7 +7,7 @@ import { PrayerKey } from '../types/prayer';
  * - Asr: Shafi'i shadow ratio (shadow = object + noon shadow)
  * - Imsak: 10 minutes prior to Subuh
  * - Syuruk: Sunrise (-0.833°)
- * - Zohor: Solar Noon + 2-3 minutes ihtiyat
+ * - Zohor: Solar Noon + 2 minutes ihtiyat
  * - Timezone: Malaysia Standard Time (UTC+8)
  */
 
@@ -20,12 +20,12 @@ function toDegrees(rad: number): number {
 }
 
 function fixAngle(angle: number): number {
-  let a = angle - 360 * Math.floor(angle / 360);
+  const a = angle - 360 * Math.floor(angle / 360);
   return a < 0 ? a + 360 : a;
 }
 
 function fixHour(hour: number): number {
-  let h = hour - 24 * Math.floor(hour / 24);
+  const h = hour - 24 * Math.floor(hour / 24);
   return h < 0 ? h + 24 : h;
 }
 
@@ -57,8 +57,8 @@ function sunCoordinates(d: number) {
       Math.atan2(Math.cos(toRadians(e)) * Math.sin(toRadians(L)), Math.cos(toRadians(L)))
     ) / 15;
   const dec = toDegrees(Math.asin(Math.sin(toRadians(e)) * Math.sin(toRadians(L))));
-  
-  // Normalisasikan Equation of Time (EqT) agar sentiasa dalam julat [-12, +12] jam (sekitar -16 min hingga +16 min)
+
+  // Normalisasikan Equation of Time (EqT) agar sentiasa dalam julat [-12, +12] jam
   let EqT = q / 15 - fixHour(RA);
   if (EqT > 12) EqT -= 24;
   if (EqT < -12) EqT += 24;
@@ -95,17 +95,25 @@ export function formatHour(hour: number): string {
   return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
 }
 
-// Format "HH:mm" 24-jam kepada format paparan 12-jam "h:mm AM/PM" (kebal ralat crash jika input kosong/undefined)
+// Format "HH:mm" 24-jam kepada format paparan 12-jam "h:mm AM/PM" (selamat jika dipanggil berulang kali)
 export function formatDisplayTime(time24: string): string {
   if (!time24 || typeof time24 !== 'string' || !time24.includes(':')) {
     return '--:--';
   }
-  const [hStr, mStr] = time24.trim().split(':');
+  const cleaned = time24.trim().toUpperCase();
+  const hasPM = cleaned.includes('PM');
+  const hasAM = cleaned.includes('AM');
+
+  const [hStr, mStr] = cleaned.replace(/[A-Z\s]/g, '').split(':');
   let h = parseInt(hStr, 10);
   const m = parseInt(mStr, 10);
   if (isNaN(h) || isNaN(m)) {
     return '--:--';
   }
+
+  if (hasPM && h < 12) h += 12;
+  else if (hasAM && h === 12) h = 0;
+
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12;
   h = h ? h : 12; // 0 becomes 12
@@ -122,7 +130,8 @@ export function calculateLocalPrayerTimes(
   const month = date.getMonth() + 1;
   const day = date.getDate();
 
-  const jd = getJulianDate(year, month, day);
+  // Laraskan Julian Date ke waktu tengah hari tempatan (12:00 UTC+8) untuk ketepatan deklinasi matahari
+  const jd = getJulianDate(year, month, day) + 0.5 - timezone / 24;
   const d = jd - 2451545.0;
   const { dec, EqT } = sunCoordinates(d);
 
@@ -152,8 +161,7 @@ export function calculateLocalPrayerTimes(
   const ishaHA = hourAngle(lat, dec, 18);
   const ishaTime = noon + ishaHA / 15;
 
-  // Precautionary buffer (Ihtiyat) applied by JAKIM:
-  // Zohor: +2 min, Asr: +2 min, Maghrib: +2 min, Isyak: +2 min, Subuh: +2 min
+  // Precautionary buffer (Ihtiyat) applied by JAKIM (+2 minit)
   const ihtiyatMinutes = 2 / 60;
   const subuhHours = fajrTime + ihtiyatMinutes;
   const imsakHours = subuhHours - 10 / 60; // 10 minutes before Subuh
