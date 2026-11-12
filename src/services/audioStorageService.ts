@@ -12,36 +12,14 @@ const CACHE_VERSION = 'solatkini_audio_cache_v5';
 
 class AudioStorageService {
   private dbPromise: Promise<IDBDatabase> | null = null;
+  private versionChecked: boolean = false;
 
-  constructor() {
-    this.initCacheVersionCheck();
-  }
-
-  private initCacheVersionCheck() {
-    if (typeof window !== 'undefined') {
-      try {
-        const currentVer = localStorage.getItem('solatkini_audio_cache_version');
-        if (currentVer !== CACHE_VERSION) {
-          console.info('[AudioStorage] Versi cache audio diperbaharui. Mengosongkan data lama...');
-          this.clearAllAudioCache()
-            .then(() => {
-              localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
-            })
-            .catch(() => {
-              localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
-            });
-        }
-      } catch {
-        // Abaikan ralat localStorage
-      }
-    }
-  }
-
-  private getDB(): Promise<IDBDatabase> {
+  private openRawDB(): Promise<IDBDatabase> {
     if (this.dbPromise) return this.dbPromise;
 
     this.dbPromise = new Promise((resolve, reject) => {
       if (typeof window === 'undefined' || !window.indexedDB) {
+        this.dbPromise = null;
         reject(new Error('IndexedDB tidak disokong di dalam persekitaran ini'));
         return;
       }
@@ -56,16 +34,60 @@ class AudioStorageService {
       };
 
       request.onsuccess = (e) => {
-        resolve((e.target as IDBOpenDBRequest).result);
+        const db = (e.target as IDBOpenDBRequest).result;
+        // Tetapkan semula dbPromise jika sambungan ditutup oleh sistem operasi / pelayar
+        db.onclose = () => {
+          this.dbPromise = null;
+        };
+        db.onversionchange = () => {
+          db.close();
+          this.dbPromise = null;
+        };
+        resolve(db);
       };
 
       request.onerror = (e) => {
-        this.dbPromise = null; // Tetapkan semula agar boleh dicuba semula
+        this.dbPromise = null;
         reject((e.target as IDBOpenDBRequest).error);
+      };
+
+      request.onblocked = () => {
+        this.dbPromise = null;
+        reject(new Error('Sambungan IndexedDB disekat oleh tab lain'));
       };
     });
 
     return this.dbPromise;
+  }
+
+  private async getDB(): Promise<IDBDatabase> {
+    const db = await this.openRawDB();
+
+    if (!this.versionChecked && typeof window !== 'undefined') {
+      this.versionChecked = true;
+      try {
+        const currentVer = localStorage.getItem('solatkini_audio_cache_version');
+        if (currentVer !== CACHE_VERSION) {
+          console.info('[AudioStorage] Versi cache audio diperbaharui. Mengosongkan data lama...');
+          await new Promise<void>((resolve) => {
+            try {
+              const tx = db.transaction(STORE_NAME, 'readwrite');
+              tx.objectStore(STORE_NAME).clear();
+              tx.oncomplete = () => resolve();
+              tx.onerror = () => resolve();
+              tx.onabort = () => resolve();
+            } catch {
+              resolve();
+            }
+          });
+          localStorage.setItem('solatkini_audio_cache_version', CACHE_VERSION);
+        }
+      } catch {
+        // Abaikan ralat localStorage
+      }
+    }
+
+    return db;
   }
 
   public isValidAudioBlob(blob: Blob | null | undefined): boolean {
@@ -79,17 +101,18 @@ class AudioStorageService {
 
   public async saveAudioBlob(voiceId: string, blob: Blob): Promise<void> {
     if (!this.isValidAudioBlob(blob)) {
-      throw new Error(`Fail audio tidak sah (${blob.size} bytes)`);
+      throw new Error(`Fail audio tidak sah (${blob?.size || 0} bytes)`);
     }
 
     const db = await this.getDB();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      const req = store.put(blob, voiceId);
+      store.put(blob, voiceId);
 
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error || new Error('Transaksi simpanan audio dibatalkan'));
     });
   }
 
@@ -137,10 +160,10 @@ class AudioStorageService {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.delete(voiceId);
+        store.delete(voiceId);
 
-        req.onsuccess = () => resolve();
-        req.onerror = () => reject(req.error);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
       });
     } catch {
       // Abaikan
@@ -153,13 +176,13 @@ class AudioStorageService {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
-        const req = store.clear();
+        store.clear();
 
-        req.onsuccess = () => {
+        tx.oncomplete = () => {
           console.info('[AudioStorage] Semua memori cache audio berjaya dikosongkan.');
           resolve();
         };
-        req.onerror = () => reject(req.error);
+        tx.onerror = () => reject(tx.error);
       });
     } catch (err) {
       console.warn('Gagal memadam cache audio:', err);
@@ -187,12 +210,16 @@ class AudioStorageService {
   public setActiveDeviceVoice(voiceId: string) {
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_active_device_voice', voiceId);
+      localStorage.setItem('solatkini_azan_voice', voiceId);
     }
   }
 
   public getActiveDeviceVoice(): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('solatkini_active_device_voice');
+      return (
+        localStorage.getItem('solatkini_active_device_voice') ||
+        localStorage.getItem('solatkini_azan_voice')
+      );
     }
     return null;
   }
@@ -205,15 +232,16 @@ class AudioStorageService {
     url: string,
     onProgress?: (progressPercent: number) => void
   ): Promise<Blob> {
-    // 1. Cuba kaedah fetch standard
-    try {
-      const targetUrl = url.startsWith('/') && typeof window !== 'undefined'
+    const targetUrl =
+      url.startsWith('/') && typeof window !== 'undefined'
         ? new URL(url, window.location.href).href
         : url;
 
+    // 1. Cuba kaedah fetch standard
+    try {
       const response = await fetch(targetUrl);
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
         // Sekat jika pelayan memulangkan HTML (SPA routing 404 fallback)
         if (contentType.includes('text/html') || contentType.includes('text/plain')) {
           throw new Error('Pelayan memulangkan format HTML dan bukannya audio MP3.');
@@ -231,9 +259,19 @@ class AudioStorageService {
             received += value.length;
             onProgress(Math.min(100, Math.round((received / contentLength) * 100)));
           }
-          return new Blob(chunks, { type: 'audio/mpeg' });
+          const streamedBlob = new Blob(chunks, { type: 'audio/mpeg' });
+          if (this.isValidAudioBlob(streamedBlob)) {
+            return streamedBlob;
+          }
+          throw new Error('Saiz fail audio yang distrim tidak mencukupi.');
         }
-        return await response.blob();
+
+        const directBlob = await response.blob();
+        if (this.isValidAudioBlob(directBlob)) {
+          if (onProgress) onProgress(100);
+          return directBlob;
+        }
+        throw new Error('Fail audio daripada fetch tidak sah.');
       }
     } catch (err) {
       console.warn(`[AudioStorage] Fetch gagal bagi ${url}, mencuba XMLHttpRequest:`, err);
@@ -243,12 +281,12 @@ class AudioStorageService {
     return new Promise((resolve, reject) => {
       try {
         const xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
+        xhr.open('GET', targetUrl, true);
         xhr.responseType = 'blob';
 
         if (onProgress) {
           xhr.onprogress = (event) => {
-            if (event.lengthComputable) {
+            if (event.lengthComputable && event.total > 0) {
               const percent = Math.min(100, Math.round((event.loaded / event.total) * 100));
               onProgress(percent);
             }
@@ -258,12 +296,13 @@ class AudioStorageService {
         xhr.onload = () => {
           if (xhr.status === 200 || xhr.status === 0) {
             const blob = xhr.response as Blob;
-            if (blob && blob.size > 100_000 && !blob.type.includes('html')) {
+            if (this.isValidAudioBlob(blob)) {
+              if (onProgress) onProgress(100);
               resolve(blob);
               return;
             }
           }
-          reject(new Error(`XHR status ${xhr.status}: Format fail tidak sah`));
+          reject(new Error(`XHR status ${xhr.status}: Format atau saiz fail tidak sah`));
         };
 
         xhr.onerror = () => reject(new Error('Rangkaian terputus semasa memuat turun fail audio'));
@@ -313,7 +352,7 @@ class AudioStorageService {
         console.info(`[AudioStorage] Beralih ke fallback CDN bagi '${voiceId}': ${fallbackUrl}`);
         try {
           blob = await this.fetchAudioBlobWithFallback(fallbackUrl, onProgress);
-        } catch (fallbackErr) {
+        } catch {
           throw new Error(`Gagal memuat turun fail azan (${filename}). Sila pastikan sambungan internet aktif.`);
         }
       } else {
