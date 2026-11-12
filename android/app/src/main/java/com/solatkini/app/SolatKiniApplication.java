@@ -17,7 +17,46 @@ public class SolatKiniApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        installCrashLogger();
         createNotificationChannels();
+    }
+
+    private void installCrashLogger() {
+        final Thread.UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
+            try {
+                StringBuilder sb = new StringBuilder();
+                sb.append(throwable.getClass().getSimpleName())
+                  .append(": ")
+                  .append(throwable.getMessage() != null ? throwable.getMessage() : "Tiada mesej");
+
+                StackTraceElement[] traces = throwable.getStackTrace();
+                int count = 0;
+                for (StackTraceElement el : traces) {
+                    if (count >= 4) break;
+                    sb.append(" | ")
+                      .append(el.getFileName())
+                      .append(":")
+                      .append(el.getLineNumber())
+                      .append(" (")
+                      .append(el.getMethodName())
+                      .append(")");
+                    count++;
+                }
+
+                AzanHistoryLogger.recordSync(
+                    getApplicationContext(),
+                    "CRASH APLIKASI",
+                    "crash",
+                    AzanHistoryLogger.STATUS_FAILED,
+                    sb.toString()
+                );
+            } catch (Throwable ignored) {}
+
+            if (defaultHandler != null) {
+                defaultHandler.uncaughtException(thread, throwable);
+            }
+        });
     }
 
     private void createNotificationChannels() {
@@ -25,16 +64,14 @@ public class SolatKiniApplication extends Application {
             NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager == null) return;
 
-            // Padamkan saluran versi lama supaya sistem tidak keliru dengan tetapan lapuk
             try {
                 manager.deleteNotificationChannel("solatkini_azan_channel");
                 manager.deleteNotificationChannel("solatkini_azan_channel_v2");
                 manager.deleteNotificationChannel("solatkini_azan_channel_v3");
                 manager.deleteNotificationChannel("solatkini_persistent_channel");
                 manager.deleteNotificationChannel("solatkini_top_widget_channel");
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {}
 
-            // 1. Saluran Penggera Azan (Audio dimainkan secara eksklusif oleh MediaPlayer STREAM_ALARM)
             NotificationChannel azanChannel = new NotificationChannel(
                 AZAN_CHANNEL_ID,
                 "Penggera Azan SolatKini",
@@ -45,10 +82,8 @@ public class SolatKiniApplication extends Application {
             azanChannel.enableVibration(true);
             azanChannel.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 1000});
             azanChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-            // Senyapkan saluran notifikasi agar sistem tidak mencetuskan audio notifikasi default bertindih
             azanChannel.setSound(null, null);
 
-            // 2. Saluran Peringatan Waktu Solat
             NotificationChannel reminderChannel = new NotificationChannel(
                 REMINDER_CHANNEL_ID,
                 "Peringatan Waktu Solat",
@@ -58,7 +93,6 @@ public class SolatKiniApplication extends Application {
             reminderChannel.enableVibration(true);
             reminderChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
 
-            // 3. Saluran Notifikasi Tetap Waktu Solat Teratas (Widget Top Bar & Chronometer Pemasa Undur)
             NotificationChannel persistentChannel = new NotificationChannel(
                 PERSISTENT_CHANNEL_ID,
                 "Widget Bar 5 Waktu Solat Teratas",
