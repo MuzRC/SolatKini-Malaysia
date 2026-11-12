@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, BellRing, Sparkles, Play, Square } from 'lucide-react';
 import { AzanVoice, PrayerKey } from '../types/prayer';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
@@ -24,6 +24,9 @@ const DEFAULT_DOA_AZAN = {
   reference: 'Sahih al-Bukhari (No. 614)',
 };
 
+// Anggaran tempoh maksimum laungan azan penuh di Android Native (4 minit = 240 saat)
+const NATIVE_FULL_AZAN_DURATION_SEC = 240;
+
 export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   isOpen,
   prayerKey,
@@ -35,11 +38,16 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [volume, setVolume] = useState(1.0);
   const [showDoa, setShowDoa] = useState(false);
+  const nativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isNative = nativeAlarmService.getIsNative();
 
-  // Kunci kebal Subuh Khas
-  const effectiveVoice: AzanVoice = prayerKey === 'subuh' ? 'subuh_special' : voice;
+  // Gunakan suara Subuh Khas jika waktu Subuh menggunakan suara standard ('jakim' atau kosong),
+  // tetapi hormati jika pengguna memilih suara spesifik lain.
+  const effectiveVoice: AzanVoice =
+    prayerKey === 'subuh' && (!voice || voice === 'jakim' || voice === 'subuh_special')
+      ? 'subuh_special'
+      : voice;
 
   // Padanan suara pintar: Mengelakkan fallback ke JAKIM jika ID Subuh didaftarkan sebagai 'subuh'
   const selectedVoice =
@@ -55,12 +63,26 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
 
   const doaAzan = DUA_COLLECTION?.find((d) => d.id === 'dua-selepas-azan') || DEFAULT_DOA_AZAN;
 
+  const clearNativePlaybackTimer = () => {
+    if (nativeTimerRef.current) {
+      clearTimeout(nativeTimerRef.current);
+      nativeTimerRef.current = null;
+    }
+  };
+
+  const startNativePlaybackTimer = (durationSec: number = NATIVE_FULL_AZAN_DURATION_SEC) => {
+    clearNativePlaybackTimer();
+    nativeTimerRef.current = setTimeout(() => {
+      setIsPlaying(false);
+    }, durationSec * 1000);
+  };
+
   useEffect(() => {
     if (isOpen) {
       setIsPlaying(true);
       setShowDoa(false);
+      setProgress({ current: 0, total: 0 });
 
-      // Hanya dengar servis audio web sekiranya BUKAN di peranti Android asli
       if (!isNative) {
         const unsubscribe = audioNotificationService.addAudioStateListener(
           (playing, cur, dur) => {
@@ -69,13 +91,20 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
           }
         );
         return () => unsubscribe();
+      } else {
+        // Di Android Native, kemas kini status isPlaying kepada false selepas tempoh maksimum azan tamat
+        startNativePlaybackTimer(NATIVE_FULL_AZAN_DURATION_SEC);
+        return () => clearNativePlaybackTimer();
       }
+    } else {
+      clearNativePlaybackTimer();
     }
   }, [isOpen, isNative]);
 
   if (!isOpen) return null;
 
   const handleStopAudio = () => {
+    clearNativePlaybackTimer();
     audioNotificationService.stopAudio();
     nativeAlarmService.stopNativeAzan();
     setIsPlaying(false);
@@ -83,9 +112,17 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
 
   const handlePlayAudio = () => {
     if (isNative) {
-      // Di Android Native, laungkan semula melalui perkhidmatan penggera STREAM_ALARM
-      nativeAlarmService.testAlarm(prayerName, effectiveVoice, 1);
+      // Gunakan delaySeconds = 0 supaya AzanAudioService terus dimulakan tanpa penjadualan semula AlarmManager
+      // dan berikan tempoh autoStop penuh (240s) jika servis menyokong parameter ke-4
+      (nativeAlarmService.testAlarm as (
+        name: string,
+        v: AzanVoice,
+        delay?: number,
+        autoStop?: number
+      ) => void)(prayerName, effectiveVoice, 0, NATIVE_FULL_AZAN_DURATION_SEC);
+
       setIsPlaying(true);
+      startNativePlaybackTimer(NATIVE_FULL_AZAN_DURATION_SEC);
     } else {
       audioNotificationService.unlockAudio();
       audioNotificationService.playAzan(effectiveVoice, () => setIsPlaying(false));
@@ -94,6 +131,7 @@ export const AzanAlarmModal: React.FC<AzanAlarmModalProps> = ({
   };
 
   const handleCloseAll = () => {
+    clearNativePlaybackTimer();
     audioNotificationService.stopAudio();
     nativeAlarmService.stopNativeAzan();
     onClose();
