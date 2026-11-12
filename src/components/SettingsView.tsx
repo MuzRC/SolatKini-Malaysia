@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Globe,
   Palette,
@@ -14,16 +14,14 @@ import {
   Power,
   ShieldAlert,
   Square,
-  Play,
+  BatteryCharging,
 } from 'lucide-react';
-import { DayPrayerTimes, JakimZone, AzanVoice, PrayerKey } from '../types/prayer';
+import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
 import { ThemeId, THEME_OPTIONS, applyTheme } from '../utils/theme';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
 import { audioStorageService } from '../services/audioStorageService';
 import { nativeAlarmService } from '../services/nativeAlarmService';
-import { PRAYER_KEYS_ORDER, PRAYER_LABELS } from '../services/prayerService';
-import { formatDisplayTime } from '../utils/prayerCalculator';
 
 // ==============================================================================================
 // [MULA KOD BOLEH PADAM] : IMPORT KAD LOG AZAN
@@ -61,11 +59,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   persistentNotification,
   onTogglePersistentNotification,
   onOpenDndGuide,
-  onTriggerTestAlarm,
+  onTriggerTestAlarm: _onTriggerTestAlarm,
 }) => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeDeviceVoice, setActiveDeviceVoice] = useState<string | null>(() => {
-    return audioStorageService.getActiveDeviceVoice();
+    return audioStorageService.getActiveDeviceVoice() || selectedVoice;
   });
 
   // State untuk Auto-Start Selepas Restart Telefon (Lalai / Default: TRUE)
@@ -80,14 +78,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   // State ujian suara azan pada saluran penggera (STREAM_ALARM) dengan had 20 saat
   const [testingVoiceId, setTestingVoiceId] = useState<string | null>(null);
   const [testCountdown, setTestCountdown] = useState<number>(0);
-  const testTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const testIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const testTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const stopAzanTest = () => {
-    nativeAlarmService.stopNativeAzan();
-    audioNotificationService.stopAudio();
-    setTestingVoiceId(null);
-    setTestCountdown(0);
+  const stopAzanTest = useCallback(() => {
     if (testTimerRef.current) {
       clearTimeout(testTimerRef.current);
       testTimerRef.current = null;
@@ -96,7 +90,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       clearInterval(testIntervalRef.current);
       testIntervalRef.current = null;
     }
-  };
+    nativeAlarmService.stopNativeAzan();
+    audioNotificationService.stopAudio();
+    setTestingVoiceId(null);
+    setTestCountdown(0);
+  }, []);
 
   const playAzanTestOnAlarm = (voiceId: AzanVoice, voiceTitle: string) => {
     stopAzanTest();
@@ -106,19 +104,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     if (nativeAlarmService.getIsNative()) {
       // Mainkan serta-merta pada saluran STREAM_ALARM telefon dengan henti automatik 20s
       nativeAlarmService.testAlarm(`Ujian ${voiceTitle}`, voiceId, 0, 20);
+      // Pastikan pilihan suara utama dalam SharedPreferences kekal selaras
+      nativeAlarmService.setActiveVoice(voiceId);
     } else {
       audioNotificationService.unlockAudio();
       audioNotificationService.playAzan(voiceId, () => stopAzanTest());
     }
 
     testIntervalRef.current = setInterval(() => {
-      setTestCountdown((prev) => {
-        if (prev <= 1) {
-          stopAzanTest();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTestCountdown((prev) => (prev > 1 ? prev - 1 : 0));
     }, 1000);
 
     testTimerRef.current = setTimeout(() => {
@@ -130,7 +124,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return () => {
       stopAzanTest();
     };
-  }, []);
+  }, [stopAzanTest]);
+
+  // Selaraskan activeDeviceVoice apabila prop selectedVoice berubah
+  useEffect(() => {
+    if (selectedVoice) {
+      setActiveDeviceVoice(selectedVoice);
+    }
+  }, [selectedVoice]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -147,12 +148,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   }, []);
 
-  const handleToggleAutoStart = () => {
+  const handleToggleAutoStart = async () => {
     const nextVal = !autoStartBoot;
     setAutoStartBoot(nextVal);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('solatkini_autostart_boot', String(nextVal));
+    }
+
+    if (nextVal && nativeAlarmService.getIsNative()) {
+      await nativeAlarmService.openAutostartSettings();
     }
 
     showToast(
@@ -183,7 +188,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleClearAudioCache = async () => {
     try {
-      audioNotificationService.stopAudio();
+      stopAzanTest();
       await audioStorageService.clearAllAudioCache();
       showToast(
         currentLang === 'ms'
@@ -412,8 +417,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
 
-        {/* Nota Tambahan Mesra Pengguna untuk Peranti Sekatan Agresif */}
-        <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-slate-300 space-y-1">
+        {/* Nota Tambahan & Pintasan Terus ke Tetapan OEM / Bateri */}
+        <div className="p-3.5 rounded-2xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-slate-300 space-y-2.5">
           <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
             <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
             <span>Perhatian untuk Pengguna Xiaomi / Vivo / Oppo / Realme:</span>
@@ -421,6 +426,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <p className="leading-relaxed text-slate-400">
             Sila pastikan anda mengaktifkan kebenaran <strong>&quot;Autostart / Mulakan Sendiri&quot;</strong> dan menetapkan <strong>&quot;Tiada Sekatan Bateri&quot;</strong> di Tetapan Telefon agar azan tidak disekat daripada berbunyi tepat pada waktunya.
           </p>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => nativeAlarmService.openAutostartSettings()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-semibold transition cursor-pointer"
+            >
+              <Power className="w-3.5 h-3.5" />
+              <span>Buka Tetapan Autostart</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => nativeAlarmService.requestIgnoreBatteryOptimization()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold transition cursor-pointer"
+            >
+              <BatteryCharging className="w-3.5 h-3.5" />
+              <span>Kecualikan Sekatan Bateri</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -516,31 +539,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                       return;
                     }
 
-                    // 1. Tetapkan suara dan segerakkan ke AlarmManager peranti
-                    onVoiceChange(opt.id);
+                    // 1. Kemas kini pilihan suara melalui onVoiceChange (App.tsx akan menguruskan
+                    // jadual AlarmManager mengikut suis waktu solat sebenar pengguna)
                     audioStorageService.setActiveDeviceVoice(opt.id);
                     setActiveDeviceVoice(opt.id);
-                    nativeAlarmService.setActiveVoice(opt.id);
-
-                    if (_prayerTimes && _prayerTimes.times) {
-                      const list = PRAYER_KEYS_ORDER.map((k) => ({
-                        key: k,
-                        label: PRAYER_LABELS[k],
-                        time: _prayerTimes.times[k],
-                        displayTime: formatDisplayTime(_prayerTimes.times[k]),
-                        voice: (k === 'subuh' ? 'subuh_special' : opt.id) as AzanVoice,
-                      }));
-                      const enabledMap: Record<PrayerKey, boolean> = {
-                        imsak: false,
-                        subuh: true,
-                        syuruk: false,
-                        zohor: true,
-                        asar: true,
-                        maghrib: true,
-                        isyak: true,
-                      };
-                      nativeAlarmService.schedulePrayers(list, opt.id, enabledMap);
-                    }
+                    onVoiceChange(opt.id);
 
                     // 2. Mainkan ujian audio azan serta-merta pada saluran STREAM_ALARM (henti automatik 20 saat)
                     playAzanTestOnAlarm(opt.id, opt.title);
