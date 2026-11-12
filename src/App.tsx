@@ -10,7 +10,8 @@ import {
   MapPin,
   X,
   Award,
-  Settings
+  Settings,
+  Download
 } from 'lucide-react';
 import { ActiveTab, DayPrayerTimes, JakimZone, PrayerKey, AzanVoice } from './types/prayer';
 import { JAKIM_ZONES, findZoneByCode, findNearestZone } from './data/jakimZones';
@@ -18,6 +19,7 @@ import { fetchDayPrayerTimes, PRAYER_KEYS_ORDER, PRAYER_LABELS } from './service
 import { audioNotificationService } from './services/audioNotificationService';
 import { nativeAlarmService } from './services/nativeAlarmService';
 import { widgetService } from './services/widgetService';
+import { checkForAppUpdate, AppUpdateInfo } from './services/updateCheckerService';
 import { PrayerDashboard } from './components/PrayerDashboard';
 import { QiblaCompass } from './components/QiblaCompass';
 import { FastingTracker } from './components/FastingTracker';
@@ -85,6 +87,7 @@ export default function App() {
   });
 
   const [_isDndGuideOpen, setIsDndGuideOpen] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
 
   useEffect(() => {
     applyTheme(currentTheme);
@@ -403,6 +406,21 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // 7. Semakan kemaskini versi baharu APK secara senyap
+  useEffect(() => {
+    if (showOnboarding) return;
+    const timer = setTimeout(() => {
+      checkForAppUpdate()
+        .then((info) => {
+          if (info && info.hasUpdate) {
+            setUpdateInfo(info);
+          }
+        })
+        .catch(() => {});
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [showOnboarding]);
+
   const handleZoneChange = (zone: JakimZone) => {
     if (zone && zone.code) {
       setCurrentZone(zone);
@@ -499,6 +517,46 @@ export default function App() {
             </div>
             <button
               onClick={() => setGeoStatus(null)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {updateInfo && (
+        <div className="fixed bottom-20 md:bottom-6 right-4 left-4 md:left-auto md:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="glass-panel p-4 rounded-2xl border border-emerald-500/50 bg-[#0c1d16]/95 shadow-2xl flex items-start justify-between gap-3 text-left">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0 mt-0.5">
+                <Download className="w-4 h-4 text-emerald-400" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="text-xs font-bold text-white">
+                  Kemaskini Baharu v{updateInfo.latestVersion}
+                </div>
+                <p className="text-[11px] text-slate-300 leading-snug">
+                  {updateInfo.releaseNotes}
+                </p>
+                <div className="pt-1 flex items-center gap-2">
+                  <button
+                    onClick={() => window.open(updateInfo.downloadUrl, '_blank')}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-[11px] transition cursor-pointer"
+                  >
+                    Muat Turun APK
+                  </button>
+                  <button
+                    onClick={() => setUpdateInfo(null)}
+                    className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] transition cursor-pointer"
+                  >
+                    Nanti
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setUpdateInfo(null)}
               className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
             >
               <X className="w-4 h-4" />
