@@ -171,18 +171,35 @@ class AudioNotificationService {
     return this.volume;
   }
 
-  public triggerAzan(prayerKey: PrayerKey, prayerName: string, voice?: AzanVoice) {
+  /**
+   * Cetusan waktu solat.
+   * @param skipNativeAudio Tetapkan `true` jika dipanggil daripada event `azanAlarmTriggered` MainActivity
+   *                        kerana AzanAudioService sudah pun memainkan audio di latar belakang.
+   */
+  public triggerAzan(
+    prayerKey: PrayerKey,
+    prayerName: string,
+    voice?: AzanVoice,
+    skipNativeAudio: boolean = false
+  ) {
     const activeDeviceVoice = (audioStorageService.getActiveDeviceVoice() as AzanVoice) || null;
-    const resolvedVoice: AzanVoice = voice || activeDeviceVoice || this.activeVoice || 'jakim';
+    const baseVoice: AzanVoice = voice || activeDeviceVoice || this.activeVoice || 'jakim';
+    const resolvedVoice: AzanVoice =
+      prayerKey === 'subuh' && (baseVoice === 'jakim' || !voice) ? 'subuh_special' : baseVoice;
+
     this.activeVoice = resolvedVoice;
     this.unlockAudio();
 
     // 1. Beritahu modal skrin penuh untuk terpapar
     this.onAzanTriggerCallbacks.forEach((cb) => cb(prayerKey, prayerName, resolvedVoice));
 
-    // 2. Mainkan Audio: Jika pada Android Native, guna AzanAudioService (STREAM_ALARM)
+    // 2. Mainkan Audio: Jika pada Android Native, guna AzanAudioService (STREAM_ALARM) dengan tempoh penuh
     if (nativeAlarmService.getIsNative()) {
-      nativeAlarmService.testAlarm(prayerName, resolvedVoice, 0);
+      if (!skipNativeAudio) {
+        const voiceConfig = AZAN_OPTIONS.find((v) => v.id === resolvedVoice);
+        const fullDurationSec = (voiceConfig?.durationSec ?? 220) + 20;
+        nativeAlarmService.testAlarm(prayerName, resolvedVoice, 0, fullDurationSec);
+      }
     } else {
       // Pelayar web: mainkan audio HTML5
       this.playAzan(resolvedVoice);
@@ -244,8 +261,9 @@ class AudioNotificationService {
 
     const voiceConfig = AZAN_OPTIONS.find((v) => v.id === voice) || AZAN_OPTIONS[2];
 
-    // LANGKAH 1: Semak Blob IndexedDB
-    let sourceUrl = this.customAudioUrl;
+    // LANGKAH 1: Semak audio tersuai (jika dipilih) atau Blob IndexedDB
+    const isCustomRequested = (voice as string) === 'custom' || (voice as string) === 'custom_azan';
+    let sourceUrl: string | null = isCustomRequested ? this.customAudioUrl : null;
 
     if (!sourceUrl) {
       try {
@@ -267,9 +285,9 @@ class AudioNotificationService {
       return;
     }
 
-    // LANGKAH 2: Guna fail tempatan atau fallback CDN
+    // LANGKAH 2: Guna fail tempatan atau customAudioUrl sebagai sandaran
     if (!sourceUrl) {
-      sourceUrl = voiceConfig.audioUrl;
+      sourceUrl = voiceConfig.audioUrl || this.customAudioUrl || '';
     }
 
     if (typeof window !== 'undefined' && typeof Audio !== 'undefined') {
@@ -295,7 +313,7 @@ class AudioNotificationService {
           }
         };
 
-        // Pengendali Ralat Pintar 3 Peringkat
+        // Pengendali Ralat Pintar 3 Peringkat (Bebas Gelung Tanpa Henti)
         audio.onerror = () => {
           if (this.currentPlaySessionId !== sessionId) return;
           console.warn(`Ralat memainkan sumber (${sourceUrl}). Mencuba sumber sandaran...`);
@@ -304,7 +322,8 @@ class AudioNotificationService {
 
           // Peringkat 1: Cuba fail tempatan jika sebelum ini guna blob yang gagal
           if (typeof sourceUrl === 'string' && sourceUrl.startsWith('blob:') && voiceConfig.audioUrl) {
-            audio.src = voiceConfig.audioUrl;
+            sourceUrl = voiceConfig.audioUrl;
+            audio.src = sourceUrl;
             audio.play().catch(() => this.tryFallbackUrl(audio, voiceConfig, sessionId, onEnded));
             return;
           }
@@ -317,6 +336,12 @@ class AudioNotificationService {
         if (playPromise !== undefined) {
           playPromise.catch((err) => {
             console.warn('Autoplay disekat oleh pelayar (perlu interaksi pengguna):', err);
+            // Jika disekat oleh polisi Autoplay pelayar, kemas kini UI supaya butang Play dipaparkan
+            if (err && err.name === 'NotAllowedError' && this.currentPlaySessionId === sessionId) {
+              this.isPlaying = false;
+              this.notifyState(0, 0);
+              if (onEnded) onEnded();
+            }
           });
         }
       } catch (e) {
@@ -411,11 +436,14 @@ class AudioNotificationService {
   public stopAudio() {
     this.currentPlaySessionId++;
 
-    // 1. Matikan audio pelayar web
+    // 1. Matikan audio pelayar web dengan menanggalkan pendengar acara terlebih dahulu
     if (this.currentAudioElement) {
       try {
+        this.currentAudioElement.ontimeupdate = null;
+        this.currentAudioElement.onended = null;
+        this.currentAudioElement.onerror = null;
         this.currentAudioElement.pause();
-        this.currentAudioElement.src = '';
+        this.currentAudioElement.removeAttribute('src');
         this.currentAudioElement.load();
       } catch {}
       this.currentAudioElement = null;
@@ -428,11 +456,7 @@ class AudioNotificationService {
     // 2. Berhentikan servis audio native Android jika sedang berjalan
     if (nativeAlarmService.getIsNative()) {
       try {
-        if (typeof (nativeAlarmService as any).stopAlarm === 'function') {
-          (nativeAlarmService as any).stopAlarm();
-        } else if (typeof (nativeAlarmService as any).stopAudio === 'function') {
-          (nativeAlarmService as any).stopAudio();
-        }
+        nativeAlarmService.stopNativeAzan();
       } catch (err) {
         console.warn('Gagal mematikan audio native dari stopAudio:', err);
       }
