@@ -1,6 +1,6 @@
 {
-  "latestVersion": "3.3.6",
-  "versionCode": 336,
-  "releaseNotes": "feat: optimize azan audio loading priority",
-  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.3.6/SolatKini-v3.3.6-signed.apk"
+  "latestVersion": "3.4.0",
+  "versionCode": 340,
+  "releaseNotes": "Update AzanAudioService.java",
+  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.4.0/SolatKini-v3.4.0-signed.apk"
 }
