@@ -60,6 +60,35 @@ export interface AzanAlarmPluginInterface {
 
 const AzanAlarm = registerPlugin<AzanAlarmPluginInterface>('AzanAlarm');
 
+/**
+ * Fungsi pembantu untuk menghuraikan rentetan masa ("05:45", "13:15", atau "1:15 PM")
+ * kepada jam (0-23) dan minit (0-59) dengan selamat.
+ */
+function parsePrayerTimeString(timeStr: string): { hours: number; minutes: number } | null {
+  if (!timeStr) return null;
+  const cleaned = timeStr.trim().toUpperCase();
+  const isPM = cleaned.includes('PM');
+  const isAM = cleaned.includes('AM');
+
+  const timeOnly = cleaned.replace(/[A-Z\s]/g, '');
+  const parts = timeOnly.split(':');
+  if (parts.length < 2) return null;
+
+  let hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+
+  if (isNaN(hours) || isNaN(minutes)) return null;
+
+  if (isPM && hours < 12) {
+    hours += 12;
+  } else if (isAM && hours === 12) {
+    hours = 0;
+  }
+
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return { hours, minutes };
+}
+
 class NativeAlarmService {
   private isNative: boolean;
 
@@ -176,7 +205,7 @@ class NativeAlarmService {
     if (!this.isNative) return true;
     try {
       const res = await AzanAlarm.checkAutoTime();
-      return res.isAutoTimeEnabled;
+      return (res.isAutoTimeEnabled ?? true) && (res.isAutoTimeZoneEnabled ?? true);
     } catch {
       return true;
     }
@@ -211,32 +240,26 @@ class NativeAlarmService {
     const alarms: NativeAlarmItem[] = [];
 
     for (const item of prayerTimes) {
-      // Imsak & Syuruk sentiasa dimasukkan untuk pusingan pemasa undur (Chronometer)
       const isTransitionOnly = item.key === 'imsak' || item.key === 'syuruk';
+      const isPrayerDisabled = !isTransitionOnly && enabledPrayers && enabledPrayers[item.key] === false;
 
-      // Solat fardhu mematuhi suis hidup/mati tetapan pengguna
-      if (!isTransitionOnly && enabledPrayers && enabledPrayers[item.key] === false) {
-        continue;
-      }
-
-      const [hoursStr, minutesStr] = item.time.split(':');
-      const h = parseInt(hoursStr, 10);
-      const m = parseInt(minutesStr, 10);
-
-      if (isNaN(h) || isNaN(m)) continue;
+      const parsed = parsePrayerTimeString(item.time);
+      if (!parsed) continue;
 
       const targetDate = new Date();
-      targetDate.setHours(h, m, 0, 0);
+      targetDate.setHours(parsed.hours, parsed.minutes, 0, 0);
 
       // Jika waktu hari ini sudah lepas, anjak jadual ke esok secara automatik
       if (targetDate.getTime() <= now.getTime()) {
         targetDate.setDate(targetDate.getDate() + 1);
       }
 
-      // Imsak & Syuruk menggunakan mod suara 'none' (Peralihan senyap tanpa bunyi azan)
-      const resolvedVoice: AzanVoice = isTransitionOnly
-        ? ('none' as any)
-        : (item.voice || (item.key === 'subuh' ? 'subuh_special' : voice));
+      // Imsak, Syuruk, atau waktu solat yang dimatikan suis azannya menggunakan mod 'none'
+      // supaya pemasa undur notifikasi (Chronometer) tetap beranjak tepat pada waktunya tanpa bunyi azan.
+      const resolvedVoice: AzanVoice =
+        isTransitionOnly || isPrayerDisabled
+          ? ('none' as AzanVoice)
+          : item.voice || (item.key === 'subuh' ? 'subuh_special' : voice);
 
       alarms.push({
         prayerKey: item.key,
@@ -263,6 +286,8 @@ class NativeAlarmService {
 
       if (alarms.length > 0) {
         const result = await AzanAlarm.schedulePrayerAlarms({ alarms });
+        // Pastikan suara utama pilihan pengguna disimpan semula dan tidak tertindih oleh 'none' atau 'subuh_special'
+        await this.setActiveVoice(voice);
         return result.scheduledCount;
       }
 
