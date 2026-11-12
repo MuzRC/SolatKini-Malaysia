@@ -42,15 +42,18 @@ export const ISLAMIC_EVENTS: Record<string, string> = {
   '13-11': 'Hari Tasyrik (13 Zulhijjah)',
 };
 
+// Tahun-tahun lompat dalam kitaran 30 tahun takwim Hijriah (Zulhijjah mempunyai 30 hari)
+const HIJRI_LEAP_YEARS_IN_CYCLE = new Set([2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29]);
+
 /**
  * Converts a Gregorian date to Hijri date using Kuwaiti/Umm al-Qura astronomical algorithm
  * calibrated for Malaysia (MABIMS Rukyah & Hisab convention).
  */
 export function getHijriDate(date: Date, adjustmentDays: number = 0): HijriDateInfo {
   const d = new Date(date.getTime() + adjustmentDays * 86400000);
-  let day = d.getDate();
-  let month = d.getMonth();
-  let year = d.getFullYear();
+  const day = d.getDate();
+  const month = d.getMonth();
+  const year = d.getFullYear();
 
   let m = month + 1;
   let y = year;
@@ -75,13 +78,16 @@ export function getHijriDate(date: Date, adjustmentDays: number = 0): HijriDateI
   const hijriYear = 30 * cyc + j + 1;
 
   // Day of the year in Hijri
-  const dayOfYear = Math.floor(rem - Math.floor(j * 354.36667) + 0.5);
+  const dayOfYear = Math.max(1, Math.floor(rem - Math.floor(j * 354.36667) + 0.5));
 
-  let hijriMonth = 0;
+  const yearInCycle = ((hijriYear - 1) % 30) + 1;
+  const isLeapYear = HIJRI_LEAP_YEARS_IN_CYCLE.has(yearInCycle);
+
+  let hijriMonth = 11;
   let hijriDay = dayOfYear;
 
-  // Month lengths alternate 30, 29, 30, 29...
-  const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, 29];
+  // Panjang bulan berselang-seli 30, 29... dan bulan ke-12 (Zulhijjah) mempunyai 30 hari pada tahun lompat
+  const monthLengths = [30, 29, 30, 29, 30, 29, 30, 29, 30, 29, 30, isLeapYear ? 30 : 29];
   for (let i = 0; i < 12; i++) {
     const len = monthLengths[i];
     if (hijriDay <= len) {
@@ -91,13 +97,18 @@ export function getHijriDate(date: Date, adjustmentDays: number = 0): HijriDateI
     hijriDay -= len;
   }
 
-  // Fallback clamp
+  // Fallback clamp keselamatan (jika melebihi 355 hari)
   if (hijriDay <= 0) hijriDay = 1;
+  if (hijriDay > 30) hijriDay = 30;
   if (hijriMonth > 11) hijriMonth = 11;
 
   const monthName = HIJRI_MONTHS[hijriMonth];
   const formatted = `${hijriDay} ${monthName} ${hijriYear}H`;
-  const isAyyamulBidh = hijriDay >= 13 && hijriDay <= 15;
+
+  // 13 Zulhijjah ialah Hari Tasyrik (haram berpuasa), jadi kecualikan daripada Ayyamul Bidh
+  const isThirteenthZulhijjah = hijriMonth === 11 && hijriDay === 13;
+  const isAyyamulBidh = hijriDay >= 13 && hijriDay <= 15 && !isThirteenthZulhijjah;
+
   const eventKey = `${hijriDay}-${hijriMonth}`;
   const specialEvent = ISLAMIC_EVENTS[eventKey];
   const isRamadan = hijriMonth === 8;
@@ -121,6 +132,20 @@ export function getFastingRecommendation(date: Date, hijri: HijriDateInfo): {
 } {
   const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, 4 = Thursday
 
+  // 1. Semak Hari Haram Berpuasa terlebih dahulu (1 Syawal, 10 Zulhijjah, & Hari Tasyrik 11-13 Zulhijjah)
+  const isAidilfitri = hijri.monthIndex === 9 && hijri.day === 1;
+  const isAidiladha = hijri.monthIndex === 11 && hijri.day === 10;
+  const isHariTasyrik = hijri.monthIndex === 11 && hijri.day >= 11 && hijri.day <= 13;
+
+  if (isAidilfitri || isAidiladha || isHariTasyrik) {
+    return {
+      isRecommended: false,
+      type: isHariTasyrik ? 'Hari Tasyrik (Diharamkan Berpuasa)' : 'Hari Raya (Diharamkan Berpuasa)',
+      description: 'Umat Islam diharamkan berpuasa pada Hari Raya Aidilfitri, Aidiladha, dan tiga Hari Tasyrik.',
+    };
+  }
+
+  // 2. Puasa Wajib Ramadan
   if (hijri.isRamadan) {
     return {
       isRecommended: true,
@@ -129,6 +154,7 @@ export function getFastingRecommendation(date: Date, hijri: HijriDateInfo): {
     };
   }
 
+  // 3. Puasa Sunat Hari Arafah (9 Zulhijjah)
   if (hijri.day === 9 && hijri.monthIndex === 11) {
     return {
       isRecommended: true,
@@ -137,14 +163,16 @@ export function getFastingRecommendation(date: Date, hijri: HijriDateInfo): {
     };
   }
 
+  // 4. Puasa Sunat Tasu'a & Asyura (9 & 10 Muharram)
   if ((hijri.day === 9 || hijri.day === 10) && hijri.monthIndex === 0) {
     return {
       isRecommended: true,
-      type: 'Puasa Sunat Tasu\'a & Asyura',
+      type: "Puasa Sunat Tasu'a & Asyura",
       description: 'Sunat berpuasa pada 9 dan 10 Muharram.',
     };
   }
 
+  // 5. Puasa Sunat Ayyamul Bidh (13, 14, 15 setiap bulan kecuali 13 Zulhijjah)
   if (hijri.isAyyamulBidh) {
     return {
       isRecommended: true,
@@ -153,6 +181,7 @@ export function getFastingRecommendation(date: Date, hijri: HijriDateInfo): {
     };
   }
 
+  // 6. Puasa Sunat Isnin & Khamis
   if (dayOfWeek === 1) {
     return {
       isRecommended: true,
