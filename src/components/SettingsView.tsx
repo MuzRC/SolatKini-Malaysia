@@ -15,6 +15,10 @@ import {
   ShieldAlert,
   Square,
   BatteryCharging,
+  RefreshCw,
+  Download,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone, AzanVoice } from '../types/prayer';
 import { Language, LANGUAGE_OPTIONS, t, saveLanguage } from '../utils/i18n';
@@ -22,6 +26,12 @@ import { ThemeId, THEME_OPTIONS, applyTheme } from '../utils/theme';
 import { AZAN_OPTIONS, audioNotificationService } from '../services/audioNotificationService';
 import { audioStorageService } from '../services/audioStorageService';
 import { nativeAlarmService } from '../services/nativeAlarmService';
+import {
+  checkForAppUpdate,
+  CURRENT_APP_VERSION,
+  CURRENT_VERSION_CODE,
+  AppUpdateInfo,
+} from '../services/updateCheckerService';
 
 // ==============================================================================================
 // [MULA KOD BOLEH PADAM] : IMPORT KAD LOG AZAN
@@ -80,6 +90,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [testCountdown, setTestCountdown] = useState<number>(0);
   const testTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // State semakan kemaskini APK manual
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateCheckMsg, setUpdateCheckMsg] = useState<string | null>(null);
+  const [updateCheckStatus, setUpdateCheckStatus] = useState<'idle' | 'up_to_date' | 'available' | 'error'>('idle');
+  const [settingsUpdateInfo, setSettingsUpdateInfo] = useState<AppUpdateInfo | null>(null);
 
   const stopAzanTest = useCallback(() => {
     if (testTimerRef.current) {
@@ -199,6 +215,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       );
     } catch (e: any) {
       showToast(e.message || 'Ralat');
+    }
+  };
+
+  const handleManualUpdateCheck = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateCheckMsg(null);
+    try {
+      const res = await checkForAppUpdate(true); // true = langkau had masa 6 jam
+      if (res.status === 'update_available' && res.info) {
+        setUpdateCheckStatus('available');
+        setSettingsUpdateInfo(res.info);
+        setUpdateCheckMsg(res.message);
+        showToast(`Kemaskini v${res.info.latestVersion} ditemui!`);
+      } else if (res.status === 'up_to_date') {
+        setUpdateCheckStatus('up_to_date');
+        setSettingsUpdateInfo(null);
+        setUpdateCheckMsg(res.message);
+        showToast('Aplikasi sudah menggunakan versi terkini.');
+      } else {
+        setUpdateCheckStatus('error');
+        setUpdateCheckMsg(res.message);
+      }
+    } catch {
+      setUpdateCheckStatus('error');
+      setUpdateCheckMsg('Gagal menyambung ke pelayan kemaskini.');
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -671,6 +714,78 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <li>Tarik (*drag*) widget ke skrin utama anda untuk memaparkan jadual waktu solat 24 jam.</li>
           </ol>
         </div>
+      </div>
+
+      {/* 7. KAD SEMAK KEMASKINI APLIKASI (APK) */}
+      <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+              <Download className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white">
+                Kemaskini Aplikasi (APK)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Versi Terpasang: <span className="font-mono font-bold text-emerald-400">v{CURRENT_APP_VERSION}</span> (Build #{CURRENT_VERSION_CODE})
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleManualUpdateCheck}
+            disabled={isCheckingUpdate}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-emerald-950/40 transition active:scale-95 cursor-pointer shrink-0"
+          >
+            <RefreshCw className={`w-4 h-4 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+            <span>{isCheckingUpdate ? 'Menyemak...' : 'Semak Kemaskini'}</span>
+          </button>
+        </div>
+
+        {/* Paparan Status Semakan */}
+        {updateCheckMsg && (
+          <div
+            className={`p-3.5 rounded-2xl border text-xs space-y-2.5 ${
+              updateCheckStatus === 'available'
+                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
+                : updateCheckStatus === 'up_to_date'
+                ? 'bg-slate-950/70 border-emerald-500/30 text-emerald-300'
+                : 'bg-amber-950/40 border-amber-500/30 text-amber-300'
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {updateCheckStatus === 'available' || updateCheckStatus === 'up_to_date' ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              )}
+              <div className="space-y-1">
+                <p className="font-semibold">{updateCheckMsg}</p>
+                {settingsUpdateInfo && (
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    {settingsUpdateInfo.releaseNotes}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {settingsUpdateInfo && (
+              <div className="pt-1">
+                <a
+                  href={settingsUpdateInfo.downloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Muat Turun APK v{settingsUpdateInfo.latestVersion}</span>
+                </a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
