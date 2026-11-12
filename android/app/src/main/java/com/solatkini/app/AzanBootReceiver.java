@@ -40,6 +40,11 @@ public class AzanBootReceiver extends BroadcastReceiver {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
             if (alarmManager == null) return;
 
+            boolean canExact = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                canExact = alarmManager.canScheduleExactAlarms();
+            }
+
             long now = System.currentTimeMillis();
             int scheduledCount = 0;
 
@@ -76,15 +81,23 @@ public class AzanBootReceiver extends BroadcastReceiver {
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
                     );
 
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                        AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
-                        alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                    if (canExact) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            AlarmManager.AlarmClockInfo clockInfo = new AlarmManager.AlarmClockInfo(timestamp, showPendingIntent);
+                            alarmManager.setAlarmClock(clockInfo, pendingIntent);
+                        } else {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        }
                     } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        } else {
+                            alarmManager.set(AlarmManager.RTC_WAKEUP, timestamp, pendingIntent);
+                        }
                     }
 
                     scheduledCount++;
-                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula tepat melalui setAlarmClock pada: " + timestamp);
+                    Log.i(TAG, "Penggera solat " + prayerName + " berjaya dijadualkan semula pada: " + timestamp);
                 }
             }
 
@@ -97,11 +110,9 @@ public class AzanBootReceiver extends BroadcastReceiver {
                 "Peranti hidup semula. Sebanyak " + scheduledCount + " waktu solat berjaya dijadualkan semula ke AlarmManager."
             );
 
-            // 2. Segerakkan widget skrin utama secara automatik
-            SolatWidgetProvider.updateAllWidgets(context);
-
-            // 3. Hidupkan semula notifikasi tetap bersama pemasa undur (Chronometer) ke waktu solat seterusnya
+            // 2. Hidupkan semula notifikasi tetap bersama pemasa undur (Chronometer) & segerakkan widget skrin utama
             SolatWidgetPlugin.advanceToNextPrayer(context);
+            SolatWidgetProvider.updateAllWidgets(context);
 
             Log.i(TAG, "Selesai! Penggera (" + scheduledCount + "), widget skrin, dan notifikasi pemasa undur berjaya disegarkan selepas reboot.");
 
