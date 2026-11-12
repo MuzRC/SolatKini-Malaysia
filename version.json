@@ -1,6 +1,6 @@
 {
-  "latestVersion": "3.3.1",
-  "versionCode": 331,
-  "releaseNotes": "Update CreditsPage.tsx",
-  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.3.1/SolatKini-v3.3.1-signed.apk"
+  "latestVersion": "3.3.2",
+  "versionCode": 332,
+  "releaseNotes": "chore: kemaskini version.json ke v3.3.1 (build 331) [skip ci]",
+  "downloadUrl": "https://github.com/MuzRC/SolatKini-Malaysia/releases/download/v3.3.2/SolatKini-v3.3.2-signed.apk"
 }
