@@ -355,9 +355,9 @@ public class AzanAlarmPlugin extends Plugin {
             String prayerKey = call.getString("prayerKey", "subuh");
             String voice = call.getString("voice", "jakim");
             Integer delayObj = call.getInt("delaySeconds", 0);
-            Integer autoStopObj = call.getInt("autoStopSeconds", 20);
+            Integer autoStopObj = call.getInt("autoStopSeconds", 0);
             int delaySeconds = delayObj != null ? delayObj : 0;
-            int autoStopSeconds = autoStopObj != null ? autoStopObj : 20;
+            int autoStopSeconds = autoStopObj != null ? autoStopObj : 0;
 
             if (delaySeconds <= 0) {
                 Intent serviceIntent = new Intent(context, AzanAudioService.class);
@@ -368,7 +368,16 @@ public class AzanAlarmPlugin extends Plugin {
                 serviceIntent.putExtra("is_test", true);
                 serviceIntent.putExtra("auto_stop_seconds", autoStopSeconds);
 
-                ContextCompat.startForegroundService(context, serviceIntent);
+                try {
+                    ContextCompat.startForegroundService(context, serviceIntent);
+                } catch (Exception e) {
+                    Log.w(TAG, "ContextCompat.startForegroundService gagal, mencuba startService biasa: " + e.getMessage());
+                    try {
+                        context.startService(serviceIntent);
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Gagal memulakan service audio: " + ex.getMessage(), ex);
+                    }
+                }
             } else {
                 AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
                 Intent intent = new Intent(context, AzanAlarmReceiver.class);

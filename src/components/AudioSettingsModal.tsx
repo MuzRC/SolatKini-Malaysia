@@ -100,17 +100,18 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
       setPreviewingVoiceId(voice);
 
       if (nativeAlarmService.getIsNative()) {
-        // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM (henti automatik 20 saat)
-        nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 20);
+        // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM (berkumandang sehingga penuh atau ditekan henti)
+        nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 0);
         // Kekalkan suara aktif sebenar pilihan pengguna di dalam SharedPreferences
         const currentSavedVoice = (activeDeviceVoice || selectedVoice) as string;
         if (currentSavedVoice) {
           nativeAlarmService.setActiveVoice(currentSavedVoice);
         }
+        // Sandaran had masa maksimum 4 minit (240s) untuk status UI
         previewTimerRef.current = setTimeout(() => {
           setIsPlayingPreview(false);
           setPreviewingVoiceId(null);
-        }, 20000);
+        }, 240000);
       } else {
         audioNotificationService.unlockAudio();
         audioNotificationService.playAzan(voice, () => {
@@ -302,7 +303,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                   handleStopAll();
                   const activeVoice = (activeDeviceVoice || selectedVoice) as AzanVoice;
                   const testVoice = (nextPrayerKey === 'subuh' && activeVoice === 'jakim' ? 'subuh_special' : activeVoice) as AzanVoice;
-                  const res = await nativeAlarmService.testAlarm(nextPrayerLabel, testVoice, 3, 20);
+                  const res = await nativeAlarmService.testAlarm(nextPrayerLabel, testVoice, 3, 0);
                   if (res) {
                     // Kekalkan suara pilihan harian dalam SharedPreferences
                     await nativeAlarmService.setActiveVoice(activeVoice);

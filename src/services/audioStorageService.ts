@@ -259,7 +259,7 @@ class AudioStorageService {
             received += value.length;
             onProgress(Math.min(100, Math.round((received / contentLength) * 100)));
           }
-          const streamedBlob = new Blob(chunks, { type: 'audio/mpeg' });
+          const streamedBlob = new Blob(chunks as BlobPart[], { type: 'audio/mpeg' });
           if (this.isValidAudioBlob(streamedBlob)) {
             return streamedBlob;
           }

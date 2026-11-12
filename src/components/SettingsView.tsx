@@ -115,11 +115,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const playAzanTestOnAlarm = (voiceId: AzanVoice, voiceTitle: string) => {
     stopAzanTest();
     setTestingVoiceId(voiceId);
-    setTestCountdown(20);
 
     if (nativeAlarmService.getIsNative()) {
-      // Mainkan serta-merta pada saluran STREAM_ALARM telefon dengan henti automatik 20s
-      nativeAlarmService.testAlarm(`Ujian ${voiceTitle}`, voiceId, 0, 20);
+      // Mainkan serta-merta pada saluran STREAM_ALARM telefon tanpa henti pramatang (berkumandang sepenuhnya)
+      nativeAlarmService.testAlarm(`Ujian ${voiceTitle}`, voiceId, 0, 0);
       // Pastikan pilihan suara utama dalam SharedPreferences kekal selaras
       nativeAlarmService.setActiveVoice(voiceId);
     } else {
@@ -127,13 +126,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       audioNotificationService.playAzan(voiceId, () => stopAzanTest());
     }
 
-    testIntervalRef.current = setInterval(() => {
-      setTestCountdown((prev) => (prev > 1 ? prev - 1 : 0));
-    }, 1000);
-
+    // Sandaran had masa 4 minit (240s) maksimum jika tidak dihentikan manual
     testTimerRef.current = setTimeout(() => {
       stopAzanTest();
-    }, 20000);
+    }, 240000);
   };
 
   useEffect(() => {
@@ -513,7 +509,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span>{t('current_device_azan', currentLang)}</span>
               {testingVoiceId && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px] border border-rose-500/40 animate-pulse font-mono">
-                  ● Sedang Berbunyi (STREAM_ALARM) · {testCountdown}s
+                  ● Sedang Berbunyi (STREAM_ALARM)
                 </span>
               )}
             </span>
@@ -546,7 +542,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {testingVoiceId ? (
               <>
                 <Square className="w-3.5 h-3.5 fill-current" />
-                <span>Hentikan ({testCountdown}s)</span>
+                <span>Hentikan Azan</span>
               </>
             ) : (
               <>

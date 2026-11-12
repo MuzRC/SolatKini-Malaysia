@@ -439,8 +439,8 @@ export default function App() {
         prayerName: name,
         voice: effectiveVoice,
       });
-      // Mulakan AzanAudioService serta-merta (delay = 0) dengan had ujian 20 saat
-      nativeAlarmService.testAlarm(name, effectiveVoice, 0, 20);
+      // Mulakan AzanAudioService serta-merta (delay = 0) tanpa sekatan masa 20s supaya azan berkumandang sepenuhnya
+      nativeAlarmService.testAlarm(name, effectiveVoice, 0, 0);
     } else {
       audioNotificationService.unlockAudio();
       audioNotificationService.triggerAzan(key, name, effectiveVoice);

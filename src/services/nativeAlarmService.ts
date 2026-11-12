@@ -312,7 +312,7 @@ class NativeAlarmService {
     prayerName: string = 'Zohor',
     voice: AzanVoice = 'jakim',
     delaySeconds: number = 0,
-    autoStopSeconds: number = 20
+    autoStopSeconds: number = 0
   ): Promise<boolean> {
     if (!this.isNative) return false;
     try {
