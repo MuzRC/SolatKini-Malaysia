@@ -19,6 +19,7 @@ import {
   Shield
 } from 'lucide-react';
 import { ActiveTab } from '../types/prayer';
+import { CURRENT_APP_VERSION } from '../services/updateCheckerService';
 
 interface CreditsPageProps {
   onNavigateToTab?: (tab: ActiveTab) => void;
@@ -26,7 +27,7 @@ interface CreditsPageProps {
 
 export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => {
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 max-w-4xl mx-auto pb-12 select-none">
+    <div className="space-y-8 animate-in fade-in duration-300 max-w-5xl mx-auto pb-12 select-none">
       {/* Header Banner */}
       <div className="text-center max-w-2xl mx-auto space-y-3 pt-2">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
@@ -42,9 +43,9 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
       </div>
 
       {/* Main Attribution Showcase */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Card 1: Musa Bin Sarudin (Pencetus Visi) */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950/70 via-slate-900/90 to-slate-900 border border-emerald-500/30 p-6 sm:p-8 shadow-xl flex flex-col justify-between group hover:border-emerald-500/50 transition">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-950/70 via-slate-900/90 to-slate-900 border border-emerald-500/30 p-6 sm:p-7 shadow-xl flex flex-col justify-between group hover:border-emerald-500/50 transition">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-emerald-500/20 transition" />
 
           <div className="space-y-4">
@@ -52,7 +53,7 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
               <span className="px-3 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold tracking-wider uppercase">
                 Pencetus Visi & Konsep
               </span>
-              <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-md">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shadow-md shrink-0">
                 <User className="w-5 h-5" />
               </div>
             </div>
@@ -85,7 +86,7 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
         </div>
 
         {/* Card 2: Kejuruteraan & Arkitektur Sistem */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900/90 to-slate-900 border border-indigo-500/30 p-6 sm:p-8 shadow-xl flex flex-col justify-between group hover:border-indigo-500/50 transition">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900/90 to-slate-900 border border-indigo-500/30 p-6 sm:p-7 shadow-xl flex flex-col justify-between group hover:border-indigo-500/50 transition">
           <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-indigo-500/20 transition" />
 
           <div className="space-y-4">
@@ -93,7 +94,7 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
               <span className="px-3 py-1 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold tracking-wider uppercase">
                 Arkitektur & Kejuruteraan
               </span>
-              <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-md">
+              <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-md shrink-0">
                 <Cpu className="w-5 h-5" />
               </div>
             </div>
@@ -122,6 +123,47 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
           <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center gap-2 text-xs text-slate-400">
             <Code2 className="w-4 h-4 text-indigo-400 shrink-0" />
             <span>Dibina dengan seni bina modular, ringan & pantas</span>
+          </div>
+        </div>
+
+        {/* Card 3: Audit Keselamatan & Integriti Sistem */}
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/60 via-slate-900/90 to-slate-900 border border-amber-500/30 p-6 sm:p-7 shadow-xl flex flex-col justify-between group hover:border-amber-500/50 transition md:col-span-2 lg:col-span-1">
+          <div className="absolute top-0 right-0 -mr-12 -mt-12 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/20 transition" />
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="px-3 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[11px] font-bold tracking-wider uppercase">
+                Audit Keselamatan
+              </span>
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-300 shadow-md shrink-0">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Penilaian & Integriti Sistem</p>
+              <h2 className="text-2xl font-extrabold text-white mt-1">
+                Gemini 4 Argon
+              </h2>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Melaksanakan audit keselamatan kod sumber, pengesahan integriti aliran penggera latar belakang, kawalan kebenaran storan serta perlindungan data setempat peranti bagi memastikan aplikasi bebas daripada kerentanan dan kebocoran maklumat.
+            </p>
+
+            <div className="pt-2 flex flex-wrap gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 text-amber-300 border border-amber-900/50 font-medium">
+                Security & Code Audit
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-slate-800/80 text-amber-300 border border-amber-900/50 font-medium">
+                Perlindungan Data Setempat
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center gap-2 text-xs text-slate-400">
+            <Shield className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Disahkan selamat untuk privasi & ketahanan sistem</span>
           </div>
         </div>
       </div>
@@ -226,7 +268,7 @@ export const CreditsPage: React.FC<CreditsPageProps> = ({ onNavigateToTab }) => 
             <span>Versi Aplikasi</span>
           </div>
           <div>
-            <div className="text-2xl font-black text-white font-mono">v2.5.0</div>
+            <div className="text-2xl font-black text-white font-mono">v{CURRENT_APP_VERSION}</div>
             <p className="text-xs text-slate-400 mt-0.5">SolatKini Android APK</p>
           </div>
           <div className="text-[11px] text-emerald-400 bg-emerald-950/50 px-2.5 py-1 rounded-lg border border-emerald-900/40 w-fit">
