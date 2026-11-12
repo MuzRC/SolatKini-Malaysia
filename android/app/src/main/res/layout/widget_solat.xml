@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:gravity="center_vertical"
     android:padding="12dp"
     android:background="#0a1a14">
 
@@ -13,7 +14,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="8dp">
+        android:layout_marginBottom="6dp">
 
         <TextView
             android:id="@+id/widget_title"
@@ -23,16 +24,22 @@
             android:text="SolatKini Malaysia"
             android:textColor="#34d399"
             android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
         <TextView
             android:id="@+id/widget_zone"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:maxWidth="150dp"
             android:text="WLY01"
             android:textColor="#a7f3d0"
             android:textSize="11sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
     </LinearLayout>
 
     <!-- Next Prayer Highlight -->
@@ -42,26 +49,40 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#132a20"
-        android:padding="8dp"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="7dp"
         android:layout_marginBottom="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏳ Seterusnya: "
+            android:textColor="#94a3b8"
+            android:textSize="11sp"
+            android:maxLines="1" />
 
         <TextView
             android:id="@+id/widget_next_label"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Waktu Solat Seterusnya"
-            android:textColor="#e2e8f0"
-            android:textSize="12sp" />
+            android:text="Waktu Solat"
+            android:textColor="#ffffff"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
         <TextView
             android:id="@+id/widget_next_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:text="--:--"
             android:textColor="#fcd34d"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:maxLines="1" />
     </LinearLayout>
 
     <!-- 5 Prayers Grid -->
@@ -83,15 +104,17 @@
                 android:layout_height="wrap_content"
                 android:text="Subuh"
                 android:textColor="#94a3b8"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:maxLines="1" />
             <TextView
                 android:id="@+id/widget_subuh"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="05:50"
                 android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
         </LinearLayout>
 
         <!-- Zohor -->
@@ -106,15 +129,17 @@
                 android:layout_height="wrap_content"
                 android:text="Zohor"
                 android:textColor="#94a3b8"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:maxLines="1" />
             <TextView
                 android:id="@+id/widget_zohor"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="13:10"
                 android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
         </LinearLayout>
 
         <!-- Asar -->
@@ -129,15 +154,17 @@
                 android:layout_height="wrap_content"
                 android:text="Asar"
                 android:textColor="#94a3b8"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:maxLines="1" />
             <TextView
                 android:id="@+id/widget_asar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="16:20"
                 android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
         </LinearLayout>
 
         <!-- Maghrib -->
@@ -152,15 +179,17 @@
                 android:layout_height="wrap_content"
                 android:text="Maghrib"
                 android:textColor="#94a3b8"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:maxLines="1" />
             <TextView
                 android:id="@+id/widget_maghrib"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="19:15"
                 android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
         </LinearLayout>
 
         <!-- Isyak -->
@@ -175,15 +204,17 @@
                 android:layout_height="wrap_content"
                 android:text="Isyak"
                 android:textColor="#94a3b8"
-                android:textSize="10sp" />
+                android:textSize="10sp"
+                android:maxLines="1" />
             <TextView
                 android:id="@+id/widget_isyak"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="20:25"
                 android:textColor="#ffffff"
-                android:textSize="11sp"
-                android:textStyle="bold" />
+                android:textSize="10.5sp"
+                android:textStyle="bold"
+                android:maxLines="1" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>
