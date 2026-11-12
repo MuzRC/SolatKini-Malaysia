@@ -20,11 +20,82 @@ type FontSize = 'normal' | 'large' | 'xlarge' | '4xl';
 
 export const TasbihWirid: React.FC = () => {
   const [activeSection, setActiveSection] = useState<'tasbih' | 'wirid'>('tasbih');
-  const [count, setCount] = useState<number>(0);
-  const [targetCount, setTargetCount] = useState<number>(33);
-  const [lapCount, setLapCount] = useState<number>(0);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [vibrateEnabled, setVibrateEnabled] = useState<boolean>(true);
+
+  // Kekalkan pilihan tasbih, kiraan, pusingan, dan sasaran di dalam localStorage
+  // supaya tidak hilang apabila pengguna menukar tab navigasi
+  const [selectedTasbihId, setSelectedTasbihId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('solatkini_tasbih_selected_id') || 'tasbih';
+    }
+    return 'tasbih';
+  });
+
+  const activeTasbih = TASBIH_LIST.find((t) => t.id === selectedTasbihId) || TASBIH_LIST[0];
+
+  const [count, setCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const val = Number(localStorage.getItem('solatkini_tasbih_count') || '0');
+      return isNaN(val) ? 0 : Math.max(0, val);
+    }
+    return 0;
+  });
+
+  const [targetCount, setTargetCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_tasbih_target');
+      if (saved !== null) {
+        const val = Number(saved);
+        if (!isNaN(val) && val >= 0) return val;
+      }
+    }
+    return activeTasbih?.defaultTarget ?? 33;
+  });
+
+  const [lapCount, setLapCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const val = Number(localStorage.getItem('solatkini_tasbih_laps') || '0');
+      return isNaN(val) ? 0 : Math.max(0, val);
+    }
+    return 0;
+  });
+
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('solatkini_tasbih_sound');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
+
+  const [vibrateEnabled] = useState<boolean>(true);
+  const [confirmResetAll, setConfirmResetAll] = useState<boolean>(false);
+
+  // Rujukan masa nyata untuk memastikan ketikan pantas tidak tercicir
+  const countRef = useRef<number>(count);
+  useEffect(() => {
+    countRef.current = count;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_tasbih_count', String(count));
+    }
+  }, [count]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_tasbih_laps', String(lapCount));
+    }
+  }, [lapCount]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_tasbih_target', String(targetCount));
+    }
+  }, [targetCount]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_tasbih_sound', String(soundEnabled));
+    }
+  }, [soundEnabled]);
 
   // Mod Sentuhan Bebas (Free Touch)
   const [freeTouchEnabled, setFreeTouchEnabled] = useState<boolean>(() => {
@@ -44,12 +115,12 @@ export const TasbihWirid: React.FC = () => {
     });
   };
 
-  // State pilihan tasbih daripada senarai luar (wiridAndDoa.ts)
-  const [selectedTasbihId, setSelectedTasbihId] = useState<string>('tasbih');
-  const activeTasbih = TASBIH_LIST.find((t) => t.id === selectedTasbihId) || TASBIH_LIST[0];
-
   const handleSelectTasbih = (id: string) => {
     setSelectedTasbihId(id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('solatkini_tasbih_selected_id', id);
+    }
+    countRef.current = 0;
     setCount(0);
     setLapCount(0);
     const item = TASBIH_LIST.find((t) => t.id === id);
@@ -129,10 +200,13 @@ export const TasbihWirid: React.FC = () => {
 
   const stopCurrentAudio = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current.onended = null;
-      audioRef.current.onerror = null;
+      try {
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current.pause();
+        audioRef.current.removeAttribute('src');
+        audioRef.current.load();
+      } catch {}
       audioRef.current = null;
     }
     setPlayingAudioId(null);
@@ -174,18 +248,19 @@ export const TasbihWirid: React.FC = () => {
     };
   }, [activeSection]);
 
-  // Digital Tasbih Tap (Menguruskan kiraan, audio klik & getaran)
+  // Digital Tasbih Tap (Bebas Stale State pada ketikan pantas)
   const handleTap = () => {
-    const nextCount = count + 1;
-    setCount(nextCount);
+    const nextCount = countRef.current + 1;
 
     if (soundEnabled) {
       audioNotificationService.playTasbihClick();
     }
 
+    const reachedTarget = targetCount > 0 && nextCount >= targetCount;
+
     if (vibrateEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
       try {
-        if (targetCount > 0 && nextCount % targetCount === 0) {
+        if (reachedTarget) {
           navigator.vibrate([80, 40, 120]);
         } else {
           navigator.vibrate(35);
@@ -193,19 +268,31 @@ export const TasbihWirid: React.FC = () => {
       } catch {}
     }
 
-    if (targetCount > 0 && nextCount >= targetCount) {
-      setLapCount((prev) => prev + 1);
+    if (reachedTarget) {
+      countRef.current = 0;
       setCount(0);
+      setLapCount((prev) => prev + 1);
+    } else {
+      countRef.current = nextCount;
+      setCount(nextCount);
     }
   };
 
-  const handleReset = () => setCount(0);
+  const handleReset = () => {
+    countRef.current = 0;
+    setCount(0);
+  };
 
   const handleResetAll = () => {
-    if (window.confirm('Tetapkan semula kiraan dan pusingan tasbih?')) {
-      setCount(0);
-      setLapCount(0);
+    if (!confirmResetAll) {
+      setConfirmResetAll(true);
+      setTimeout(() => setConfirmResetAll(false), 3500);
+      return;
     }
+    countRef.current = 0;
+    setCount(0);
+    setLapCount(0);
+    setConfirmResetAll(false);
   };
 
   const fontStyles = {
@@ -424,6 +511,7 @@ export const TasbihWirid: React.FC = () => {
                     type="button"
                     onClick={() => {
                       setTargetCount(t);
+                      countRef.current = 0;
                       setCount(0);
                     }}
                     className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -454,10 +542,15 @@ export const TasbihWirid: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleResetAll}
-                  className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-red-400 transition cursor-pointer"
+                  className={`px-2.5 py-2 rounded-xl border text-xs font-medium flex items-center gap-1 transition cursor-pointer ${
+                    confirmResetAll
+                      ? 'bg-red-600 border-red-400 text-white font-bold'
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-red-400'
+                  }`}
                   title="Reset Pusingan"
                 >
                   <RotateCcw className="w-4 h-4" />
+                  {confirmResetAll && <span>Sahkan Reset?</span>}
                 </button>
               </div>
             </div>
@@ -483,7 +576,7 @@ export const TasbihWirid: React.FC = () => {
                 <div className="absolute inset-7 rounded-full border border-dashed border-emerald-500/20 pointer-events-none" />
 
                 <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-1">
-                  Ketik Disini
+                  Ketik Di Sini
                 </span>
                 <span className="text-6xl sm:text-7xl font-black text-white font-mono tracking-tighter tabular-nums drop-shadow-md">
                   {count}
@@ -614,7 +707,7 @@ export const TasbihWirid: React.FC = () => {
 
                   {/* 1. Teks Arab Dikuasakan oleh ArabicQuranText (Dipetakan Baris demi Baris) */}
                   {showArabic && (
-                    <div className="space-y-2 text-right">
+                    <div className="space-y-2 text-right" dir="rtl">
                       {item.arabic
                         .split('\n')
                         .filter((line) => line.trim().length > 0)
