@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, CheckCircle2, MapPin } from 'lucide-react';
 import { JakimZone } from '../types/prayer';
 import { JAKIM_ZONES } from '../data/jakimZones';
 
@@ -10,6 +10,10 @@ interface ZoneSelectModalProps {
   onZoneChange: (zone: JakimZone) => void;
 }
 
+const getZoneStateName = (zone: JakimZone): string => {
+  return ((zone as any)?.state || (zone as any)?.negeri || '').trim();
+};
+
 export const ZoneSelectModal: React.FC<ZoneSelectModalProps> = ({
   isOpen,
   onClose,
@@ -19,21 +23,41 @@ export const ZoneSelectModal: React.FC<ZoneSelectModalProps> = ({
   const [zoneSearchQuery, setZoneSearchQuery] = useState('');
   const [selectedStateFilter, setSelectedStateFilter] = useState('Semua');
 
+  // Tetapkan semula carian apabila modal dibuka
+  useEffect(() => {
+    if (isOpen) {
+      setZoneSearchQuery('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const states = ['Semua', ...Array.from(new Set(JAKIM_ZONES.map((z) => z.state)))];
+  const states = [
+    'Semua',
+    ...Array.from(
+      new Set(
+        JAKIM_ZONES.map((z) => getZoneStateName(z)).filter((s) => s.length > 0)
+      )
+    ),
+  ];
+
+  const q = zoneSearchQuery.trim().toLowerCase();
 
   const filteredZones = JAKIM_ZONES.filter((zone) => {
-    const matchesState = selectedStateFilter === 'Semua' || zone.state === selectedStateFilter;
-    const matchesQuery =
-      zone.code.toLowerCase().includes(zoneSearchQuery.toLowerCase()) ||
-      zone.daerah.toLowerCase().includes(zoneSearchQuery.toLowerCase()) ||
-      zone.state.toLowerCase().includes(zoneSearchQuery.toLowerCase());
-    return matchesState && matchesQuery;
+    const stateName = getZoneStateName(zone);
+    const matchesState = selectedStateFilter === 'Semua' || stateName === selectedStateFilter;
+    if (!matchesState) return false;
+    if (!q) return true;
+
+    return (
+      (zone.code || '').toLowerCase().includes(q) ||
+      (zone.daerah || '').toLowerCase().includes(q) ||
+      stateName.toLowerCase().includes(q)
+    );
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200 select-none">
       <div className="relative w-full max-w-xl max-h-[85vh] rounded-3xl bg-[#0f1a16] border border-emerald-500/20 p-6 flex flex-col shadow-2xl">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div>
@@ -43,6 +67,7 @@ export const ZoneSelectModal: React.FC<ZoneSelectModalProps> = ({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
           >
@@ -56,13 +81,14 @@ export const ZoneSelectModal: React.FC<ZoneSelectModalProps> = ({
             placeholder="Cari daerah, negeri, atau kod (cth: Beaufort, SBH07, Shah Alam)..."
             value={zoneSearchQuery}
             onChange={(e) => setZoneSearchQuery(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-emerald-500"
+            className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
           />
 
           <div className="flex items-center gap-1.5 overflow-x-auto pb-2 text-xs scrollbar-none">
             {states.map((st) => (
               <button
                 key={st}
+                type="button"
                 onClick={() => setSelectedStateFilter(st)}
                 className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition cursor-pointer ${
                   selectedStateFilter === st
@@ -77,36 +103,47 @@ export const ZoneSelectModal: React.FC<ZoneSelectModalProps> = ({
         </div>
 
         <div className="flex-1 overflow-y-auto mt-2 space-y-2 pr-1">
-          {filteredZones.map((z) => {
-            const isSelected = z.code === currentZone.code;
-            return (
-              <button
-                key={z.code}
-                onClick={() => {
-                  onZoneChange(z);
-                  onClose();
-                }}
-                className={`w-full p-3.5 rounded-xl text-left flex items-start justify-between transition cursor-pointer ${
-                  isSelected
-                    ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-200'
-                    : 'bg-slate-900/50 hover:bg-slate-800/60 border border-slate-800 text-slate-300'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/40 font-bold">
-                      {z.code}
-                    </span>
-                    <span className="text-xs font-semibold text-slate-400">{z.state}</span>
+          {filteredZones.length === 0 ? (
+            <div className="py-10 text-center text-slate-400 space-y-1">
+              <MapPin className="w-7 h-7 text-slate-600 mx-auto mb-1" />
+              <p className="text-xs font-semibold">Tiada zon waktu solat ditemui.</p>
+              <p className="text-[11px] text-slate-500">Cuba cari nama daerah lain atau pilih negeri &quot;Semua&quot;.</p>
+            </div>
+          ) : (
+            filteredZones.map((z) => {
+              const isSelected = z.code === currentZone.code;
+              const stateName = getZoneStateName(z);
+
+              return (
+                <button
+                  key={z.code}
+                  type="button"
+                  onClick={() => {
+                    onZoneChange(z);
+                    onClose();
+                  }}
+                  className={`w-full p-3.5 rounded-xl text-left flex items-start justify-between transition cursor-pointer ${
+                    isSelected
+                      ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-200'
+                      : 'bg-slate-900/50 hover:bg-slate-800/60 border border-slate-800 text-slate-300'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/40 font-bold">
+                        {z.code}
+                      </span>
+                      <span className="text-xs font-semibold text-slate-400">{stateName}</span>
+                    </div>
+                    <p className="text-sm font-medium text-white mt-1.5 leading-snug">
+                      {z.daerah}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium text-white mt-1.5 leading-snug">
-                    {z.daerah}
-                  </p>
-                </div>
-                {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-1" />}
-              </button>
-            );
-          })}
+                  {isSelected && <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-1" />}
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
