@@ -81,7 +81,11 @@ export const DuaCollection: React.FC = () => {
     if (typeof window !== 'undefined') {
       try {
         const saved = localStorage.getItem('solatkini_dua_bookmarks');
-        return saved ? JSON.parse(saved) : ['dua-selepas-solat', 'dua-kedua-ibu-bapa'];
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        }
+        return ['dua-selepas-solat', 'dua-kedua-ibu-bapa'];
       } catch {
         return [];
       }
@@ -102,7 +106,7 @@ export const DuaCollection: React.FC = () => {
   const handleCopy = (dua: DuaItem) => {
     const textToCopy = `${dua.title}\n\n${dua.arabic}\n\n"${dua.transliteration || ''}"\n\nTerjemahan:\n${dua.translation || ''}\n\n(${dua.reference || 'SolatKini Malaysia'})`;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(textToCopy);
+      navigator.clipboard.writeText(textToCopy).catch(() => {});
       setCopiedId(dua.id);
       setTimeout(() => setCopiedId(null), 2000);
     }
@@ -141,22 +145,22 @@ export const DuaCollection: React.FC = () => {
 
   const fontStyles = {
     normal: {
-      arabic: 'text-lg sm:text-xl leading-relaxed',
+      arabic: 'text-lg sm:text-xl leading-relaxed whitespace-pre-line',
       rumi: 'text-xs sm:text-sm',
       translation: 'text-xs sm:text-sm',
     },
     large: {
-      arabic: 'text-xl sm:text-2xl leading-loose',
+      arabic: 'text-xl sm:text-2xl leading-loose whitespace-pre-line',
       rumi: 'text-sm sm:text-base',
       translation: 'text-sm sm:text-base',
     },
     xlarge: {
-      arabic: 'text-2xl sm:text-3xl leading-loose',
+      arabic: 'text-2xl sm:text-3xl leading-loose whitespace-pre-line',
       rumi: 'text-base sm:text-lg',
       translation: 'text-base sm:text-lg',
     },
     '4xl': {
-      arabic: 'text-3xl sm:text-4xl leading-loose',
+      arabic: 'text-3xl sm:text-4xl leading-loose whitespace-pre-line',
       rumi: 'text-lg sm:text-xl',
       translation: 'text-lg sm:text-xl',
     },
@@ -342,10 +346,12 @@ export const DuaCollection: React.FC = () => {
 
                 {/* 1. Teks Arab / Jawi dengan Sokongan Roset Emas Mushaf Quran */}
                 {showArabic && (
-                  <ArabicQuranText
-                    text={dua.arabic}
-                    className={`font-arabic text-right text-emerald-200 transition-all duration-150 ${fontStyles.arabic}`}
-                  />
+                  <div className="text-right" dir="rtl">
+                    <ArabicQuranText
+                      text={dua.arabic}
+                      className={`font-arabic text-right text-emerald-200 block transition-all duration-150 ${fontStyles.arabic}`}
+                    />
+                  </div>
                 )}
 
                 {/* 2. Teks Rumi (Boleh Collapse) */}
