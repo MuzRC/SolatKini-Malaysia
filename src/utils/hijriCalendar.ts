@@ -3,11 +3,23 @@ export interface HijriDateInfo {
   monthIndex: number; // 0-based: 0 = Muharram
   monthName: string;
   year: number;
-  formatted: string; // e.g. "24 Rabiulakhir 1448H"
+  formatted: string; // e.g. "2 Jamadilakhir 1448H"
   isAyyamulBidh: boolean;
   specialEvent?: string;
   isRamadan: boolean;
 }
+
+export interface RamadanCountdownInfo {
+  isRamadan: boolean;
+  currentRamadanDay: number; // 1-30 semasa Ramadan, 0 di luar Ramadan
+  daysRemainingInRamadan: number; // Baki hari menuju 1 Syawal semasa Ramadan
+  daysUntilNextRamadan: number; // Baki hari menuju 1 Ramadan seterusnya (0 jika sedang Ramadan)
+  nextRamadanHijriYear: number; // Tahun Hijrah bagi Ramadan semasa atau akan datang
+  estimatedRamadanStartDate: Date; // Tarikh Masihi anggaran 1 Ramadan
+  ramadanYearKey: string; // Kunci unik per tahun Hijrah (cth. "1448")
+}
+
+export const HIJRI_ADJUSTMENT_STORAGE_KEY = 'solatkini_hijri_adjustment';
 
 export const HIJRI_MONTHS = [
   'Muharram',
@@ -46,11 +58,55 @@ export const ISLAMIC_EVENTS: Record<string, string> = {
 const HIJRI_LEAP_YEARS_IN_CYCLE = new Set([2, 5, 7, 10, 13, 16, 18, 21, 24, 26, 29]);
 
 /**
+ * Baca pelarasan hari Hijrah (-2 hingga +2 hari) daripada localStorage
+ * bagi menyelaraskan takwim dengan pengisytiharan rasmi JAKIM / Penyimpan Mohor Besar Raja-Raja.
+ */
+export function getSavedHijriAdjustment(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = localStorage.getItem(HIJRI_ADJUSTMENT_STORAGE_KEY);
+    if (!raw) return 0;
+    const parsed = parseInt(raw, 10);
+    if (isNaN(parsed)) return 0;
+    return Math.max(-2, Math.min(2, parsed));
+  } catch {
+    return 0;
+  }
+}
+
+export function saveHijriAdjustment(days: number): number {
+  const clamped = Math.max(-2, Math.min(2, Math.round(days)));
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(HIJRI_ADJUSTMENT_STORAGE_KEY, String(clamped));
+    } catch {}
+  }
+  return clamped;
+}
+
+/**
+ * Menukar rentetan tarikh Hijrah JAKIM e-Solat (contoh: "1448-06-03") kepada format bacaan Malaysia.
+ */
+export function parseJakimHijriString(jakimHijri?: string): string | null {
+  if (!jakimHijri || typeof jakimHijri !== 'string') return null;
+  const parts = jakimHijri.trim().split('-');
+  if (parts.length !== 3) return null;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (isNaN(y) || isNaN(m) || isNaN(d) || m < 1 || m > 12 || d < 1 || d > 30) {
+    return null;
+  }
+  return `${d} ${HIJRI_MONTHS[m - 1]} ${y}H`;
+}
+
+/**
  * Converts a Gregorian date to Hijri date using Kuwaiti/Umm al-Qura astronomical algorithm
  * calibrated for Malaysia (MABIMS Rukyah & Hisab convention).
  */
-export function getHijriDate(date: Date, adjustmentDays: number = 0): HijriDateInfo {
-  const d = new Date(date.getTime() + adjustmentDays * 86400000);
+export function getHijriDate(date: Date, adjustmentDays?: number): HijriDateInfo {
+  const effectiveAdj = adjustmentDays !== undefined ? adjustmentDays : getSavedHijriAdjustment();
+  const d = new Date(date.getTime() + effectiveAdj * 86400000);
   const day = d.getDate();
   const month = d.getMonth();
   const year = d.getFullYear();
@@ -122,6 +178,66 @@ export function getHijriDate(date: Date, adjustmentDays: number = 0): HijriDateI
     isAyyamulBidh,
     specialEvent,
     isRamadan,
+  };
+}
+
+/**
+ * Mengesan status Ramadan semasa secara automatik serta mengira baki hari
+ * menuju 1 Ramadan (jika di luar Ramadan) atau baki hari menuju 1 Syawal (jika sedang Ramadan).
+ */
+export function getRamadanCountdownInfo(date: Date, adjustmentDays?: number): RamadanCountdownInfo {
+  const effectiveAdj = adjustmentDays !== undefined ? adjustmentDays : getSavedHijriAdjustment();
+  const baseDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+  const currentHijri = getHijriDate(baseDate, effectiveAdj);
+
+  if (currentHijri.isRamadan) {
+    // Cari tarikh 1 Syawal untuk kiraan baki hari Ramadan yang tepat
+    let daysToSyawal = Math.max(0, 30 - currentHijri.day);
+    for (let i = 1; i <= 31; i++) {
+      const future = new Date(baseDate.getTime() + i * 86400000);
+      const h = getHijriDate(future, effectiveAdj);
+      if (h.monthIndex === 9 && h.day === 1) {
+        daysToSyawal = i;
+        break;
+      }
+    }
+
+    const startDate = new Date(baseDate.getTime() - (currentHijri.day - 1) * 86400000);
+    return {
+      isRamadan: true,
+      currentRamadanDay: currentHijri.day,
+      daysRemainingInRamadan: daysToSyawal,
+      daysUntilNextRamadan: 0,
+      nextRamadanHijriYear: currentHijri.year,
+      estimatedRamadanStartDate: startDate,
+      ramadanYearKey: String(currentHijri.year),
+    };
+  }
+
+  // Di luar bulan Ramadan: imbas ke hadapan sehingga jumpa 1 Ramadan
+  let daysUntil = 0;
+  let targetYear = currentHijri.monthIndex < 8 ? currentHijri.year : currentHijri.year + 1;
+  let estimatedStart = new Date(baseDate.getTime() + 30 * 86400000);
+
+  for (let i = 1; i <= 370; i++) {
+    const future = new Date(baseDate.getTime() + i * 86400000);
+    const h = getHijriDate(future, effectiveAdj);
+    if (h.monthIndex === 8 && h.day === 1) {
+      daysUntil = i;
+      targetYear = h.year;
+      estimatedStart = future;
+      break;
+    }
+  }
+
+  return {
+    isRamadan: false,
+    currentRamadanDay: 0,
+    daysRemainingInRamadan: 0,
+    daysUntilNextRamadan: daysUntil,
+    nextRamadanHijriYear: targetYear,
+    estimatedRamadanStartDate: estimatedStart,
+    ramadanYearKey: String(targetYear),
   };
 }
 
