@@ -450,16 +450,9 @@ public class AzanAlarmPlugin extends Plugin {
     public void stopAzanAudio(PluginCall call) {
         try {
             Context context = getContext();
-            Intent stopIntent = new Intent(context, AzanAudioService.class);
-            stopIntent.setAction(AzanAudioService.ACTION_STOP_AZAN);
-            try {
-                context.startService(stopIntent);
-            } catch (Throwable e) {
-                // Sandaran jika servis tidak berada dalam keadaan aktif pada Android 8+
-                try {
-                    context.stopService(new Intent(context, AzanAudioService.class));
-                } catch (Throwable ignored) {}
-            }
+            // Terus guna stopService() tanpa beratur ACTION_STOP_AZAN melalui startService()
+            // supaya tidak mematikan audio baharu yang dimainkan serta-merta selepasnya.
+            context.stopService(new Intent(context, AzanAudioService.class));
 
             JSObject ret = new JSObject();
             ret.put("success", true);
