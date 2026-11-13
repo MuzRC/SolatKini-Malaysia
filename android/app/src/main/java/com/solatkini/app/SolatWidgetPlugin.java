@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Build;
+import android.service.notification.StatusBarNotification;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import com.getcapacitor.JSObject;
@@ -19,9 +20,9 @@ public class SolatWidgetPlugin extends Plugin {
     private static final String TAG = "SolatWidgetPlugin";
     public static final int PERSISTENT_NOTIFICATION_ID = 8801;
     public static final String ACTION_SYNC_PRAYER = "com.solatkini.app.ACTION_SYNC_PRAYER";
+    public static final String ACTION_RESTORE_PERSISTENT_NOTIF = "com.solatkini.app.ACTION_RESTORE_PERSISTENT_NOTIF";
     public static final String WIDGET_PREFS = "SolatKiniWidgetPrefs";
 
-    // Fungsi pembantu untuk membuang label AM/PM supaya paparan jadual padat & tidak melimpah
     private static String stripAmPm(String timeStr) {
         if (timeStr == null || timeStr.isEmpty() || timeStr.equals("--:--")) return "--:--";
         return timeStr.replace(" AM", "")
@@ -55,7 +56,6 @@ public class SolatWidgetPlugin extends Plugin {
             }
             editor.commit();
 
-            // Terus kemaskini widget & jadualkan penggera pertukaran waktu secara serta-merta
             SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
 
             JSObject ret = new JSObject();
@@ -131,7 +131,7 @@ public class SolatWidgetPlugin extends Plugin {
             if (call.hasOption("upcoming_days_json")) {
                 editor.putString("upcoming_days_json", call.getString("upcoming_days_json"));
             }
-            editor.apply();
+            editor.commit();
 
             buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nextTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
             SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
@@ -165,7 +165,6 @@ public class SolatWidgetPlugin extends Plugin {
 
             long now = System.currentTimeMillis();
 
-            // Pintasan Buka App
             Intent openIntent = new Intent(context, MainActivity.class);
             openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             PendingIntent openPending = PendingIntent.getActivity(
@@ -175,7 +174,6 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Pintasan Segerak
             Intent syncIntent = new Intent(context, MainActivity.class);
             syncIntent.setAction(ACTION_SYNC_PRAYER);
             syncIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -183,6 +181,15 @@ public class SolatWidgetPlugin extends Plugin {
                 context,
                 2002,
                 syncIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            Intent restoreIntent = new Intent(context, SolatWidgetProvider.class);
+            restoreIntent.setAction(ACTION_RESTORE_PERSISTENT_NOTIF);
+            PendingIntent restorePending = PendingIntent.getBroadcast(
+                context,
+                2003,
+                restoreIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
@@ -214,11 +221,14 @@ public class SolatWidgetPlugin extends Plugin {
                 .setContentText(nextKicker)
                 .setStyle(bigStyle)
                 .setContentIntent(openPending)
+                .setDeleteIntent(restorePending)
                 .setOngoing(true)
+                .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .addAction(android.R.drawable.ic_menu_today, "Buka", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
@@ -240,12 +250,42 @@ public class SolatWidgetPlugin extends Plugin {
         }
     }
 
+    public static void ensurePersistentNotificationActive(Context context) {
+        try {
+            SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
+            if (!widgetPrefs.getBoolean("is_persistent_enabled", false)) {
+                return;
+            }
+
+            NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (manager == null) return;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                StatusBarNotification[] active = manager.getActiveNotifications();
+                if (active != null) {
+                    for (StatusBarNotification sbn : active) {
+                        if (sbn != null && sbn.getId() == PERSISTENT_NOTIFICATION_ID) {
+                            return;
+                        }
+                    }
+                }
+            }
+
+            advanceToNextPrayer(context);
+        } catch (Throwable t) {
+            Log.w(TAG, "Gagal menyemak status notifikasi tetap: " + t.getMessage());
+        }
+    }
+
     public static void advanceToNextPrayer(Context context) {
         try {
-            // Segarkan widget & kira semula waktu solat seterusnya secara masa nyata
             SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
 
             SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
+            if (!widgetPrefs.getBoolean("is_persistent_enabled", false)) {
+                return;
+            }
+
             String zone = widgetPrefs.getString("zone", "Beaufort");
             String hijri = widgetPrefs.getString("hijri", "");
             String imsak = widgetPrefs.getString("imsak", "--:--");
@@ -259,23 +299,21 @@ public class SolatWidgetPlugin extends Plugin {
             String nextTime = widgetPrefs.getString("next_time", subuh);
             long targetTimestamp = widgetPrefs.getLong("next_timestamp", 0L);
 
-            if (widgetPrefs.getBoolean("is_persistent_enabled", false)) {
-                buildAndShowNotification(
-                    context,
-                    zone,
-                    hijri,
-                    nextLabel,
-                    nextTime,
-                    targetTimestamp,
-                    imsak,
-                    subuh,
-                    syuruk,
-                    zohor,
-                    asar,
-                    maghrib,
-                    isyak
-                );
-            }
+            buildAndShowNotification(
+                context,
+                zone,
+                hijri,
+                nextLabel,
+                nextTime,
+                targetTimestamp,
+                imsak,
+                subuh,
+                syuruk,
+                zohor,
+                asar,
+                maghrib,
+                isyak
+            );
         } catch (Throwable e) {
             Log.w(TAG, "Ralat menganjak waktu solat", e);
         }
@@ -285,13 +323,13 @@ public class SolatWidgetPlugin extends Plugin {
     public void cancelPersistentNotification(PluginCall call) {
         try {
             Context context = getContext();
+            SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
+            prefs.edit().putBoolean("is_persistent_enabled", false).commit();
+
             NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
             if (manager != null) {
                 manager.cancel(PERSISTENT_NOTIFICATION_ID);
             }
-
-            SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
-            prefs.edit().putBoolean("is_persistent_enabled", false).apply();
 
             JSObject ret = new JSObject();
             ret.put("success", true);
