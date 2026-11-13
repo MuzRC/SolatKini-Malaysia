@@ -49,7 +49,10 @@ public class SolatWidgetProvider extends AppWidgetProvider {
     @Override
     public void onDisabled(Context context) {
         super.onDisabled(context);
-        cancelWidgetTick(context);
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        if (!prefs.getBoolean("is_persistent_enabled", false)) {
+            cancelWidgetTick(context);
+        }
     }
 
     @Override
@@ -85,6 +88,13 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             editor.commit();
 
             refreshAndScheduleAllWidgets(context);
+        } else if (SolatWidgetPlugin.ACTION_RESTORE_PERSISTENT_NOTIF.equals(action)) {
+            // Pengguna tersapu (swipe dismiss) pada Android 14/15: pulihkan semula serta-merta
+            SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            if (prefs.getBoolean("is_persistent_enabled", false)) {
+                Log.i(TAG, "Memulihkan semula notifikasi tetap SolatKini selepas disapu.");
+                SolatWidgetPlugin.advanceToNextPrayer(context);
+            }
         } else if (
             ACTION_WIDGET_TICK.equals(action)
             || Intent.ACTION_BOOT_COMPLETED.equals(action)
@@ -94,7 +104,6 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
         ) {
             refreshAndScheduleAllWidgets(context);
-            // Selaraskan juga notifikasi tetap sekiranya diaktifkan
             try {
                 SolatWidgetPlugin.advanceToNextPrayer(context);
             } catch (Throwable ignored) {}
@@ -102,10 +111,8 @@ public class SolatWidgetProvider extends AppWidgetProvider {
     }
 
     /**
-     * Kemas kini semua widget secara autonomi:
-     * 1. Semak jika tarikh sudah bertukar hari dan muatkan jadual hari baharu dari cache berbilang hari.
-     * 2. Kira waktu solat seterusnya secara masa nyata berdasarkan jam peranti.
-     * 3. Jadualkan penggera tepat (AlarmManager) untuk pertukaran waktu seterusnya & tengah malam.
+     * Kemas kini semua widget secara autonomi serta memastikan notifikasi tetap
+     * tidak hilang pada Android 14/15.
      */
     public static void refreshAndScheduleAllWidgets(Context context) {
         if (context == null) return;
@@ -115,7 +122,6 @@ public class SolatWidgetProvider extends AppWidgetProvider {
 
             String zone = prefs.getString("zone", "WLY01");
             String subuh = prefs.getString("subuh", "05:50");
-            String syuruk = prefs.getString("syuruk", "07:05");
             String zohor = prefs.getString("zohor", "13:10");
             String asar = prefs.getString("asar", "16:20");
             String maghrib = prefs.getString("maghrib", "19:15");
@@ -132,8 +138,10 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
             ComponentName thisWidget = new ComponentName(context, SolatWidgetProvider.class);
             int[] appWidgetIds = manager.getAppWidgetIds(thisWidget);
+            boolean hasWidgets = appWidgetIds != null && appWidgetIds.length > 0;
+            boolean hasPersistentNotif = prefs.getBoolean("is_persistent_enabled", false);
 
-            if (appWidgetIds != null && appWidgetIds.length > 0) {
+            if (hasWidgets) {
                 for (int appWidgetId : appWidgetIds) {
                     renderWidgetViews(
                         context,
@@ -149,6 +157,13 @@ public class SolatWidgetProvider extends AppWidgetProvider {
                         isyak
                     );
                 }
+            }
+
+            if (hasPersistentNotif) {
+                SolatWidgetPlugin.ensurePersistentNotificationActive(context);
+            }
+
+            if (hasWidgets || hasPersistentNotif) {
                 scheduleNextWidgetTick(context, computed.targetTimestamp);
             } else {
                 cancelWidgetTick(context);
@@ -209,7 +224,6 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_maghrib, maghrib);
         views.setTextViewText(R.id.widget_isyak, isyak);
 
-        // Tekan mana-mana bahagian widget untuk buka aplikasi SolatKini & segerak masa nyata
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -223,18 +237,10 @@ public class SolatWidgetProvider extends AppWidgetProvider {
         appWidgetManager.updateAppWidget(appWidgetId, views);
     }
 
-    /**
-     * Kaedah statik untuk kemas kini kesemua widget aktif sekali gus
-     * (Dipanggil oleh BootReceiver, AzanAlarmReceiver, atau servis latar belakang)
-     */
     public static void updateAllWidgets(Context context) {
         refreshAndScheduleAllWidgets(context);
     }
 
-    /**
-     * Jika jadual berbilang hari (upcoming_days_json) tersimpan dan tarikh sudah beralih ke hari baharu,
-     * muatkan jadual hari ini secara automatik tanpa perlu membuka aplikasi.
-     */
     private static void rollOverToTodayScheduleIfAvailable(SharedPreferences prefs) {
         try {
             String todayStr = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
@@ -282,7 +288,6 @@ public class SolatWidgetProvider extends AppWidgetProvider {
             }
         }
 
-        // Selepas Isyak: waktu seterusnya ialah Subuh hari esok
         String tomorrowSubuhRaw = getTomorrowSubuhFromCache(prefs);
         if (tomorrowSubuhRaw == null || tomorrowSubuhRaw.isEmpty()) {
             tomorrowSubuhRaw = prefs.getString("subuh", "05:50");
@@ -365,7 +370,6 @@ public class SolatWidgetProvider extends AppWidgetProvider {
 
             long now = System.currentTimeMillis();
 
-            // Kira tengah malam seterusnya (00:00:05) supaya tarikh & jadual hari baharu bertukar tepat
             Calendar midnight = Calendar.getInstance();
             midnight.add(Calendar.DAY_OF_YEAR, 1);
             midnight.set(Calendar.HOUR_OF_DAY, 0);
@@ -376,7 +380,7 @@ public class SolatWidgetProvider extends AppWidgetProvider {
 
             long targetTrigger = nextMidnightMillis;
             if (nextPrayerTimestamp > now && nextPrayerTimestamp < nextMidnightMillis) {
-                targetTrigger = nextPrayerTimestamp + 1500L; // +1.5 saat selepas waktu solat masuk
+                targetTrigger = nextPrayerTimestamp + 1500L;
             }
 
             Intent tickIntent = new Intent(context, SolatWidgetProvider.class);
