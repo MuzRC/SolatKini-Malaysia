@@ -49,15 +49,18 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const customObjectUrlRef = useRef<string | null>(null);
 
-  const handleStopAll = useCallback(() => {
+  const handleStopAll = useCallback(async () => {
     if (previewTimerRef.current) {
       clearTimeout(previewTimerRef.current);
       previewTimerRef.current = null;
     }
-    audioNotificationService.stopAudio();
-    nativeAlarmService.stopNativeAzan();
     setIsPlayingPreview(false);
     setPreviewingVoiceId(null);
+
+    audioNotificationService.stopAudio();
+    if (nativeAlarmService.getIsNative()) {
+      await nativeAlarmService.stopNativeAzan();
+    }
   }, []);
 
   useEffect(() => {
@@ -68,13 +71,13 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
       const devVoice = audioStorageService.getActiveDeviceVoice();
       setActiveDeviceVoice(devVoice || selectedVoice);
     } else {
-      handleStopAll();
+      void handleStopAll();
     }
   }, [isOpen, selectedVoice, handleStopAll]);
 
   useEffect(() => {
     return () => {
-      handleStopAll();
+      void handleStopAll();
       if (customObjectUrlRef.current) {
         try {
           URL.revokeObjectURL(customObjectUrlRef.current);
@@ -86,44 +89,50 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
-    handleStopAll();
+  const handleClose = async () => {
+    await handleStopAll();
     onClose();
   };
 
-  const handlePlayPreview = (voice: AzanVoice) => {
+  const handlePlayPreview = async (voice: AzanVoice) => {
     if (isPlayingPreview && previewingVoiceId === voice) {
-      handleStopAll();
-    } else {
-      handleStopAll();
-      setIsPlayingPreview(true);
-      setPreviewingVoiceId(voice);
+      await handleStopAll();
+      return;
+    }
 
-      if (nativeAlarmService.getIsNative()) {
-        // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM (berkumandang sehingga penuh atau ditekan henti)
-        nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 0);
-        // Kekalkan suara aktif sebenar pilihan pengguna di dalam SharedPreferences
-        const currentSavedVoice = (activeDeviceVoice || selectedVoice) as string;
-        if (currentSavedVoice) {
-          nativeAlarmService.setActiveVoice(currentSavedVoice);
-        }
-        // Sandaran had masa maksimum 4 minit (240s) untuk status UI
-        previewTimerRef.current = setTimeout(() => {
-          setIsPlayingPreview(false);
-          setPreviewingVoiceId(null);
-        }, 240000);
-      } else {
-        audioNotificationService.unlockAudio();
-        audioNotificationService.playAzan(voice, () => {
-          setIsPlayingPreview(false);
-          setPreviewingVoiceId(null);
-        });
+    if (isPlayingPreview) {
+      await handleStopAll();
+    }
+
+    setIsPlayingPreview(true);
+    setPreviewingVoiceId(voice);
+
+    if (nativeAlarmService.getIsNative()) {
+      // Pada peranti Android Native, salurkan ujian azan terus melalui saluran STREAM_ALARM
+      await nativeAlarmService.testAlarm('Ujian Azan', voice, 0, 0);
+      // Kekalkan suara aktif sebenar pilihan pengguna di dalam SharedPreferences
+      const currentSavedVoice = (activeDeviceVoice || selectedVoice) as string;
+      if (currentSavedVoice) {
+        await nativeAlarmService.setActiveVoice(currentSavedVoice);
       }
+      // Sandaran had masa maksimum 4 minit (240s) untuk status UI
+      previewTimerRef.current = setTimeout(() => {
+        setIsPlayingPreview(false);
+        setPreviewingVoiceId(null);
+      }, 240000);
+    } else {
+      audioNotificationService.unlockAudio();
+      audioNotificationService.playAzan(voice, () => {
+        setIsPlayingPreview(false);
+        setPreviewingVoiceId(null);
+      });
     }
   };
 
   const handleSetAsDeviceVoice = async (opt: ExtendedAzanAudioOption) => {
-    handleStopAll();
+    if (isPlayingPreview) {
+      await handleStopAll();
+    }
 
     audioStorageService.setActiveDeviceVoice(opt.id);
     setActiveDeviceVoice(opt.id);
@@ -209,7 +218,9 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
 
   const handleClearAllAudioCache = async () => {
     try {
-      handleStopAll();
+      if (isPlayingPreview) {
+        await handleStopAll();
+      }
       await audioStorageService.clearAllAudioCache();
       setCachedVoiceIds([]);
       setAudioToast('Memori cache berjaya dikosongkan! Vokal azan MP3 rasmi sedia dimainkan secara lancar.');
@@ -274,7 +285,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
             <button
               onClick={() => {
                 const voiceToTest = (activeDeviceVoice || selectedVoice) as AzanVoice;
-                handlePlayPreview(voiceToTest);
+                void handlePlayPreview(voiceToTest);
               }}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shrink-0 shadow-md transition active:scale-95 cursor-pointer"
             >
@@ -300,7 +311,9 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
             <div className="pt-1 flex flex-wrap items-center gap-2">
               <button
                 onClick={async () => {
-                  handleStopAll();
+                  if (isPlayingPreview) {
+                    await handleStopAll();
+                  }
                   const activeVoice = (activeDeviceVoice || selectedVoice) as AzanVoice;
                   const testVoice = (nextPrayerKey === 'subuh' && activeVoice === 'jakim' ? 'subuh_special' : activeVoice) as AzanVoice;
                   const res = await nativeAlarmService.testAlarm(nextPrayerLabel, testVoice, 3, 0);
@@ -384,7 +397,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handlePlayPreview(opt.id);
+                      void handlePlayPreview(opt.id);
                     }}
                     className={`min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-white shrink-0 transition shadow-md cursor-pointer ${
                       isThisPreviewing
@@ -420,7 +433,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                       disabled={isDownloading}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleSetAsDeviceVoice(opt);
+                        void handleSetAsDeviceVoice(opt);
                       }}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-semibold transition active:scale-95 shadow-sm cursor-pointer"
                     >
@@ -434,7 +447,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                       disabled={isDownloading}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggleOfflineCache(opt);
+                        void handleToggleOfflineCache(opt);
                       }}
                       className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium transition cursor-pointer ${
                         isCached
@@ -451,7 +464,7 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                       disabled={isDownloading}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDownloadFile(opt);
+                        void handleDownloadFile(opt);
                       }}
                       className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium border border-slate-700 transition active:scale-95 cursor-pointer"
                       title={`Muat turun fail ${opt.filename} ke memori telefon`}
@@ -480,10 +493,12 @@ export const AudioSettingsModal: React.FC<AudioSettingsModalProps> = ({
                 type="file"
                 accept="audio/*"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    handleStopAll();
+                    if (isPlayingPreview) {
+                      await handleStopAll();
+                    }
                     if (customObjectUrlRef.current) {
                       try {
                         URL.revokeObjectURL(customObjectUrlRef.current);
