@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Flame,
   RotateCcw,
+  Clock,
+  SlidersHorizontal,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -28,7 +30,14 @@ import {
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
 import { getFastingCountdown, getLocalDateString } from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
-import { getHijriDate, getFastingRecommendation } from '../utils/hijriCalendar';
+import {
+  getHijriDate,
+  getFastingRecommendation,
+  getRamadanCountdownInfo,
+  getSavedHijriAdjustment,
+  saveHijriAdjustment,
+  parseJakimHijriString,
+} from '../utils/hijriCalendar';
 import { DUA_COLLECTION } from '../data/wiridAndDoa';
 
 interface FastingTrackerProps {
@@ -69,10 +78,11 @@ const CustomChartTooltip = ({
 };
 
 export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, currentZone }) => {
-  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [confirmResetRamadan, setConfirmResetRamadan] = useState<boolean>(false);
   const [confirmResetGanti, setConfirmResetGanti] = useState<boolean>(false);
+  const [hijriAdjustment, setHijriAdjustment] = useState<number>(() => getSavedHijriAdjustment());
 
   // Jam masa nyata berdetik setiap saat untuk kiraan waktu berbuka puasa
   useEffect(() => {
@@ -82,13 +92,39 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     return () => clearInterval(timer);
   }, []);
 
-  const hijri = getHijriDate(currentTime);
-  const recommendation = getFastingRecommendation(currentTime, hijri);
+  const hijri = useMemo(
+    () => getHijriDate(currentTime, hijriAdjustment),
+    [currentTime, hijriAdjustment]
+  );
+  const ramadanInfo = useMemo(
+    () => getRamadanCountdownInfo(currentTime, hijriAdjustment),
+    [currentTime, hijriAdjustment]
+  );
+  const recommendation = useMemo(
+    () => getFastingRecommendation(currentTime, hijri),
+    [currentTime, hijri]
+  );
 
-  // Tab pilihan paparan carta: 'ramadan' | 'sunnah'
+  const jakimOfficialHijri = useMemo(() => {
+    const rawHijri = (prayerTimes as DayPrayerTimes & { hijri?: string })?.hijri;
+    return parseJakimHijriString(rawHijri);
+  }, [prayerTimes]);
+
+  // Tab pilihan paparan carta: automatik pilih 'ramadan' hanya apabila bulan Ramadan sebenar aktif
   const [chartTab, setChartTab] = useState<'ramadan' | 'sunnah'>(() => {
-    return hijri.isRamadan ? 'ramadan' : 'sunnah';
+    return getHijriDate(new Date(), getSavedHijriAdjustment()).isRamadan ? 'ramadan' : 'sunnah';
   });
+
+  // Kemas kini tab automatik apabila bulan Ramadan bertukar atau pelarasan tarikh diubah
+  useEffect(() => {
+    setChartTab(hijri.isRamadan ? 'ramadan' : 'sunnah');
+  }, [hijri.isRamadan]);
+
+  const handleAdjustHijri = (delta: number) => {
+    const next = delta === 0 ? 0 : hijriAdjustment + delta;
+    const saved = saveHijriAdjustment(next);
+    setHijriAdjustment(saved);
+  };
 
   // Simpanan data puasa ganti
   const [completedGantiCount, setCompletedGantiCount] = useState<number>(() => {
@@ -135,10 +171,13 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     return defaults;
   });
 
-  // Data Puasa Ramadan (senarai nombor hari 1 hingga 30 yang telah berpuasa)
+  const ramadanStorageKey = `solatkini_ramadan_completed_days_${ramadanInfo.ramadanYearKey}`;
+
+  // Data Puasa Ramadan diasingkan mengikut tahun Hijrah (cth. 1448H)
   const [ramadanCompletedDays, setRamadanCompletedDays] = useState<number[]>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('solatkini_ramadan_completed_days');
+      const key = `solatkini_ramadan_completed_days_${getRamadanCountdownInfo(new Date(), getSavedHijriAdjustment()).ramadanYearKey}`;
+      const saved = localStorage.getItem(key) || localStorage.getItem('solatkini_ramadan_completed_days');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -148,6 +187,22 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     }
     return [];
   });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(ramadanStorageKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setRamadanCompletedDays(parsed);
+            return;
+          }
+        } catch {}
+      }
+      setRamadanCompletedDays([]);
+    }
+  }, [ramadanStorageKey]);
 
   // Simpan data sunnah bila berubah
   useEffect(() => {
@@ -159,9 +214,9 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
   // Simpan data Ramadan bila berubah
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('solatkini_ramadan_completed_days', JSON.stringify(ramadanCompletedDays));
+      localStorage.setItem(ramadanStorageKey, JSON.stringify(ramadanCompletedDays));
     }
-  }, [ramadanCompletedDays]);
+  }, [ramadanCompletedDays, ramadanStorageKey]);
 
   const toggleRamadanDay = (dayNum: number) => {
     setRamadanCompletedDays((prev) => {
@@ -347,22 +402,61 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
     completedGantiCount +
     sunnahData.otherSunnahCompleted;
 
+  const estimatedRamadanFormatted = useMemo(() => {
+    return ramadanInfo.estimatedRamadanStartDate.toLocaleDateString('ms-MY', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }, [ramadanInfo.estimatedRamadanStartDate]);
+
+  // Fasa semasa berasaskan hari sebenar Ramadan (bukan bilangan petak ditanda)
+  const activeRamadanPhase = useMemo(() => {
+    const dayRef = hijri.isRamadan ? hijri.day : 1;
+    if (dayRef <= 10) {
+      return { title: '10 Malam Rahmat', subtitle: 'Fasa 1: Hari 1–10' };
+    }
+    if (dayRef <= 20) {
+      return { title: '10 Malam Keampunan', subtitle: 'Fasa 2: Hari 11–20' };
+    }
+    return { title: '10 Malam Pembebasan', subtitle: 'Fasa 3: Hari 21–30' };
+  }, [hijri.isRamadan, hijri.day]);
+
+  const remainingGantiCount = Math.max(0, targetGantiCount - completedGantiCount);
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-10 select-none">
       {/* Top Banner Waktu Berbuka / Imsak */}
       <div className="glass-panel rounded-3xl p-6 border border-emerald-500/20 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-semibold mb-2">
-              <Moon className="w-3.5 h-3.5" />
-              Penunjuk Waktu Berbuka Puasa & Imsak
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-xs font-semibold">
+                <Moon className="w-3.5 h-3.5" />
+                Penunjuk Waktu Berbuka Puasa & Imsak
+              </div>
+
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                  hijri.isRamadan
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/40'
+                    : 'bg-slate-800/90 text-slate-300 border-slate-700'
+                }`}
+              >
+                <Calendar className="w-3 h-3 text-amber-300" />
+                {hijri.isRamadan
+                  ? `Ramadan Aktif · Hari ke-${hijri.day} Ramadan ${hijri.year}H`
+                  : `${hijri.formatted}${jakimOfficialHijri && jakimOfficialHijri !== hijri.formatted ? ` (JAKIM: ${jakimOfficialHijri})` : ''}`}
+              </span>
             </div>
+
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               {isFastingActive ? fastingCountdown.title : 'Jadual Waktu Berbuka & Imsak'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-300 mt-1">
               Zon {currentZone.code} ({currentZone.daerah})
-              {!hijri.isRamadan && !isFastingActive && ' · Bukan Bulan Ramadan (Rujukan Jadual)'}
+              {!hijri.isRamadan &&
+                ` · ${ramadanInfo.daysUntilNextRamadan} Hari Lagi Menuju 1 Ramadan ${ramadanInfo.nextRamadanHijriYear}H`}
             </p>
 
             {/* Fasting Recommendation Pill */}
@@ -394,9 +488,53 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
           </div>
         </div>
 
+        {/* Pelarasan Takwim Hijrah Malaysia (Rukyah / Pengisytiharan JAKIM) */}
+        <div className="mt-4 px-3.5 py-2.5 rounded-2xl bg-slate-900/60 border border-slate-800/90 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 text-slate-300">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>
+              Takwim Hijrah: <strong className="text-white">{hijri.formatted}</strong>
+              {hijriAdjustment !== 0 && (
+                <span className="text-amber-300 font-mono ml-1">
+                  ({hijriAdjustment > 0 ? `+${hijriAdjustment}` : hijriAdjustment} hari)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => handleAdjustHijri(-1)}
+              disabled={hijriAdjustment <= -2}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 font-mono text-[11px] border border-slate-700 cursor-pointer"
+              title="Anjak 1 hari ke belakang mengikut rukyah"
+            >
+              -1 Hari
+            </button>
+            <button
+              onClick={() => handleAdjustHijri(0)}
+              className={`px-2 py-1 rounded-lg font-mono text-[11px] border cursor-pointer ${
+                hijriAdjustment === 0
+                  ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40 font-bold'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
+              title="Tetapkan semula kepada kiraan automatik MABIMS"
+            >
+              Auto
+            </button>
+            <button
+              onClick={() => handleAdjustHijri(1)}
+              disabled={hijriAdjustment >= 2}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 font-mono text-[11px] border border-slate-700 cursor-pointer"
+              title="Anjak 1 hari ke hadapan mengikut rukyah"
+            >
+              +1 Hari
+            </button>
+          </div>
+        </div>
+
         {/* Toggle Mod Berpuasa Hari Ini (Di Luar Ramadan) */}
         {!hijri.isRamadan && (
-          <div className="mt-5 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="mt-3 p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-white">Status Berpuasa Hari Ini:</span>
@@ -461,46 +599,113 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
               Ringkasan Kemajuan Puasa
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Visualisasi hari puasa yang telah diselesaikan bagi Ramadan dan Puasa Sunat
+              {hijri.isRamadan
+                ? `Bulan Ramadan ${hijri.year}H sedang berlangsung (Hari ke-${hijri.day} daripada 30 hari)`
+                : `Mod Luar Ramadan (${hijri.monthName} ${hijri.year}H) · Paparan automatik Puasa Sunat & Qadha`}
             </p>
           </div>
 
-          {/* Tab Switcher */}
+          {/* Tab Switcher: Susun tab aktif mengikut bulan Hijrah sebenar */}
           <div className="flex items-center bg-slate-900/90 p-1 rounded-2xl border border-slate-800 shrink-0">
-            <button
-              onClick={() => setChartTab('ramadan')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                chartTab === 'ramadan'
-                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Moon className="w-3.5 h-3.5" />
-              <span>Puasa Ramadan</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
-                {ramadanCompletedDays.length}/30
-              </span>
-            </button>
-            <button
-              onClick={() => setChartTab('sunnah')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-                chartTab === 'sunnah'
-                  ? 'bg-amber-600 text-white shadow-md shadow-amber-950/40'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Puasa Sunat & Qadha</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
-                {totalSunnahCompleted} Hari
-              </span>
-            </button>
+            {hijri.isRamadan ? (
+              <>
+                <button
+                  onClick={() => setChartTab('ramadan')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                    chartTab === 'ramadan'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Puasa Ramadan</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
+                    {ramadanCompletedDays.length}/30
+                  </span>
+                </button>
+                <button
+                  onClick={() => setChartTab('sunnah')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                    chartTab === 'sunnah'
+                      ? 'bg-amber-600 text-white shadow-md shadow-amber-950/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Puasa Sunat & Qadha</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
+                    {totalSunnahCompleted} Hari
+                  </span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setChartTab('sunnah')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                    chartTab === 'sunnah'
+                      ? 'bg-amber-600 text-white shadow-md shadow-amber-950/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Puasa Sunat & Qadha</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 font-mono">
+                    {totalSunnahCompleted} Hari
+                  </span>
+                </button>
+                <button
+                  onClick={() => setChartTab('ramadan')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                    chartTab === 'ramadan'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/40'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <Moon className="w-3.5 h-3.5" />
+                  <span>Ramadan {ramadanInfo.nextRamadanHijriYear}H</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/15 font-mono">
+                    -{ramadanInfo.daysUntilNextRamadan}h
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* KANDUNGAN TAB 1: PUASA RAMADAN */}
         {chartTab === 'ramadan' && (
           <div className="mt-5 space-y-6">
+            {/* Banner Status Khas Apabila Di Luar Bulan Ramadan */}
+            {!hijri.isRamadan && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/60 via-slate-900/90 to-emerald-950/50 border border-amber-500/35 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                    <Clock className="w-3.5 h-3.5" />
+                    Belum Masuk Bulan Ramadan (Sekarang: {hijri.formatted})
+                  </div>
+                  <h4 className="text-base sm:text-lg font-extrabold text-white">
+                    {ramadanInfo.daysUntilNextRamadan} Hari Lagi Menuju 1 Ramadan {ramadanInfo.nextRamadanHijriYear}H
+                  </h4>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Anggaran mula berpuasa pada <strong className="text-emerald-300">{estimatedRamadanFormatted}</strong> (tertakluk kepada pengisytiharan rasmi JAKIM).
+                    {remainingGantiCount > 0 && (
+                      <>
+                        {' '}Anda masih mempunyai baki <strong className="text-amber-300">{remainingGantiCount} hari</strong> puasa ganti (Qada&apos;) yang disarankan selesai sebelum Ramadan tiba.
+                      </>
+                    )}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setChartTab('sunnah')}
+                  className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 transition active:scale-95 cursor-pointer shadow-md"
+                >
+                  Ke Puasa Sunat &amp; Qadha
+                </button>
+              </div>
+            )}
+
             {/* Ringkasan Kad Statistik Ramadan */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
@@ -510,17 +715,23 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                   <span className="text-xs text-slate-400 font-sans font-normal">/ 30 Hari</span>
                 </div>
                 <div className="text-[10px] text-emerald-400/80 mt-0.5 flex items-center gap-1">
-                  <Check className="w-3 h-3" /> Rekod disahkan
+                  <Check className="w-3 h-3" /> Tahun {ramadanInfo.ramadanYearKey}H
                 </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
-                <span className="text-[11px] text-slate-400 font-medium">Baki Hari</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {hijri.isRamadan ? 'Baki Hingga Syawal' : 'Menuju 1 Ramadan'}
+                </span>
                 <div className="text-xl sm:text-2xl font-black text-amber-300 font-mono mt-0.5">
-                  {Math.max(0, 30 - ramadanCompletedDays.length)}{' '}
+                  {hijri.isRamadan
+                    ? ramadanInfo.daysRemainingInRamadan
+                    : ramadanInfo.daysUntilNextRamadan}{' '}
                   <span className="text-xs text-slate-400 font-sans font-normal">Hari</span>
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Hingga 1 Syawal</div>
+                <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  {hijri.isRamadan ? 'Hingga 1 Syawal' : estimatedRamadanFormatted}
+                </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
@@ -530,25 +741,19 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-400" />
-                  Sasaran 100%
+                  {hijri.isRamadan ? `Hari ke-${hijri.day} Ramadan` : 'Sasaran 100%'}
                 </div>
               </div>
 
               <div className="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800">
-                <span className="text-[11px] text-slate-400 font-medium">Fasa Semasa</span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {hijri.isRamadan ? 'Fasa Semasa' : 'Status Takwim'}
+                </span>
                 <div className="text-sm font-bold text-amber-300 truncate mt-1">
-                  {ramadanCompletedDays.length <= 10
-                    ? '10 Malam Rahmat'
-                    : ramadanCompletedDays.length <= 20
-                    ? '10 Malam Keampunan'
-                    : '10 Malam Pembebasan'}
+                  {hijri.isRamadan ? activeRamadanPhase.title : `Menanti Ramadan ${ramadanInfo.nextRamadanHijriYear}H`}
                 </div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
-                  {ramadanCompletedDays.length <= 10
-                    ? 'Fasa 1: Hari 1-10'
-                    : ramadanCompletedDays.length <= 20
-                    ? 'Fasa 2: Hari 11-20'
-                    : 'Fasa 3: Hari 21-30'}
+                  {hijri.isRamadan ? activeRamadanPhase.subtitle : `Bulan ${hijri.monthName}`}
                 </div>
               </div>
             </div>
@@ -560,7 +765,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                     <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-                    Pencapaian Mingguan Ramadan
+                    Pencapaian Mingguan Ramadan {ramadanInfo.ramadanYearKey}H
                   </span>
                   <span className="text-[10px] text-slate-400">Sasaran vs Selesai</span>
                 </div>
@@ -663,7 +868,9 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 <div>
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                    Kalendar Semakan Harian Ramadan (30 Hari)
+                    {hijri.isRamadan
+                      ? `Kalendar Semakan Harian Ramadan ${hijri.year}H (Hari Ini: Hari ke-${hijri.day})`
+                      : `Perancangan Kalendar Ramadan ${ramadanInfo.nextRamadanHijriYear}H (30 Hari)`}
                   </span>
                   <p className="text-[11px] text-slate-400">
                     Ketik mana-mana nombor hari untuk menandakan puasa selesai atau belum
@@ -671,12 +878,14 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={markAllPastRamadanDays}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-[11px] font-medium transition cursor-pointer"
-                  >
-                    Tanda Semua Sebelum Ini
-                  </button>
+                  {hijri.isRamadan && (
+                    <button
+                      onClick={markAllPastRamadanDays}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Tanda Hingga Hari ke-{hijri.day}
+                    </button>
+                  )}
                   {ramadanCompletedDays.length > 0 && (
                     <button
                       onClick={resetRamadanDays}
@@ -694,10 +903,11 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                 </div>
               </div>
 
-              {/* Grid 30 Petak Hari (menggunakan repeat(15) yang sah pada skrin sederhana/besar) */}
+              {/* Grid 30 Petak Hari */}
               <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-[repeat(15,minmax(0,1fr))] gap-1.5">
                 {Array.from({ length: 30 }, (_, i) => i + 1).map((dayNum) => {
                   const isDone = ramadanCompletedDays.includes(dayNum);
+                  const isTodayRamadan = hijri.isRamadan && hijri.day === dayNum;
                   return (
                     <button
                       key={`day-${dayNum}`}
@@ -705,9 +915,13 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
                       className={`h-9 rounded-xl flex flex-col items-center justify-center text-xs font-mono font-bold transition active:scale-90 cursor-pointer ${
                         isDone
                           ? 'bg-emerald-600 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/50'
+                          : isTodayRamadan
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-400 ring-1 ring-amber-400/50'
                           : 'bg-slate-800/80 text-slate-400 hover:bg-slate-700/80 hover:text-slate-200 border border-slate-700/50'
                       }`}
-                      title={`Hari ke-${dayNum} Ramadan - ${isDone ? 'Selesai' : 'Belum Selesai'}`}
+                      title={`Hari ke-${dayNum} Ramadan${isTodayRamadan ? ' (Hari Ini)' : ''} - ${
+                        isDone ? 'Selesai' : 'Belum Selesai'
+                      }`}
                     >
                       <span>{dayNum}</span>
                       {isDone && <Check className="w-2.5 h-2.5 text-emerald-200 -mt-0.5" />}
@@ -1003,7 +1217,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
               Penjejak Puasa Ganti (Qada&apos;)
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Pantau baki bilangan hari puasa yang perlu diganti sebelum ketibaan Ramadan
+              Pantau baki bilangan hari puasa yang perlu diganti sebelum ketibaan Ramadan {ramadanInfo.nextRamadanHijriYear}H
             </p>
           </div>
 
@@ -1039,7 +1253,7 @@ export const FastingTracker: React.FC<FastingTrackerProps> = ({ prayerTimes, cur
               <div className="text-xs text-slate-400 mt-1">
                 Baki yang tinggal:{' '}
                 <strong className="text-amber-300 font-mono">
-                  {Math.max(0, targetGantiCount - completedGantiCount)} hari
+                  {remainingGantiCount} hari
                 </strong>
               </div>
             </div>
