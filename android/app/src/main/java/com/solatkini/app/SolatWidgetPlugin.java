@@ -13,11 +13,6 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 @CapacitorPlugin(name = "SolatWidget")
 public class SolatWidgetPlugin extends Plugin {
@@ -40,27 +35,34 @@ public class SolatWidgetPlugin extends Plugin {
     public void updateWidget(PluginCall call) {
         try {
             Context context = getContext();
-            Intent intent = new Intent(context, SolatWidgetProvider.class);
-            intent.setAction(SolatWidgetProvider.ACTION_UPDATE_PRAYER_TIMES);
+            SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = prefs.edit();
 
-            if (call.hasOption("zone")) intent.putExtra("zone", call.getString("zone"));
-            if (call.hasOption("next_label")) intent.putExtra("next_label", call.getString("next_label"));
-            if (call.hasOption("next_time")) intent.putExtra("next_time", call.getString("next_time"));
-            if (call.hasOption("imsak")) intent.putExtra("imsak", call.getString("imsak"));
-            if (call.hasOption("subuh")) intent.putExtra("subuh", call.getString("subuh"));
-            if (call.hasOption("syuruk")) intent.putExtra("syuruk", call.getString("syuruk"));
-            if (call.hasOption("zohor")) intent.putExtra("zohor", call.getString("zohor"));
-            if (call.hasOption("asar")) intent.putExtra("asar", call.getString("asar"));
-            if (call.hasOption("maghrib")) intent.putExtra("maghrib", call.getString("maghrib"));
-            if (call.hasOption("isyak")) intent.putExtra("isyak", call.getString("isyak"));
+            if (call.hasOption("zone")) editor.putString("zone", call.getString("zone"));
+            if (call.hasOption("hijri")) editor.putString("hijri", call.getString("hijri"));
+            if (call.hasOption("date")) editor.putString("date", call.getString("date"));
+            if (call.hasOption("next_label")) editor.putString("next_label", call.getString("next_label"));
+            if (call.hasOption("next_time")) editor.putString("next_time", call.getString("next_time"));
+            if (call.hasOption("imsak")) editor.putString("imsak", call.getString("imsak"));
+            if (call.hasOption("subuh")) editor.putString("subuh", call.getString("subuh"));
+            if (call.hasOption("syuruk")) editor.putString("syuruk", call.getString("syuruk"));
+            if (call.hasOption("zohor")) editor.putString("zohor", call.getString("zohor"));
+            if (call.hasOption("asar")) editor.putString("asar", call.getString("asar"));
+            if (call.hasOption("maghrib")) editor.putString("maghrib", call.getString("maghrib"));
+            if (call.hasOption("isyak")) editor.putString("isyak", call.getString("isyak"));
+            if (call.hasOption("upcoming_days_json")) {
+                editor.putString("upcoming_days_json", call.getString("upcoming_days_json"));
+            }
+            editor.commit();
 
-            context.sendBroadcast(intent);
+            // Terus kemaskini widget & jadualkan penggera pertukaran waktu secara serta-merta
+            SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
 
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal mengemaskini widget Android: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal mengemaskini widget Android: " + e.getMessage());
         }
     }
 
@@ -108,7 +110,7 @@ public class SolatWidgetPlugin extends Plugin {
             String isyak = call.getString("isyak", "--:--");
 
             SharedPreferences prefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
-            prefs.edit()
+            SharedPreferences.Editor editor = prefs.edit()
                 .putBoolean("is_persistent_enabled", true)
                 .putString("zone", zone)
                 .putString("hijri", hijri)
@@ -121,16 +123,24 @@ public class SolatWidgetPlugin extends Plugin {
                 .putString("zohor", zohor)
                 .putString("asar", asar)
                 .putString("maghrib", maghrib)
-                .putString("isyak", isyak)
-                .apply();
+                .putString("isyak", isyak);
+
+            if (call.hasOption("date")) {
+                editor.putString("date", call.getString("date"));
+            }
+            if (call.hasOption("upcoming_days_json")) {
+                editor.putString("upcoming_days_json", call.getString("upcoming_days_json"));
+            }
+            editor.apply();
 
             buildAndShowNotification(context, zone, hijri, nextLabel, nextTime, nextTimestamp, imsak, subuh, syuruk, zohor, asar, maghrib, isyak);
+            SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
 
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal mengemaskini notifikasi tetap: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal mengemaskini notifikasi tetap: " + e.getMessage());
         }
     }
 
@@ -176,16 +186,13 @@ public class SolatWidgetPlugin extends Plugin {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // 1. Tajuk Padat: Buang pengulangan nama app supaya tarikh Hijri muat penuh tanpa terpotong (...)
             String cleanZone = zone != null ? zone.replace("SolatKini · ", "").trim() : "Beaufort";
             String titleText = (hijri != null && !hijri.isEmpty())
                 ? cleanZone + " • " + hijri
                 : cleanZone;
 
-            // 2. Baris Fokus Waktu Seterusnya
             String nextKicker = "⏳ Seterusnya: " + nextLabel + " (" + nextTime + ")";
 
-            // 3. Susunan Jadual 7 Waktu: Nilai jam dibersihkan daripada AM/PM supaya muat tepat 2 baris seimbang
             String line1 = String.format("Imsak %s  •  Subuh %s  •  Syuruk %s",
                 stripAmPm(imsak), stripAmPm(subuh), stripAmPm(syuruk));
 
@@ -215,7 +222,6 @@ public class SolatWidgetPlugin extends Plugin {
                 .addAction(android.R.drawable.ic_menu_today, "Buka", openPending)
                 .addAction(android.R.drawable.ic_popup_sync, "Segerak", syncPending);
 
-            // Kawalan Pemasa Undur (Chronometer Countdown)
             if (nextTimestamp > now) {
                 builder.setWhen(nextTimestamp);
                 builder.setShowWhen(true);
@@ -229,33 +235,17 @@ public class SolatWidgetPlugin extends Plugin {
             }
 
             manager.notify(PERSISTENT_NOTIFICATION_ID, builder.build());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.w(TAG, "Gagal memaparkan notifikasi", e);
         }
     }
 
     public static void advanceToNextPrayer(Context context) {
         try {
+            // Segarkan widget & kira semula waktu solat seterusnya secara masa nyata
+            SolatWidgetProvider.refreshAndScheduleAllWidgets(context);
+
             SharedPreferences widgetPrefs = context.getSharedPreferences(WIDGET_PREFS, Context.MODE_PRIVATE);
-            SharedPreferences alarmPrefs = context.getSharedPreferences("SolatKiniAlarms", Context.MODE_PRIVATE);
-            String alarmsJson = alarmPrefs.getString("scheduled_alarms_json", null);
-
-            long now = System.currentTimeMillis();
-            JSONObject nextUpcoming = null;
-            long nearestTimestamp = Long.MAX_VALUE;
-
-            if (alarmsJson != null && !alarmsJson.isEmpty()) {
-                JSONArray alarmsArray = new JSONArray(alarmsJson);
-                for (int i = 0; i < alarmsArray.length(); i++) {
-                    JSONObject obj = alarmsArray.getJSONObject(i);
-                    long ts = obj.optLong("timestamp", 0);
-                    if (ts > now && ts < nearestTimestamp) {
-                        nearestTimestamp = ts;
-                        nextUpcoming = obj;
-                    }
-                }
-            }
-
             String zone = widgetPrefs.getString("zone", "Beaufort");
             String hijri = widgetPrefs.getString("hijri", "");
             String imsak = widgetPrefs.getString("imsak", "--:--");
@@ -265,33 +255,10 @@ public class SolatWidgetPlugin extends Plugin {
             String asar = widgetPrefs.getString("asar", "--:--");
             String maghrib = widgetPrefs.getString("maghrib", "--:--");
             String isyak = widgetPrefs.getString("isyak", "--:--");
+            String nextLabel = widgetPrefs.getString("next_label", "Subuh");
+            String nextTime = widgetPrefs.getString("next_time", subuh);
+            long targetTimestamp = widgetPrefs.getLong("next_timestamp", 0L);
 
-            String nextLabel;
-            String nextTime;
-            long targetTimestamp;
-
-            if (nextUpcoming != null) {
-                nextLabel = nextUpcoming.optString("prayerName", "Solat");
-                SimpleDateFormat timeFmt = new SimpleDateFormat("h:mm a", Locale.getDefault());
-                nextTime = timeFmt.format(new Date(nearestTimestamp));
-                targetTimestamp = nearestTimestamp;
-            } else {
-                // Sandaran selepas Isyak jika jadual esok belum disegerakkan
-                nextLabel = "Subuh";
-                nextTime = subuh;
-                targetTimestamp = 0L;
-            }
-
-            widgetPrefs.edit()
-                .putString("next_label", nextLabel)
-                .putString("next_time", nextTime)
-                .putLong("next_timestamp", targetTimestamp)
-                .apply();
-
-            // Segerakkan juga paparan widget skrin utama
-            SolatWidgetProvider.updateAllWidgets(context);
-
-            // Kemas kini notifikasi kekal jika diaktifkan
             if (widgetPrefs.getBoolean("is_persistent_enabled", false)) {
                 buildAndShowNotification(
                     context,
@@ -309,7 +276,7 @@ public class SolatWidgetPlugin extends Plugin {
                     isyak
                 );
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.w(TAG, "Ralat menganjak waktu solat", e);
         }
     }
@@ -329,8 +296,8 @@ public class SolatWidgetPlugin extends Plugin {
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
-        } catch (Exception e) {
-            call.reject("Gagal membatalkan notifikasi tetap: " + e.getMessage(), e);
+        } catch (Throwable e) {
+            call.reject("Gagal membatalkan notifikasi tetap: " + e.getMessage());
         }
     }
 }
