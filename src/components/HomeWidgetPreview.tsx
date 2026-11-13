@@ -10,7 +10,12 @@ import {
   Smartphone
 } from 'lucide-react';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
-import { determineNextPrayer, PRAYER_LABELS, getFastingCountdown } from '../services/prayerService';
+import {
+  determineNextPrayer,
+  PRAYER_LABELS,
+  getFastingCountdown,
+  getLocalDateString,
+} from '../services/prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
 import { getHijriDate } from '../utils/hijriCalendar';
 
@@ -65,12 +70,12 @@ export const HomeWidgetPreview: React.FC<HomeWidgetPreviewProps> = ({
   const nextPrayer = determineNextPrayer(prayerTimes, currentTime);
   const hijri = getHijriDate(currentTime);
 
-  // Semakan mod puasa yang segerak dengan tarikh semasa
+  // Semakan mod puasa menggunakan tarikh tempatan Malaysia (elak ralat UTC antara 12 tengah malam - 8 pagi)
   const isUserFastingToday = (() => {
     if (typeof window !== 'undefined') {
       const savedDate = localStorage.getItem('solatkini_fasting_date');
       const savedActive = localStorage.getItem('solatkini_fasting_active');
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalDateString(currentTime);
       return savedDate === today && savedActive === 'true';
     }
     return false;
