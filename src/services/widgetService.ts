@@ -2,10 +2,13 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 import { DayPrayerTimes, JakimZone } from '../types/prayer';
 import { determineNextPrayer } from './prayerService';
 import { formatDisplayTime } from '../utils/prayerCalculator';
+import { getHijriDate } from '../utils/hijriCalendar';
 
 interface SolatWidgetPluginInterface {
   updateWidget(options: {
     zone: string;
+    hijri?: string;
+    date?: string;
     next_label: string;
     next_time: string;
     imsak?: string;
@@ -15,10 +18,12 @@ interface SolatWidgetPluginInterface {
     asar: string;
     maghrib: string;
     isyak: string;
+    upcoming_days_json?: string;
   }): Promise<{ success: boolean }>;
   updatePersistentNotification(options: {
     zone: string;
     hijri?: string;
+    date?: string;
     next_label: string;
     next_time: string;
     countdown?: string;
@@ -31,6 +36,7 @@ interface SolatWidgetPluginInterface {
     asar: string;
     maghrib: string;
     isyak: string;
+    upcoming_days_json?: string;
   }): Promise<{ success: boolean }>;
   cancelPersistentNotification(): Promise<{ success: boolean }>;
 }
@@ -57,10 +63,84 @@ function parseTimeParts(timeStr: string): { hours: number; minutes: number } | n
   return { hours, minutes };
 }
 
+/**
+ * Kumpulkan jadual berbilang hari (jika tersimpan dalam cache tempatan JAKIM)
+ * supaya widget skrin utama dapat bertukar hari secara automatik selepas tengah malam tanpa buka app.
+ */
+function collectUpcomingDaysScheduleJson(todayPrayerTimes: DayPrayerTimes): string {
+  if (typeof window === 'undefined') return '[]';
+  try {
+    const map = new Map<string, Record<string, string>>();
+
+    const addDayEntry = (day: Partial<DayPrayerTimes> | null | undefined) => {
+      if (!day || !day.date || !day.times) return;
+      const t = day.times;
+      if (!t.subuh || !t.zohor || !t.maghrib) return;
+      const parsedDate = new Date(`${day.date}T12:00:00`);
+      const hijriText = !isNaN(parsedDate.getTime()) ? getHijriDate(parsedDate).formatted : '';
+      map.set(day.date, {
+        date: day.date,
+        hijri: hijriText,
+        imsak: formatDisplayTime(t.imsak || t.subuh),
+        subuh: formatDisplayTime(t.subuh),
+        syuruk: formatDisplayTime(t.syuruk || t.subuh),
+        zohor: formatDisplayTime(t.zohor),
+        asar: formatDisplayTime(t.asar),
+        maghrib: formatDisplayTime(t.maghrib),
+        isyak: formatDisplayTime(t.isyak),
+      });
+    };
+
+    addDayEntry(todayPrayerTimes);
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.toLowerCase().includes('solatkini')) continue;
+      const raw = localStorage.getItem(key);
+      if (!raw || (raw[0] !== '[' && raw[0] !== '{')) continue;
+
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            if (item && typeof item === 'object' && item.date && item.times) {
+              addDayEntry(item);
+            }
+          }
+        } else if (parsed && typeof parsed === 'object') {
+          if (parsed.date && parsed.times) {
+            addDayEntry(parsed);
+          } else if (Array.isArray(parsed.days)) {
+            for (const item of parsed.days) {
+              addDayEntry(item);
+            }
+          } else {
+            for (const val of Object.values(parsed)) {
+              if (val && typeof val === 'object' && 'date' in val && 'times' in val) {
+                addDayEntry(val as DayPrayerTimes);
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    const sorted = Array.from(map.values())
+      .filter((d) => d.date >= (todayPrayerTimes.date || ''))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(0, 14);
+
+    return JSON.stringify(sorted);
+  } catch {
+    return '[]';
+  }
+}
+
 export class WidgetService {
   private lastSyncedWidgetPayload: string | null = null;
   private lastSyncedNotifPayload: string | null = null;
   private isUpdatingNotif: boolean = false;
+  private boundaryTimer: ReturnType<typeof setTimeout> | null = null;
 
   private isAndroid(): boolean {
     return Capacitor.getPlatform() === 'android';
@@ -69,6 +149,26 @@ export class WidgetService {
   private formatZoneLabel(zone: JakimZone): string {
     const daerahNama = zone?.daerah ? zone.daerah.split(',')[0].trim() : '';
     return daerahNama ? `${zone.code || ''} (${daerahNama})`.trim() : zone?.code || 'WLY01';
+  }
+
+  private scheduleInMemoryBoundaryRefresh(
+    prayerTimes: DayPrayerTimes,
+    zone: JakimZone,
+    nextTimestamp: number
+  ): void {
+    if (typeof window === 'undefined') return;
+    if (this.boundaryTimer) {
+      clearTimeout(this.boundaryTimer);
+      this.boundaryTimer = null;
+    }
+
+    const now = Date.now();
+    if (nextTimestamp > now) {
+      const delay = Math.min(nextTimestamp - now + 1000, 6 * 3600 * 1000);
+      this.boundaryTimer = setTimeout(() => {
+        void this.syncWidget(prayerTimes, zone, true);
+      }, delay);
+    }
   }
 
   public async syncWidget(
@@ -84,9 +184,13 @@ export class WidgetService {
       const nextLabel = nextPrayer ? nextPrayer.nextLabel : 'Waktu Solat';
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const zoneLabel = this.formatZoneLabel(zone);
+      const hijriFormatted = getHijriDate(now).formatted;
+      const upcomingDaysJson = collectUpcomingDaysScheduleJson(prayerTimes);
 
       const payload = {
         zone: zoneLabel,
+        hijri: hijriFormatted,
+        date: prayerTimes.date || '',
         next_label: nextLabel,
         next_time: nextTime,
         imsak: formatDisplayTime(prayerTimes.times.imsak),
@@ -96,6 +200,7 @@ export class WidgetService {
         asar: formatDisplayTime(prayerTimes.times.asar),
         maghrib: formatDisplayTime(prayerTimes.times.maghrib),
         isyak: formatDisplayTime(prayerTimes.times.isyak),
+        upcoming_days_json: upcomingDaysJson,
       };
 
       const payloadStr = JSON.stringify(payload);
@@ -110,6 +215,10 @@ export class WidgetService {
       if (this.isAndroid()) {
         await SolatWidget.updateWidget(payload);
         console.info('[WidgetService] Widget Android berjaya dikemaskini:', payload.zone);
+      }
+
+      if (nextPrayer?.targetTimestamp) {
+        this.scheduleInMemoryBoundaryRefresh(prayerTimes, zone, nextPrayer.targetTimestamp);
       }
 
       this.lastSyncedWidgetPayload = payloadStr;
@@ -139,7 +248,6 @@ export class WidgetService {
       const nextTime = nextPrayer ? nextPrayer.nextDisplayTime : '--:--';
       const countdown = nextPrayer ? nextPrayer.countdownFormatted : '';
 
-      // 1. Dapatkan nilai milisaat terus daripada targetTimestamp atau targetDate
       let nextTimestamp = 0;
       if (nextPrayer) {
         if (nextPrayer.targetTimestamp && nextPrayer.targetTimestamp > now.getTime()) {
@@ -151,27 +259,26 @@ export class WidgetService {
           }
         }
 
-        // Sandaran tambahan jika pengiraan masa terlepas (menyokong format 12j/24j)
         if (!nextTimestamp && nextPrayer.nextTime) {
           const parsedTime = parseTimeParts(nextPrayer.nextTime);
           if (parsedTime) {
             const target = new Date();
             target.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
             if (target.getTime() <= now.getTime()) {
-              target.setDate(target.getDate() + 1); // Anjak ke hari esok
+              target.setDate(target.getDate() + 1);
             }
             nextTimestamp = target.getTime();
           }
         }
       }
 
-      // 2. Gunakan format zon yang konsisten dengan Widget Skrin Utama
       const zoneLabel = this.formatZoneLabel(zone);
+      const upcomingDaysJson = collectUpcomingDaysScheduleJson(prayerTimes);
 
-      // 3. Bentuk payload lengkap merangkumi kesemua 7 waktu solat dan checkpoint
       const payload = {
         zone: zoneLabel,
-        hijri: hijriFormatted || '',
+        hijri: hijriFormatted || getHijriDate(now).formatted,
+        date: prayerTimes.date || '',
         next_label: nextLabel,
         next_time: nextTime,
         countdown: countdown,
@@ -184,9 +291,9 @@ export class WidgetService {
         asar: formatDisplayTime(prayerTimes.times.asar),
         maghrib: formatDisplayTime(prayerTimes.times.maghrib),
         isyak: formatDisplayTime(prayerTimes.times.isyak),
+        upcoming_days_json: upcomingDaysJson,
       };
 
-      // Kunci semakan tanpa medan 'countdown' yang berubah setiap saat/minit
       const dedupeKey = JSON.stringify({ ...payload, countdown: '' });
 
       if ((!force && dedupeKey === this.lastSyncedNotifPayload) || this.isUpdatingNotif) {
