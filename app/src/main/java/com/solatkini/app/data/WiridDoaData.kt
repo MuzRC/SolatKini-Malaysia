@@ -1,0 +1,615 @@
+package com.solatkini.app.data
+
+import com.solatkini.app.model.DuaCategory
+import com.solatkini.app.model.DuaItem
+import com.solatkini.app.model.TasbihPreset
+import com.solatkini.app.model.WiridItem
+
+object WiridDoaData {
+    val WIRID_LIST: List<WiridItem> = listOf(
+        WiridItem(
+            id = "wirid-1",
+            order = 1,
+            title = "Istighfar Permulaan",
+            arabic = "أَسْتَغْفِرُ اللهَ الْعَظِيْمَ الَّذِيْ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّوْمُ وَأَتُوْبُ إِلَيْهِ",
+            transliteration = "Astaghfirullāhal-‘Aẓīm, alladhī lā ilāha illā Huwal-Ḥayyul-Qayyūm wa atūbu ilayh.",
+            translation = "Aku memohon ampun kepada Allah Yang Maha Agung, tiada Tuhan selain Dia Yang Maha Hidup lagi Maha Berdiri Sendiri mentadbir sekalian makhluk, dan aku bertaubat kepada-Nya.",
+            targetCount = 3,
+            note = "Dibaca sebanyak 3 kali selepas salam.",
+            audioAssetPath = "audio/istighfar.mp3",
+            fadilat = "Mengikut sunnah Nabi SAW yang beristighfar 3 kali sejurus selesai solat (HR Muslim 591), dan lafaz taubat ini menghapuskan dosa sekalipun pernah lari dari medan perang (HR At-Tirmizi 3577, Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-2",
+            order = 2,
+            title = "Tahlil Pengakuan Tauhid",
+            arabic = "لَا إِلَهَ إِلَّا اللهُ وَحْدَهُ لَا شَرِيْكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِيْ وَيُمِيْتُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+            transliteration = "Lā ilāha illallāhu waḥdahū lā syarīka lah, lahul-mulku wa lahul-ḥamdu yuḥyī wa yumītu wa Huwa ‘alā kulli syai’in qadīr.",
+            translation = "Tiada Tuhan selain Allah Yang Maha Esa, tiada sekutu bagi-Nya. Bagi-Nyalah kerajaan dan bagi-Nyalah segala pujian. Dia yang menghidupkan dan mematikan, dan Dia Maha Kuasa atas segala sesuatu.",
+            targetCount = 3,
+            note = "Dibaca 3 kali (atau 10 kali selepas solat Subuh & Maghrib sebelum beralih kedudukan duduk).",
+            audioAssetPath = "audio/tahlil.mp3",
+            fadilat = "Dibaca 10 kali selepas Subuh & Maghrib: ditulis 10 kebaikan, dihapus 10 kejahatan, diangkat 10 darjat, dan dilindungi daripada godaan syaitan sepanjang hari (HR At-Tirmizi 3474, Hasan Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-3",
+            order = 3,
+            title = "Memohon Perlindungan Dari Neraka",
+            arabic = "اللَّهُمَّ أَجِرْنَا مِنَ النَّارِ",
+            transliteration = "Allāhumma ajirnā minan-nār.",
+            translation = "Ya Allah, selamatkanlah dan jauhkanlah kami daripada seksaan api neraka.",
+            targetCount = 3,
+            note = "Dibaca 3 kali (atau 7 kali selepas Subuh dan Maghrib).",
+            audioAssetPath = "audio/perlindungan_neraka.mp3",
+            fadilat = "Amalan ma’tsur para sahabat membaca 7 kali selepas Subuh dan Maghrib; jika meninggal dunia pada hari atau malam tersebut dicatatkan pelepasan daripada api neraka (HR Abu Daud 5079)."
+        ),
+        WiridItem(
+            id = "wirid-4",
+            order = 4,
+            title = "Pujian Kesejahteraan (As-Salam - Versi Penuh)",
+            arabic = "اَللَّهُمَّ أَنْتَ السَّلَامُ، وَمِنْكَ السَّلَامُ، وَإِلَيْكَ يَعُودُ السَّلَامُ، فَحَيِّنَا رَبَّنَا بِالسَّلَامِ، وَأَدْخِلْنَا الْـجَنَّةَ دَارَ السَّلَامِ، تَبَارَكْتَ رَبَّنَا وَتَعَالَيْتَ يَا ذَا الْـجَلَالِ وَالْإِكْرَامِ",
+            transliteration = "Allāhumma Antas-Salām, wa minkas-salām, wa ilaika ya‘ūdus-salām, faḥayyinā Rabbanā bis-salām, wa adkhilnal-jannata dāras-salām, tabārakta Rabbanā wa ta‘ālaita yā Dhal-Jalāli wal-Ikrām.",
+            translation = "Ya Allah Engkaulah penyelamat sejahtera, daripada Engkaulah datangnya kesejahteraan, kepada Engkaulah kembalinya kesejahteraan itu. Hidupkanlah kami wahai Tuhan kami dengan selamat sejahtera dan masukkanlah kami ke dalam syurga negara kesejahteraan. Maha Berkat Engkau wahai Tuhan kami dan Maha Tinggi, wahai Tuhan yang memiliki kebesaran dan kemuliaan.",
+            targetCount = 1,
+            note = "Dibaca 1 kali dengan penuh penghayatan selepas salam.",
+            audioAssetPath = "audio/as_salam.mp3",
+            fadilat = "Sunnah mu’akkadah Rasulullah SAW memuji Allah dengan sifat As-Salam sejurus selesai solat fardhu bagi memohon ketenteraman jiwa dan keselamatan akhirat (HR Muslim 591 & 592)."
+        ),
+        WiridItem(
+            id = "wirid-taawuz",
+            order = 5,
+            title = "Membaca Ta’awuz (Isti‘azah)",
+            arabic = "أَعُوذُ بِاللَّهِ مِنَ الشَّيْطَانِ الرَّجِيمِ",
+            transliteration = "A‘ūdhu billāhi minash-syaiṭānir-rajīm.",
+            translation = "Aku berlindung dengan Allah daripada syaitan yang direjam.",
+            targetCount = 1,
+            note = "Dibaca sebelum memulakan bacaan ayat-ayat suci Al-Quran.",
+            audioAssetPath = "audio/taawuz.mp3",
+            fadilat = "Perintah langsung daripada Allah SWT untuk membina benteng rohani daripada gangguan dan waswas syaitan sebelum membaca Kalam-Nya (Surah An-Nahl: 98)."
+        ),
+        WiridItem(
+            id = "wirid-fatihah",
+            order = 6,
+            title = "Membaca Surah Al-Fatihah",
+            arabic = """بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝١
+ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِينَ ۝٢
+ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝٣
+مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤
+إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
+ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦
+صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيۡهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيۡهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧""",
+            transliteration = "Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.",
+            translation = """(1) Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+(2) Segala puji tertentu bagi Allah, Tuhan sekalian alam.
+(3) Yang Maha Pemurah, lagi Maha Mengasihani.
+(4) Yang Menguasai hari Pembalasan.
+(5) Engkaulah sahaja yang kami sembah dan kepada Engkaulah kami memohon pertolongan.
+(6) Tunjukilah kami jalan yang lurus.
+(7) Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.""",
+            targetCount = 1,
+            note = "Ummul Kitab dibaca dengan tartil selepas solat fardhu.",
+            audioAssetPath = "audio/al_fatihah.mp3",
+            fadilat = "Surah paling agung dalam Al-Quran (As-Sab’ul Mathani), mengandungi munajat langsung antara hamba dengan Allah dan menjadi penawar (syifa’) segala penyakit hati (HR Al-Bukhari 4474)."
+        ),
+        WiridItem(
+            id = "wirid-baqarah-163",
+            order = 7,
+            title = "Membaca Ayat Ke-163 Surah Al-Baqarah",
+            arabic = "وَإِلَٰهُكُمۡ إِلَٰهٞ وَٰحِدٞۖ لَّآ إِلَٰهَ إِلَّا هُوَ ٱلرَّحۡمَٰنُ ٱلرَّحِيمُ ۝١٦٣",
+            transliteration = "Wa ilāhukum ilāhuw-wāḥid, lā ilāha illā Huwar-Raḥmānur-Raḥīm.",
+            translation = "Dan Tuhan kamu ialah Tuhan Yang Maha Esa; tiada Tuhan yang berhak disembah selain Dia, Yang Maha Pemurah, lagi Maha Mengasihani.",
+            targetCount = 1,
+            note = "Penegasan tauhid dan sifat rahmat Allah sebelum membaca Ayat Al-Kursi.",
+            audioAssetPath = "audio/baqarah_163.mp3",
+            fadilat = "Nabi SAW menyatakan bahawa ayat ini mengandungi Nama Allah Yang Paling Agung (Ismullah Al-A’zam) yang mana jika dipohon hajat dengannya, nescaya dimakbulkan (HR Abu Daud 1496 & At-Tirmizi 3478, Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-5",
+            order = 8,
+            title = "Ayat Al-Kursi (Surah Al-Baqarah: 255)",
+            arabic = "ٱللَّهُ لَآ إِلَٰهَ إِلَّا هُوَ ٱلۡحَيُّ ٱلۡقَيُّومُۚ لَا تَأۡخُذُهُۥ سِنَةٞ وَلَا نَوۡمٞۚ لَّهُۥ مَا فِي ٱلسَّمَٰوَٰتِ وَمَا فِي ٱلۡأَرۡضِۗ مَن ذَا ٱلَّذِي يَشۡفَعُ عِندَهُۥٓ إِلَّا بِإِذۡنِهِۦۚ يَعۡلَمُ مَا بَيۡنَ أَيۡدِيهِمۡ وَمَا خَلۡفَهُمۡۖ وَلَا يُحِيطُونَ بِشَيۡءٖ مِّنۡ عِلۡمِهِۦٓ إِلَّا بِمَا شَآءَۚ وَسِعَ كُرۡسِيُّهُ ٱلسَّمَٰوَٰتِ وَٱلۡأَرۡضَۖ وَلَا يَـُٔودُهُۥ حِفۡظُهُمَاۚ وَهُوَ ٱلۡعَلِيُّ ٱلۡعَظِيمُ ۝٢٥٥",
+            transliteration = "Allāhu lā ilāha illā Huwal-Ḥayyul-Qayyūm, lā ta’khudhuhū sinatuw-wa lā nawm, lahū mā fis-samāwāti wa mā fil-arḍ, man dhal-ladhī yasyfa‘u ‘indahū illā bi-idhnih, ya‘lamu mā baina aidīhim wa mā khalfahum, wa lā yuḥīṭūna bi-syai’im-min ‘ilmihī illā bimā syā’, wasi‘a kursiyyuhus-samāwāti wal-arḍ, wa lā ya’ūduhū ḥifẓuhumā, wa Huwal-‘Aliyyul-‘Aẓīm.",
+            translation = "Allah, tiada Tuhan melainkan Dia, Yang Maha Hidup, Yang Kekal mentadbirkan sekalian makhluk. Tidak mengantuk dan tidak tidur. Milik-Nya apa yang ada di langit dan di bumi. Tiada sesiapa yang dapat memberi syafaat di sisi-Nya melainkan dengan izin-Nya. Dia mengetahui apa yang ada di hadapan mereka dan apa yang ada di belakang mereka, sedangkan mereka tidak mengetahui sesuatu pun daripada ilmu-Nya melainkan apa yang dikehendaki-Nya. Luasnya Kursi Allah meliputi langit dan bumi; dan tiadalah menjadi keberatan kepada-Nya memelihara kedua-duanya, dan Dialah Yang Maha Tinggi lagi Maha Besar.",
+            targetCount = 1,
+            note = "Dibaca 1 kali setiap kali selesai solat fardhu.",
+            audioAssetPath = "audio/ayat_kursi.mp3",
+            fadilat = "Rasulullah SAW bersabda: "Sesiapa membaca Ayat Al-Kursi setiap kali selesai solat fardhu, tiada apa yang menghalangnya daripada masuk syurga melainkan kematian" (HR An-Nasa’i dalam As-Sunan Al-Kubra 9848 & Ibnu Hibban, Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-baqarah-284",
+            order = 9,
+            title = "Membaca Ayat Ke-284 Surah Al-Baqarah",
+            arabic = "لِّلَّهِ مَا فِي ٱلسَّمَٰوَٰتِ وَمَا فِي ٱلۡأَرۡضِۗ وَإِن تُبۡدُواْ مَا فِيٓ أَنفُسِكُمۡ أَوۡ تُخۡفُوهُ يُحَاسِبۡكُم بِهِ ٱللَّهُۖ فَيَغۡفِرُ لِمَن يَشَآءُ وَيُعَذِّبُ مَن يَشَآءُۗ وَٱللَّهُ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٨٤",
+            transliteration = "Lillāhi mā fis-samāwāti wa mā fil-arḍ, wa in tubdū mā fī anfusikum aw tukhfūhu yuḥāsibkum bihillāh, fayaghfiru limay-yasyā’u wa yu‘adh-dhibu may-yasyā’, wallāhu ‘alā kulli syai’in qadīr.",
+            translation = "Segala yang ada di langit dan di bumi adalah kepunyaan Allah. Dan jika kamu menzahirkan apa yang ada di dalam hati kamu atau kamu menyembunyikannya, nescaya Allah akan menghitungnya bagi kamu. Kemudian Dia mengampunkan bagi sesiapa yang dikehendaki-Nya dan menyeksa sesiapa yang dikehendaki-Nya. Dan Allah Maha Kuasa atas segala sesuatu.",
+            targetCount = 1,
+            note = "Ayat ke-284 Surah Al-Baqarah (permulaan 3 ayat terakhir). Dibaca 1 kali.",
+            audioAssetPath = "audio/baqarah_284.mp3",
+            fadilat = "Menginsafkan jiwa tentang ilmu dan hisab Allah yang meliputi isi hati, serta menjadi mukadimah kepada kurniaan rahmat pada ayat seterusnya."
+        ),
+        WiridItem(
+            id = "wirid-baqarah-285",
+            order = 10,
+            title = "Membaca Ayat Ke-285 Surah Al-Baqarah",
+            arabic = "ءَامَنَ ٱلرَّسُولُ بِمَآ أُنزِلَ إِلَيۡهِ مِن رَّبِّهِۦ وَٱلۡمُؤۡمِنُونَۚ كُلٌّ ءَامَنَ بِٱللَّهِ وَمَلَٰٓئِكَتِهِۦ وَكُتُبِهِۦ وَرُسُلِهِۦ لَا نُفَرِّقُ بَيۡنَ أَحَدٖ مِّن رُّسُلِهِۦۚ وَقَالُواْ سَمِعۡنَا وَأَطَعۡنَاۖ غُفۡرَانَكَ رَبَّنَا وَإِلَيۡكَ ٱلۡمَصِيرُ ۝٢٨٥",
+            transliteration = "Āmanar-Rasūlu bimā unzila ilaihi mir-Rabbihī wal-mu’minūn, kullun āmana billāhi wa malā’ikatihī wa kutubihī wa rusulih, lā nufarriqu baina aḥadim-mir-rusulih, wa qālū sami‘nā wa aṭa‘nā ghufrānaka Rabbanā wa ilaikal-maṣīr.",
+            translation = "Rasulullah telah beriman kepada apa yang diturunkan kepadanya daripada Tuhannya, demikian juga orang-orang yang beriman; semuanya beriman kepada Allah, Malaikat-malaikat-Nya, Kitab-kitab-Nya, dan Rasul-rasul-Nya. (Mereka berkata): "Kami tidak membezakan antara seorang pun daripada Rasul-rasul-Nya". Dan mereka berkata lagi: "Kami dengar dan kami taat; (kami memohon) keampunan-Mu wahai Tuhan kami, dan kepada-Mu jualah tempat kembali".",
+            targetCount = 1,
+            note = "Ayat ke-285 Surah Al-Baqarah. Dibaca 1 kali.",
+            audioAssetPath = "audio/baqarah_285.mp3",
+            fadilat = "Dua ayat terakhir Al-Baqarah (285–286) diturunkan daripada perbendaharaan di bawah Arasy; sesiapa membacanya pada waktu malam cukuplah baginya sebagai perlindungan daripada segala keburukan (HR Al-Bukhari 5009 & Muslim 808)."
+        ),
+        WiridItem(
+            id = "wirid-baqarah-286",
+            order = 11,
+            title = "Membaca Ayat Ke-286 Surah Al-Baqarah",
+            arabic = "لَا يُكَلِّفُ ٱللَّهُ نَفۡسًا إِلَّا وُسۡعَهَاۚ لَهَا مَا كَسَبَتۡ وَعَلَيۡهَا مَا ٱكۡتَسَبَتۡۗ رَبَّنَا لَا تُؤَاخِذۡنَآ إِن نَّسِينَآ أَوۡ أَخۡطَأۡنَاۚ رَبَّنَا وَلَا تَحۡمِلۡ عَلَيۡنَآ إِصۡرٗا كَمَا حَمَلۡتَهُۥ عَلَى ٱلَّذِينَ مِن قَبۡلِنَاۚ رَبَّنَا وَلَا تُحَمِّلۡنَا مَا لَا طَاقَةَ لَنَا بِهِۦۖ وَٱعۡفُ عَنَّا وَٱغۡفِرۡ لَنَا وَٱرۡحَمۡنَآۚ أَنتَ مَوۡلَىٰنَا فَٱنصُرۡنَا عَلَى ٱلۡقَوۡمِ ٱلۡكَٰفِرِينَ ۝٢٨٦",
+            transliteration = "Lā yukallifullāhu nafsan illā wus‘ahā, lahā mā kasabat wa ‘alaihā maktasabat, Rabbanā lā tu’ākhidhnā in nasīnā aw akhṭa’nā, Rabbanā wa lā taḥmil ‘alainā iṣran kamā ḥamaltahū ‘alalladhīna min qablinā, Rabbanā wa lā tuḥammilnā mā lā ṭāqata lanā bih, wa‘fu ‘annā, waghfir lanā, warḥamnā, Anta mawlānā fanṣurnā ‘alal-qawmil-kāfirīn.",
+            translation = "Allah tidak membebani seseorang melainkan apa yang terdaya olehnya. Ia mendapat pahala atas kebaikan yang diusahakannya, dan ia menanggung dosa atas kejahatan yang dilakukannya. "Wahai Tuhan kami! Janganlah Engkau hukum kami jika kami lupa atau kami tersalah. Wahai Tuhan kami! Janganlah Engkau bebankan kepada kami bebanan yang berat sebagaimana yang telah Engkau bebankan kepada orang-orang terdahulu sebelum kami. Wahai Tuhan kami! Janganlah Engkau pikulkan kepada kami apa yang kami tidak terdaya memikulnya. Dan maafkanlah kami, ampunkanlah kami, dan rahmatilah kami. Engkaulah Penolong kami, maka tolonglah kami mencapai kemenangan terhadap kaum yang kafir".",
+            targetCount = 1,
+            note = "Ayat ke-286 Surah Al-Baqarah (pelengkap 3 ayat terakhir). Dibaca 1 kali.",
+            audioAssetPath = "audio/baqarah_286.mp3",
+            fadilat = "Mengandungi doa agung memohon kemaafan dan kemenangan yang dijanjikan oleh Allah SWT dengan jawapan: "Aku telah perkenankan" (HR Muslim 126)."
+        ),
+        WiridItem(
+            id = "wirid-ali-imran-18",
+            order = 12,
+            title = "Membaca Ayat Ke-18 Surah Ali ‘Imran",
+            arabic = "شَهِدَ ٱللَّهُ أَنَّهُۥ لَآ إِلَٰهَ إِلَّا هُوَ وَٱلۡمَلَٰٓئِكَةُ وَأُوْلُواْ ٱلۡعِلۡمِ قَآئِمَۢا بِٱلۡقِسۡطِۚ لَآ إِلَٰهَ إِلَّا هُوَ ٱلۡعَزِيزُ ٱلۡحَكِيمُ ۝١٨",
+            transliteration = "Syahidallāhu annahū lā ilāha illā Huwa wal-malā’ikatu wa ulul-‘ilmi qā’imam-bil-qisṭ, lā ilāha illā Huwal-‘Azīzul-Ḥakīm.",
+            translation = "Allah menegaskan bahawasanya tiada Tuhan yang berhak disembah melainkan Dia, Yang mentadbirkan seluruh alam dengan keadilan; dan para malaikat serta orang-orang yang berilmu mengakui demikian; tiada Tuhan melainkan Dia, Yang Maha Kuasa, lagi Maha Bijaksana.",
+            targetCount = 1,
+            note = "Ayat ke-18 Surah Ali ‘Imran. Dibaca 1 kali.",
+            audioAssetPath = "audio/ali_imran_18.mp3",
+            fadilat = "Penyaksian tauhid paling mulia di sisi Allah yang menggabungkan kesaksian Zat Allah, para malaikat, dan orang-orang yang berilmu."
+        ),
+        WiridItem(
+            id = "wirid-ali-imran-19",
+            order = 13,
+            title = "Membaca Ayat Ke-19 Surah Ali ‘Imran (Sebahagian)",
+            arabic = "إِنَّ ٱلدِّينَ عِندَ ٱللَّهِ ٱلۡإِسۡلَٰمُۗ",
+            transliteration = "Innad-dīna ‘indallāhil-Islām.",
+            translation = "Sesungguhnya agama yang benar dan diredai di sisi Allah ialah Islam.",
+            targetCount = 1,
+            note = "Potongan awal ayat ke-19 Surah Ali ‘Imran sebagai ikrar tauhid. Dibaca 1 kali.",
+            audioAssetPath = "audio/ali_imran_19.mp3",
+            fadilat = "Meneguhkan keimanan hamba bahawa hanya Islam agama wahyu yang diterima di sisi Allah SWT di dunia dan akhirat."
+        ),
+        WiridItem(
+            id = "wirid-ali-imran-26",
+            order = 14,
+            title = "Membaca Ayat Ke-26 Surah Ali ‘Imran",
+            arabic = "قُلِ ٱللَّهُمَّ مَٰلِكَ ٱلۡمُلۡكِ تُؤۡتِي ٱلۡمُلۡكَ مَن تَشَآءُ وَتَنزِعُ ٱلۡمُلۡكَ مِمَّن تَشَآءُ وَتُعِزُّ مَن تَشَآءُ وَتُذِلُّ مَن تَشَآءُۖ بِيَدِكَ ٱلۡخَيۡرُۖ إِنَّكَ عَلَىٰ كُلِّ شَيۡءٖ قَدِيرٌ ۝٢٦",
+            transliteration = "Qulillāhumma Mālikal-mulki tu’til-mulka man tasyā’u wa tanzi‘ul-mulka mimman tasyā’u wa tu‘izzu man tasyā’u wa tudhillu man tasyā’, biyadikal-khair, innaka ‘alā kulli syai’in qadīr.",
+            translation = "Katakanlah: "Wahai Tuhan Pemilik kerajaan! Engkau berikan kerajaan kepada sesiapa yang Engkau kehendaki, dan Engkau cabut kerajaan daripada sesiapa yang Engkau kehendaki. Engkau muliakan sesiapa yang Engkau kehendaki, dan Engkau hinakan sesiapa yang Engkau kehendaki. Di tangan kekuasaan-Mulah segala kebaikan. Sesungguhnya Engkau Maha Kuasa atas segala sesuatu".",
+            targetCount = 1,
+            note = "Ayat ke-26 Surah Ali ‘Imran (Ayat Al-Mulk). Dibaca 1 kali.",
+            audioAssetPath = "audio/ali_imran_26.mp3",
+            fadilat = "Diajarkan oleh Nabi SAW sebagai doa agung untuk melangsaikan hutang piutang sekalipun sebesar gunung Uhud dan memohon kelapangan rezeki (HR At-Tabarani dalam Al-Mu’jam As-Saghir 558, Hasan)."
+        ),
+        WiridItem(
+            id = "wirid-ali-imran-27",
+            order = 15,
+            title = "Membaca Ayat Ke-27 Surah Ali ‘Imran",
+            arabic = "تُولِجُ ٱلَّيۡلَ فِي ٱلنَّهَارِ وَتُولِجُ ٱلنَّهَارَ فِي ٱلَّيۡلِۖ وَتُخۡرِجُ ٱلۡحَيَّ مِنَ ٱلۡمَيِّتِ وَتُخۡرِجُ ٱلۡمَيِّتَ مِنَ ٱلۡحَيِّۖ وَتَرۡزُقُ مَن تَشَآءُ بِغَيۡرِ حِسَابٖ ۝٢٧",
+            transliteration = "Tūlijul-laila fin-nahāri wa tūlijun-nahāra fil-laili wa tukhrijul-ḥayya minal-mayyiti wa tukhrijul-mayyita minal-ḥayyi wa tarzuqu man tasyā’u bighairi ḥisāb.",
+            translation = "Engkau memasukkan malam ke dalam siang dan Engkau memasukkan siang ke dalam malam. Engkau mengeluarkan yang hidup daripada yang mati, dan Engkau mengeluarkan yang mati daripada yang hidup. Dan Engkau memberi rezeki kepada sesiapa yang Engkau kehendaki tanpa hitungan.",
+            targetCount = 1,
+            note = "Ayat ke-27 Surah Ali ‘Imran. Dibaca 1 kali.",
+            audioAssetPath = "audio/ali_imran_27.mp3",
+            fadilat = "Mengakui kekuasaan mutlak Allah dalam mentadbir alam dan membuka pintu rezeki yang melimpah ruah tanpa disangka-sangka."
+        ),
+        WiridItem(
+            id = "wirid-al-ikhlas",
+            order = 16,
+            title = "Membaca Surah Al-Ikhlas",
+            arabic = """قُلۡ هُوَ ٱللَّهُ أَحَدٌ ۝١
+ٱللَّهُ ٱلصَّمَدُ ۝٢
+لَمۡ يَلِدۡ وَلَمۡ يُولَدۡ ۝٣
+وَلَمۡ يَكُن لَّهُۥ كُفُوًا أَحَدُۢ ۝٤""",
+            transliteration = "Qul Huwallāhu Aḥad. Allāhuṣ-Ṣamad. Lam yalid wa lam yūlad. Wa lam yakul-lahū kufuwan aḥad.",
+            translation = """(1) Katakanlah: "(Tuhanku) ialah Allah Yang Maha Esa.
+(2) Allah tumpuan sekalian makhluk untuk memohon sebarang hajat.
+(3) Dia tidak beranak dan tidak pula diperanakkan.
+(4) Dan tidak ada sesiapapun yang setara dengan-Nya".""",
+            targetCount = 3,
+            note = "Dibaca sebanyak 3 kali (atau 1 kali).",
+            audioAssetPath = "audio/al_ikhlas.mp3",
+            fadilat = "Pahalanya menyamai membaca 1/3 Al-Quran (HR Al-Bukhari 5013), dan sunnah dibaca di hujung setiap solat fardhu sebagai perisai tauhid (HR Abu Daud 1523, Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-al-falaq",
+            order = 17,
+            title = "Membaca Surah Al-Falaq",
+            arabic = """قُلۡ أَعُوذُ بِرَبِّ ٱلۡفَلَقِ ۝١
+مِن شَرِّ مَا خَلَقَ ۝٢
+وَمِن شَرِّ غَاسِقٍ إِذَا وَقَبَ ۝٣
+وَمِن شَرِّ ٱلنَّفَّٰثَٰتِ فِي ٱلۡعُقَدِ ۝٤
+وَمِن شَرِّ حَاسِدٍ إِذَا حَسَدَ ۝٥""",
+            transliteration = "Qul a‘ūdhu bi-Rabbil-falaq. Min syarri mā khalaq. Wa min syarri ghāsiqin idhā waqab. Wa min syarrin-naffāthāti fil-‘uqad. Wa min syarri ḥāsidin idhā ḥasad.",
+            translation = """(1) Katakanlah: "Aku berlindung kepada Tuhan yang menciptakan fajar subuh,
+(2) Dari kejahatan makhluk-makhluk yang Dia ciptakan,
+(3) Dari bahaya kegelapan apabila telah masuk,
+(4) Dari kejahatan wanita-wanita penyihir yang menghembus pada simpulan tali,
+(5) Serta dari kejahatan orang yang dengki apabila dia melakukan dengkinya".""",
+            targetCount = 3,
+            note = "Dibaca sebanyak 3 kali (atau 1 kali).",
+            audioAssetPath = "audio/al_falaq.mp3",
+            fadilat = "Perlindungan terbaik daripada sihir, pandangan mata jahat (ain), dan hasad dengki manusia; diperintahkan oleh Nabi SAW dibaca selepas setiap solat (HR Abu Daud 1523 & An-Nasa’i 1336, Sahih)."
+        ),
+        WiridItem(
+            id = "wirid-an-nas",
+            order = 18,
+            title = "Membaca Surah An-Nas",
+            arabic = """قُلۡ أَعُوذُ بِرَبِّ ٱلنَّاسِ ۝١
+مَلِكِ ٱلنَّاسِ ۝٢
+إِلَٰهِ ٱلنَّاسِ ۝٣
+مِن شَرِّ ٱلۡوَسۡوَاسِ ٱلۡخَنَّاسِ ۝٤
+ٱلَّذِي يُوَسۡوِسُ فِي صُدُورِ ٱلنَّاسِ ۝٥
+مِنَ ٱلۡجِنَّةِ وَٱلنَّاسِ ۝٦""",
+            transliteration = "Qul a‘ūdhu bi-Rabbin-nās. Malikin-nās. Ilāhin-nās. Min syarril-waswāsil-khannās. Alladhī yuwaswisu fī ṣudūrin-nās. Minal-jinnati wan-nās.",
+            translation = """(1) Katakanlah: "Aku berlindung kepada Pemelihara sekalian manusia,
+(2) Raja sekalian manusia,
+(3) Tuhan sekalian manusia,
+(4) Dari kejahatan pembisik penghasut yang berundur,
+(5) Yang membisikkan kejahatan ke dalam dada manusia,
+(6) Iaitu daripada kalangan jin dan manusia".""",
+            targetCount = 3,
+            note = "Dibaca sebanyak 3 kali (atau 1 kali).",
+            audioAssetPath = "audio/an_nas.mp3",
+            fadilat = "Kubu kebal daripada bisikan waswas syaitan jin dan manusia di dalam dada, disunnahkan dibaca bersama Al-Falaq selepas solat fardhu (HR Abu Daud 1523)."
+        ),
+        WiridItem(
+            id = "wirid-fatihah-ulangan",
+            order = 19,
+            title = "Membaca Surah Al-Fatihah (Ulangan)",
+            arabic = """بِسۡمِ ٱللَّهِ ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝١
+ٱلۡحَمۡدُ لِلَّهِ رَبِّ ٱلۡعَٰلَمِينَ ۝٢
+ٱلرَّحۡمَٰنِ ٱلرَّحِيمِ ۝٣
+مَٰلِكِ يَوۡمِ ٱلدِّينِ ۝٤
+إِيَّاكَ نَعۡبُدُ وَإِيَّاكَ نَسۡتَعِينُ ۝٥
+ٱهۡدِنَا ٱلصِّرَٰطَ ٱلۡمُسۡتَقِيمَ ۝٦
+صِرَٰطَ ٱلَّذِينَ أَنۡعَمۡتَ عَلَيۡهِمۡ غَيۡرِ ٱلۡمَغۡضُوبِ عَلَيۡهِمۡ وَلَا ٱلضَّآلِّينَ ۝٧""",
+            transliteration = "Bismillāhir-Raḥmānir-Raḥīm. Al-Ḥamdu lillāhi Rabbil-‘ālamīn. Ar-Raḥmānir-Raḥīm. Māliki yawmid-dīn. Iyyāka na‘budu wa iyyāka nasta‘īn. Ihdinaṣ-ṣirāṭal-mustaqīm. Ṣirāṭalladhīna an‘amta ‘alaihim, ghairil-maghḍūbi ‘alaihim wa laḍ-ḍāllīn.",
+            translation = """(1) Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+(2) Segala puji tertentu bagi Allah, Tuhan sekalian alam.
+(3) Yang Maha Pemurah, lagi Maha Mengasihani.
+(4) Yang Menguasai hari Pembalasan.
+(5) Engkaulah yang kami sembah dan kepada Engkaulah kami memohon pertolongan.
+(6) Tunjukilah kami jalan yang lurus.
+(7) Iaitu jalan orang-orang yang telah Engkau kurniakan nikmat kepada mereka, bukan jalan mereka yang dimurkai dan bukan pula jalan mereka yang sesat.""",
+            targetCount = 1,
+            note = "Bacaan Al-Fatihah penutup rangkaian ayat sebelum beralih ke tasbih/tahmid/takbir. Dibaca 1 kali.",
+            audioAssetPath = "audio/al_fatihah.mp3",
+            fadilat = "Menjadi wasilah tawassul doa dan pembuka keberkatan sebelum memulakan zikir tasbih 33 kali mengikut tertib ulama nusantara."
+        ),
+        WiridItem(
+            id = "wirid-tasbih-pembuka",
+            order = 20,
+            title = "Pengantar Tasbih",
+            arabic = "إِلَـٰهِى يَا رَبِّـى ــ سُبْحَانَ اللَّهِ",
+            transliteration = "Ilāhī Yā Rabbī ― Subḥānallāh (Imam: Ilāhanā Yā Rabbanā ― Subḥānallāh)",
+            translation = "Ya Allah Ya Tuhanku ― Maha Suci Allah (Imam: Ya Allah Ya Tuhan Kami ― Maha Suci Allah).",
+            targetCount = 1,
+            note = "Lafaz pengantar sebelum tasbih 33 kali. Jika solat berjemaah / menjadi imam, gunakan lafaz: إِلَـٰهَنَا يَا رَبَّنَا ــ سُبْحَانَ اللَّهِ.",
+            audioAssetPath = "audio/tasbih_pembuka.mp3",
+            fadilat = "Menghadirkan keikhlasan dan kerendahan hati mengakui Allah sebagai Rabb sebelum menyucikan Zat-Nya."
+        ),
+        WiridItem(
+            id = "wirid-tasbih-33",
+            order = 21,
+            title = "Membaca Tasbih (33 Kali)",
+            arabic = "سُبْحَانَ اللّٰهِ",
+            transliteration = "Subḥānallāh.",
+            translation = "Maha Suci Allah.",
+            targetCount = 33,
+            note = "Dibaca sebanyak 33 kali.",
+            audioAssetPath = "audio/tasbih.mp3",
+            fadilat = "Setiap tasbih menjadi sedekah (HR Muslim 720), dan bersama tahmid serta takbir ia menghapuskan dosa walau sebanyak buih di lautan (HR Muslim 597)."
+        ),
+        WiridItem(
+            id = "wirid-tahmid-pembuka",
+            order = 22,
+            title = "Pengantar Tahmid",
+            arabic = "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ دَائِمًا قَائِمًا أَبَدًا ـــ الْحَمْدُ لِلَّهِ",
+            transliteration = "Subḥānallāhi wa bi-ḥamdihī dā’iman qā’iman abadā — Al-Ḥamdu lillāh.",
+            translation = "Maha Suci Allah, aku bertasbih memuji-Nya kekal sentiasa selama-lamanya — segala puji bagi Allah.",
+            targetCount = 1,
+            note = "Lafaz pengantar sebelum memulakan tahmid 33 kali.",
+            audioAssetPath = null,
+            fadilat = "Menyambung tasbih dengan pujian tahmid abadi yang dicintai Allah SWT."
+        ),
+        WiridItem(
+            id = "wirid-tahmid-33",
+            order = 23,
+            title = "Membaca Tahmid (33 Kali)",
+            arabic = "الْحَمْدُ لِلَّهِ",
+            transliteration = "Al-Ḥamdu lillāh.",
+            translation = "Segala puji bagi Allah.",
+            targetCount = 33,
+            note = "Dibaca sebanyak 33 kali.",
+            audioAssetPath = "audio/tahmid.mp3",
+            fadilat = "Sebaik-baik ucapan syukur yang memenuhi neraca timbangan mizan pada hari kiamat (HR Muslim 223 & 597)."
+        ),
+        WiridItem(
+            id = "wirid-takbir-pembuka",
+            order = 24,
+            title = "Pengantar Takbir",
+            arabic = "الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ عَلَى كُلِّ حَالٍ وَنِعْمَةٍ ــ اللَّهُ أَكْبَرُ",
+            transliteration = "Al-Ḥamdu lillāhi Rabbil-‘ālamīna ‘alā kulli ḥāliw-wa ni‘matin ― Allāhu Akbar.",
+            translation = "Segala puji bagi Allah Tuhan sekalian alam atas setiap keadaan dan nikmat kurniaan-Nya — Allah Maha Besar.",
+            targetCount = 1,
+            note = "Lafaz pengantar sebelum memulakan takbir 33 kali.",
+            audioAssetPath = "audio/takbir_pembuka.mp3",
+            fadilat = "Mengikhlaskan pujian kepada Allah dalam sebarang keadaan susah mahupun senang sebelum membesarkan keagungan-Nya."
+        ),
+        WiridItem(
+            id = "wirid-takbir-33",
+            order = 25,
+            title = "Membaca Takbir (33 Kali)",
+            arabic = "اللَّهُ أَكْبَرُ",
+            transliteration = "Allāhu Akbar.",
+            translation = "Allah Maha Besar.",
+            targetCount = 33,
+            note = "Dibaca sebanyak 33 kali.",
+            audioAssetPath = "audio/takbir.mp3",
+            fadilat = "Mengagungkan kebesaran Allah SWT mengatasi segala urusan keduniaan dan melengkapkan 99 bilangan zikir (HR Muslim 597)."
+        ),
+        WiridItem(
+            id = "wirid-penyempurna-100",
+            order = 26,
+            title = "Membaca Pelengkap Tasbih, Tahmid dan Takbir",
+            arabic = "اللَّهُ أَكْبَرُ كَبِيرًا وَالْحَمْدُ لِلَّهِ كَثِيرًا وَسُبْحَانَ اللَّهِ بُكْرَةً وَأَصِيلًا. لَا إِلـٰهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ يُحْيِي وَيُمِيتُ وَهُوَ عَلَىٰ كُلِّ شَيْءٍ قَدِيرٌ، وَلَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ",
+            transliteration = "Allāhu Akbaru kabīraw-wal-ḥamdu lillāhi kathīraw-wa subḥānallāhi bukrataw-wa aṣīlā. Lā ilāha illallāhu waḥdahū lā syarīka lah, lahul-mulku wa lahul-ḥamdu yuḥyī wa yumītu wa Huwa ‘alā kulli syai’in qadīr, wa lā ḥawla wa lā quwwata illā billāhil-‘Aliyyil-‘Aẓīm.",
+            translation = "Allah Maha Besar sebesar-besarnya, segala puji bagi Allah sebanyak-banyaknya, dan Maha Suci Allah pada waktu pagi dan petang. Tiada Tuhan selain Allah Yang Maha Esa, tiada sekutu bagi-Nya. Bagi-Nyalah kerajaan dan kepujian, Dia menghidupkan dan mematikan, dan Dia Maha Kuasa atas segala sesuatu. Dan tiada daya serta upaya melainkan dengan pertolongan Allah Yang Maha Tinggi lagi Maha Agung.",
+            targetCount = 1,
+            note = "Penyempurna zikir bilangan ke-100 selepas selesai 33 kali Tasbih, Tahmid, dan Takbir.",
+            audioAssetPath = "audio/zikir_100.mp3",
+            fadilat = "Rasulullah SAW bersabda: "Sesiapa membaca zikir ini untuk melengkapkan bilangan ke-100 selepas solat fardhu, diampunkan segala dosa-dosanya sekalipun sebanyak buih di lautan" (HR Muslim 597)."
+        )
+    )
+
+    val DUA_COLLECTION: List<DuaItem> = listOf(
+        DuaItem(
+            id = "dua-selepas-solat",
+            category = DuaCategory.SELEPAS_SOLAT,
+            title = "Doa Lengkap Selepas Solat Fardhu",
+            arabic = """بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ
+الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ، وَالصَّلَاةُ وَالسَّلَامُ عَلَى أَشْرَفِ الْأَنْبِيَاءِ وَالْمُرْسَلِينَ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ أَجْمَعِينَ.
+اللَّهُمَّ تَقَبَّلْ مِنَّا صَلَاتَنَا وَدُعَاءَنَا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ، وَتُبْ عَلَيْنَا إِنَّكَ أَنْتَ التَّوَّابُ الرَّحِيمُ.
+اللَّهُمَّ اجْعَلْ دِينَنَا دِينَ النَّبِيِّ مُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ، وَإِسْلَامَنَا إِسْلَامَ الْمُسْلِمِينَ، وَإِيمَانَنَا إِيمَانَ الْمُؤْمِنِينَ، وَصَلَاتَنَا صَلَاةَ الْخَاشِعِينَ،
+وَأَعْمَالَنَا أَعْمَالَ الصَّالِحِينَ، وَنِيَّتَنَا نِيَّةَ الْمُخْلِصِينَ، وَذُنُوبَنَا يَا اللَّهُ ذُنُوبَ الْمُسْتَغْفِرِينَ.
+وَحَيَاتَنَا حَيَاةَ الْعُلَمَاءِ، وَمَوْتَنَا بِمَوْتِ الشُّهَدَاءِ، وَأَدْخِلْنَا الْجَنَّةَ مَعَ الْأَنْبِيَاءِ عَلَيْهِمُ الصَّلَاةُ وَالسَّلَامُ.
+رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ،
+وَصَلَّى اللَّهُ عَلَى خَيْرِ خَلْقِهِ سَيِّدِنَا مُحَمَّدٍ وَعَلَى آلِهِ وَصَحْبِهِ وَسَلَّمَ،
+سُبْحَانَ رَبِّكَ رَبِّ الْعِزَّةِ عَمَّا يَصِفُونَ، وَسَلَامٌ عَلَى الْمُرْسَلِينَ، وَالْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ""",
+            transliteration = """Bismillāhir-rahmānir-rahīm.
+
+Alhamdulillāhi rabbil-'ālamīn, was-solātu was-salāmu 'alā asyrofil-anbiyā-i wal-mursalīn, sayyidinā Muhammadin wa-'alā ālihī wa-sahbihī ajma'īn.
+
+Allāhumma taqabbal minnā solātanā wa-du'ā-anā, innaka antas-samī'ul-'alīm, wa tub 'alainā, innaka antat-tawwābur-rahīm.
+
+Allāhummaj'al dīnanā dīnan-nabiyyi Muhammadin sallallāhu 'alaihi wa sallam, wa islāmanā islāmal-muslimīn, wa īmānanā īmānal-mu'minīn, wa solātanā solātal-khāsyi'īn.
+
+Wa a'mālanā a'mālas-solihīn, wa niyyatanā niyyatal-mukhlisīn, wa zunūbanā yā Allāhu zunūbal-mustaghfirīn.
+
+Wa hayātanā hayātal-'ulamā', wa mautanā bi-mautisy-syuhadā', wa adkhilnal-jannata ma'al-anbiyā-i 'alaihimus-solātu was-salām.
+
+Rabbanā ātinā fid-dunyā hasanatan wa fil-ākhirati hasanatan wa qinā 'azāban-nār.
+
+Wa sallallāhu 'alā khairi khalqihī sayyidinā Muhammadin wa 'alā ālihī wa sahbihī wa sallam.
+
+Subhāna rabbika rabbil-'izzati 'ammā yasifūn, wa salāmun 'alal-mursalīn, wal-hamdulillāhi rabbil-'ālamīn.""",
+            translation = """Dengan nama Allah, Yang Maha Pemurah, lagi Maha Mengasihani.
+
+Segala puji bagi Allah, Tuhan sekalian alam. Selawat dan salam ke atas semulia-mulia para nabi dan rasul, junjungan kami Nabi Muhammad, serta ke atas seluruh keluarga dan para sahabat baginda.
+
+Ya Allah, terimalah daripada kami solat kami dan doa kami, sesungguhnya Engkau Maha Mendengar lagi Maha Mengetahui. Dan terimalah taubat kami, sesungguhnya Engkau Maha Penerima Taubat lagi Maha Mengasihani.
+
+Ya Allah, jadikanlah pegangan agama kami seperti agama Nabi Muhammad SAW, keislaman kami seperti Islam orang-orang yang berserah diri (muslimin), keimanan kami seperti iman orang-orang yang beriman (mukminin), dan solat kami seperti solat orang-orang yang khusyuk.
+
+Dan amalan kami seperti amalan orang-orang soleh, niat kami seperti niat orang-orang yang ikhlas, serta jadikanlah dosa-dosa kami ya Allah, seperti dosa orang-orang yang sentiasa memohon keampunan.
+
+Dan jadikanlah kehidupan kami seperti kehidupan para ulama, kematian kami seperti kematian para syuhada, dan masukkanlah kami ke dalam syurga bersama para nabi, ke atas mereka selawat dan salam.
+
+Wahai Tuhan kami, berikanlah kepada kami kebaikan di dunia dan kebaikan di akhirat, dan peliharalah kami daripada azab api neraka.
+
+Semoga Allah melimpahkan rahmat ke atas sebaik-baik makhluk-Nya, junjungan kami Nabi Muhammad, serta ke atas keluarga dan para sahabat baginda, dan kurniakanlah kesejahteraan.
+
+Maha Suci Tuhanmu, Tuhan yang memiliki keagungan dan kemuliaan daripada apa yang mereka sifatkan. Dan salam sejahtera ke atas para rasul, serta segala puji bagi Allah, Tuhan sekalian alam.""",
+            reference = "Amalan Doa Masyhur Ulama Nusantara"
+        ),
+        DuaItem(
+            id = "dua-selepas-azan",
+            category = DuaCategory.SELEPAS_SOLAT,
+            title = "Doa Selepas Azan Selesai",
+            arabic = "اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ، وَالصَّلَاةِ الْقَائِمَةِ، آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ، وَابْعَثْهُ مَقَامًا مَحْمُودًا الَّذِي وَعَدْتَهُ، إِنَّكَ لَا تُخْلِفُ الْمِيعَادَ",
+            transliteration = "Allāhumma Rabba hādhihid-da‘watit-tāmmah, waṣ-ṣalātil-qā’imah, āti Muḥammadanil-wasīlata wal-faḍīlah, wab‘athhu maqāmam-maḥmūdanil-ladhī wa‘adtah, innaka lā tukhliful-mī‘ād.",
+            translation = "Ya Allah, Tuhan yang memiliki seruan yang sempurna dan solat yang didirikan ini, kurniakanlah kepada Nabi Muhammad kedudukan wasilah dan kelebihan, dan tempatkanlah baginda pada maqam terpuji yang telah Engkau janjikan. Sesungguhnya Engkau tidak memungkiri janji.",
+            reference = "HR Al-Bukhari (No. 614) & Sunan Al-Baihaqi (1/410)"
+        ),
+        DuaItem(
+            id = "dua-berbuka-puasa",
+            category = DuaCategory.PUASA,
+            title = "Doa Berbuka Puasa (Sahih)",
+            arabic = "ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الْأَجْرُ إِنْ شَاءَ اللَّهُ",
+            transliteration = "Dhahabadh-dhama’u wabtallatil-‘urūqu wa thabatal-ajru in syā’ Allāh.",
+            translation = "Telah hilang dahaga, telah basah urat-urat dan telah tetap pahala, insya-Allah.",
+            reference = "HR Abu Daud (No. 2357, Sahih)"
+        ),
+        DuaItem(
+            id = "dua-berbuka-puasa-2",
+            category = DuaCategory.PUASA,
+            title = "Doa Berbuka Masyhur",
+            arabic = "اللَّهُمَّ لَكَ صُمْتُ وَبِكَ آمَنْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ بِرَحْمَتِكَ يَا أَرْحَمَ الرَّاحِمِينَ",
+            transliteration = "Allāhumma laka ṣumtu wa bika āmantu wa ‘alā rizqika afṭartu, bi-raḥmatika yā Arḥamar-Rāḥimīn.",
+            translation = "Ya Allah, kerana-Mu aku berpuasa, kepada-Mu aku beriman dan dengan rezeki-Mu aku berbuka, dengan limpah rahmat-Mu wahai Tuhan yang Maha Pengasih lagi Maha Penyayang.",
+            reference = "Teras Riwayat Abu Daud (No. 2358) & Amalan Masyhur"
+        ),
+        DuaItem(
+            id = "niat-puasa-ramadan-harian",
+            category = DuaCategory.PUASA,
+            title = "Lafaz Niat Puasa Harian Ramadan",
+            arabic = "نَوَيْتُ صَوْمَ غَدٍ عَنْ أَدَاءِ فَرْضِ شَهْرِ رَمَضَانَ هَذِهِ السَّنَةِ لِلَّهِ تَعَالَى",
+            transliteration = "Nawaitu ṣawma ghadin ‘an adā’i farḍi syahri Ramaḍāna hādhihis-sanati lillāhi Ta‘ālā.",
+            translation = "Sahaja aku berpuasa esok hari menunaikan fardhu bulan Ramadan tahun ini kerana Allah Taala.",
+            reference = "Panduan Rasmi JAKIM"
+        ),
+        DuaItem(
+            id = "niat-puasa-ramadan-sebulan",
+            category = DuaCategory.PUASA,
+            title = "Lafaz Niat Puasa Sebulan Penuh",
+            arabic = "نَوَيْتُ صَوْمَ شَهْرِ رَمَضَانَ كُلِّهِ لِلَّهِ تَعَالَى",
+            transliteration = "Nawaitu ṣawma syahri Ramaḍāna kullihī lillāhi Ta‘ālā.",
+            translation = "Sahaja aku berpuasa sebulan Ramadan keseluruhannya kerana Allah Taala (Mazhab Maliki / Langkah Berjaga-jaga).",
+            reference = "Panduan Rasmi JAKIM"
+        ),
+        DuaItem(
+            id = "niat-puasa-isnin-khamis",
+            category = DuaCategory.PUASA,
+            title = "Lafaz Niat Puasa Sunat Isnin / Khamis",
+            arabic = "نَوَيْتُ صَوْمَ يَوْمِ الاِثْنَيْنِ / الْخَمِيسِ سُنَّةً لِلَّهِ تَعَالَى",
+            transliteration = "Nawaitu ṣawma yawmil-ithnaini / al-khamīsi sunnatan lillāhi Ta‘ālā.",
+            translation = "Sahaja aku berpuasa sunat hari Isnin / hari Khamis kerana Allah Taala.",
+            reference = "Fiqh As-Sunnah"
+        ),
+        DuaItem(
+            id = "dua-kedua-ibu-bapa",
+            category = DuaCategory.IBU_BAPA_KELUARGA,
+            title = "Doa Untuk Kedua Ibu Bapa",
+            arabic = "رَبِّ اغْفِرْ لِي وَلِوَالِدَيَّ وَارْحَمْهُمَا كَمَا رَبَّيَانِي صَغِيرًا",
+            transliteration = "Rabbighfir lī wa li-wālidayya warḥamhumā kamā rabbayānī ṣaghīrā.",
+            translation = "Wahai Tuhanku, ampunkanlah bagiku dan bagi kedua ibu bapaku, serta kasihanilah mereka berdua sebagaimana mereka telah mendidikku semasa kecil.",
+            reference = "Surah Al-Isra': 24"
+        ),
+        DuaItem(
+            id = "dua-dunia-akhirat",
+            category = DuaCategory.HARIAN,
+            title = "Doa Kebaikan Dunia & Akhirat (Rabbana Atina)",
+            arabic = "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+            transliteration = "Rabbanā ātinā fid-dunyā ḥasanatan wa fil-ākhirati ḥasanatan wa qinā ‘adhāban-nār.",
+            translation = "Wahai Tuhan kami, kurniakanlah kepada kami kebaikan di dunia dan kebaikan di akhirat, serta peliharalah kami daripada azab neraka.",
+            reference = "Surah Al-Baqarah: 201"
+        ),
+        DuaItem(
+            id = "dua-keluar-rumah",
+            category = DuaCategory.HARIAN,
+            title = "Doa Keluar Dari Rumah",
+            arabic = "بِسْمِ اللَّهِ تَوَكَّلْتُ عَلَى اللَّهِ، لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ",
+            transliteration = "Bismillāhi tawakkaltu ‘alallāh, lā ḥawla wa lā quwwata illā billāh.",
+            translation = "Dengan nama Allah, aku bertawakkal kepada Allah; tiada daya dan tiada kekuatan melainkan dengan pertolongan Allah.",
+            reference = "HR Abu Daud (No. 5095, Sahih)"
+        ),
+        DuaItem(
+            id = "dua-naik-kenderaan",
+            category = DuaCategory.HARIAN,
+            title = "Doa Menaiki Kenderaan / Memulakan Perjalanan",
+            arabic = "سُبْحَانَ الَّذِي سَخَّرَ لَنَا هَذَا وَمَا كُنَّا لَهُ مُقْرِنِينَ، وَإِنَّا إِلَى رَبِّنَا لَمُنْقَلِبُونَ",
+            transliteration = "Subḥānal-ladhī sakh-khara lanā hādhā wa mā kunnā lahū muqrinīn, wa innā ilā Rabbinā lamunqalibūn.",
+            translation = "Maha Suci Tuhan yang telah memudahkan kenderaan ini untuk kami, sedang kami sebelum itu tidak berkuasa menguasainya. Dan sesungguhnya kami hanya kepada Tuhan kamilah akan kembali.",
+            reference = "Surah Az-Zukhruf: 13-14"
+        ),
+        DuaItem(
+            id = "dua-rezeki-keberkatan",
+            category = DuaCategory.PERLINDUNGAN_REZEKI,
+            title = "Doa Rezeki Yang Luas, Halal & Berkat",
+            arabic = "اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا، وَرِزْقًا طَيِّبًا، وَعَمَلًا مُتَقَبَّلًا",
+            transliteration = "Allāhumma innī as’aluka ‘ilman nāfi‘an, wa rizqan ṭayyiban, wa ‘amalam-mutaqabbalā.",
+            translation = "Ya Allah, sesungguhnya aku memohon kepada-Mu ilmu yang bermanfaat, rezeki yang baik lagi halal, serta amalan yang diterima.",
+            reference = "HR Ibnu Majah (No. 925, Sahih)"
+        ),
+        DuaItem(
+            id = "dua-pelindung-duka-hutang",
+            category = DuaCategory.PERLINDUNGAN_REZEKI,
+            title = "Doa Terhindar Dari Duka, Malas & Bebanan Hutang",
+            arabic = "اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ، وَأَعُوذُ بِكَ مِنَ الْعَجْزِ وَالْكَسَلِ، وَأَعُوذُ بِكَ مِنَ الْجُبْنِ وَالْبُخْلِ، وَأَعُوذُ بِكَ مِنْ غَلَبَةِ الدَّيْنِ وَقَهْرِ الرِّجَالِ",
+            transliteration = "Allāhumma innī a‘ūdhu bika minal-hammi wal-ḥazan, wa a‘ūdhu bika minal-‘ajzi wal-kasal, wa a‘ūdhu bika minal-jubni wal-bukhl, wa a‘ūdhu bika min ghalabatid-daini wa qahrir-rijāl.",
+            translation = "Ya Allah, aku berlindung kepada-Mu daripada kegelisahan dan kesedihan, daripada kelemahan dan kemalasan, daripada sifat pengecut dan bakhil, serta daripada bebanan hutang dan penindasan orang.",
+            reference = "HR Abu Daud (No. 1555, Sahih)"
+        )
+    )
+
+    val TASBIH_LIST: List<TasbihPreset> = listOf(
+        TasbihPreset(
+            id = "tasbih",
+            name = "1. Tasbih (Subhanallah)",
+            arabic = "سُبْحَانَ اللَّهِ",
+            transliteration = "Subḥānallāh",
+            translation = "Maha Suci Allah.",
+            defaultTarget = 33,
+            fadilat = "Setiap sebutan tasbih adalah sedekah (HR Muslim 720), dan membaca 100 kali tasbih menghapuskan 1,000 dosa atau mencatat 1,000 kebaikan (HR Muslim 2073)."
+        ),
+        TasbihPreset(
+            id = "tahmid",
+            name = "2. Tahmid (Alhamdulillah)",
+            arabic = "الْحَمْدُ لِلَّهِ",
+            transliteration = "Al-Ḥamdu lillāh",
+            translation = "Segala puji bagi Allah.",
+            defaultTarget = 33,
+            fadilat = "Ucapan kesyukuran tertinggi yang memenuhi neraca timbangan mizan pada hari kiamat (HR Muslim 223)."
+        ),
+        TasbihPreset(
+            id = "takbir",
+            name = "3. Takbir (Allahu Akbar)",
+            arabic = "اللَّهُ أَكْبَرُ",
+            transliteration = "Allāhu Akbar",
+            translation = "Allah Maha Besar.",
+            defaultTarget = 33,
+            fadilat = "Mengagungkan kebesaran Allah SWT dan melengkapkan zikir 33 kali selepas solat yang menghapuskan dosa walau sebanyak buih di lautan (HR Muslim 597)."
+        ),
+        TasbihPreset(
+            id = "tauhid",
+            name = "4. Tauhid (Lafaz Tahlil Lengkap)",
+            arabic = "لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ، وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ",
+            transliteration = "Lā ilāha illallāhu waḥdahū lā syarīka lah, lahul-mulku wa lahul-ḥamdu, wa Huwa ‘alā kulli syai’in qadīr",
+            translation = "Tiada Tuhan selain Allah Yang Maha Esa, tiada sekutu bagi-Nya. Bagi-Nyalah kerajaan dan kepujian, dan Dia Maha Kuasa atas segala sesuatu.",
+            defaultTarget = 100,
+            fadilat = "Dibaca 100 kali sehari: menyamai memerdekakan 10 orang hamba, dicatat 100 kebaikan, dihapus 100 dosa, dan dibina kubu perisai daripada syaitan sepanjang hari (HR Al-Bukhari 3293 & Muslim 2691)."
+        ),
+        TasbihPreset(
+            id = "istighfar",
+            name = "5. Istighfar (Sunnah Harian Nabi SAW)",
+            arabic = "أَسْتَغْفِرُ اللَّهَ وَأَتُوبُ إِلَيْهِ",
+            transliteration = "Astaghfirullāha wa atūbu ilayh",
+            translation = "Aku memohon ampun kepada Allah dan aku bertaubat kepada-Nya.",
+            defaultTarget = 100,
+            fadilat = "Mengamalkan sunnah Rasulullah SAW yang beristighfar dan bertaubat kepada Allah lebih daripada 70 hingga 100 kali setiap hari (HR Al-Bukhari 6307 & Muslim 2702)."
+        ),
+        TasbihPreset(
+            id = "taubat",
+            name = "6. Taubat (Pelebur Dosa Besar)",
+            arabic = "أَسْتَغْفِرُ اللَّهَ الْعَظِيْمَ الَّذِيْ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّوْمُ وَأَتُوْبُ إِلَيْهِ",
+            transliteration = "Astaghfirullāhal-‘Aẓīm alladhī lā ilāha illā Huwal-Ḥayyul-Qayyūm wa atūbu ilayh",
+            translation = "Aku memohon ampun kepada Allah Yang Maha Agung, tiada Tuhan melainkan Dia Yang Maha Hidup lagi Berdiri Sendiri mentadbir sekalian makhluk, dan aku bertaubat kepada-Nya.",
+            defaultTarget = 33,
+            fadilat = "Barangsiapa membacanya, diampunkan dosa-dosanya sekalipun dia pernah lari dari medan pertempuran (HR At-Tirmizi 3577 & Abu Daud 1517, Sahih)."
+        ),
+        TasbihPreset(
+            id = "subhanallahi-wabihamdihi",
+            name = "7. Subhanallahi wa Bihamdihi",
+            arabic = "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ، سُبْحَانَ اللَّهِ الْعَظِيمِ",
+            transliteration = "Subḥānallāhi wa bi-ḥamdih, Subḥānallāhil-‘Aẓīm",
+            translation = "Maha Suci Allah dan segala puji bagi-Nya, Maha Suci Allah Yang Maha Agung.",
+            defaultTarget = 100,
+            fadilat = "Dua kalimah yang ringan di lidah, amat berat di atas neraca mizan, dan dicintai oleh Allah Ar-Rahman (HR Al-Bukhari 6682 & Muslim 2694). Membaca 100 kali menghapuskan dosa walau sebanyak buih di lautan (HR Al-Bukhari 6405)."
+        ),
+        TasbihPreset(
+            id = "sayyidul-istighfar",
+            name = "8. Sayyidul Istighfar (Penghulu Istighfar)",
+            arabic = "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ",
+            transliteration = "Allāhumma Anta Rabbī lā ilāha illā Anta, khalaqtanī wa anā ‘abduka, wa anā ‘alā ‘ahdika wa wa‘dika mastaṭa‘tu, a‘ūdhu bika min syarri mā ṣana‘tu, abū’u laka bini‘matika ‘alayya, wa abū’u bidhambī faghfir lī fa-innahū lā yaghfirudh-dhunūba illā Anta",
+            translation = "Ya Allah, Engkaulah Tuhanku, tiada Tuhan selain Engkau. Engkau telah menciptakanku dan aku adalah hamba-Mu. Aku berpegang pada janji dan taat setia kepada-Mu sekadar kemampuanku. Aku berlindung kepada-Mu daripada kejahatan yang telah aku lakukan. Aku mengakui segala nikmat-Mu kepadaku dan aku mengakui dosaku, maka ampunkanlah dosaku sesungguhnya tiada yang mengampunkan dosa melainkan Engkau.",
+            defaultTarget = 3,
+            fadilat = "Barangsiapa membacanya pada waktu siang atau malam dengan penuh keyakinan lalu meninggal dunia pada hari tersebut, dia tergolong dalam kalangan ahli syurga (HR Al-Bukhari 6306)."
+        ),
+        TasbihPreset(
+            id = "bebas",
+            name = "9. Zikir Bebas (Amalan Terbuka)",
+            arabic = "ذِكْرُ اللَّهِ تَعَالَى",
+            transliteration = "Zikrullāhi Ta‘ālā",
+            translation = "Mengingati Allah secara terbuka pada setiap ketika.",
+            defaultTarget = 0,
+            fadilat = "Perumpamaan orang yang mengingati Tuhannya dengan orang yang lalai daripada berzikir adalah seumpama orang hidup dengan orang mati (HR Al-Bukhari 6407)."
+        )
+    )
+}
