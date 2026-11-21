@@ -1,4 +1,4 @@
-name: Build SolatKini Release APK
+name: Build SolatKini Kotlin Release APK
 
 on:
   workflow_dispatch:
@@ -8,173 +8,99 @@ permissions:
 
 jobs:
   build-release:
-    name: Build, Version & Publish Release
+    name: Build, Sign & Publish Kotlin Release
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repo dengan sejarah commit penuh
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Kira Versi (cth: 208 -> 2.0.8) & Jana Release Notes
       - name: 2. Kira Versi & Sediakan Release Notes
         id: versioning
         run: |
           TOTAL_COMMITS=$(git rev-list --count HEAD)
-          
+
           if [ "$TOTAL_COMMITS" -ge 100 ]; then
             APP_VERSION=$(echo "$TOTAL_COMMITS" | sed 's/\(.\)\(.\)\(.*\)/\1.\2.\3/')
           else
             APP_VERSION="2.0.${TOTAL_COMMITS}"
           fi
-          
+
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
           echo "VERSION_CODE=$TOTAL_COMMITS" >> $GITHUB_ENV
           echo "Versi APK Dijana: v$APP_VERSION (Build Code: $TOTAL_COMMITS)"
 
-          echo "### 📱 SolatKini Malaysia v${APP_VERSION}" > release_notes.md
-          echo "Binaan automatik untuk commit build #${TOTAL_COMMITS}." >> release_notes.md
+          echo "### SolatKini Malaysia v${APP_VERSION}" > release_notes.md
+          echo "Binaan automatik Kotlin + Jetpack Compose untuk build #${TOTAL_COMMITS}." >> release_notes.md
           echo "" >> release_notes.md
-          echo "#### ✨ Perubahan Terkini:" >> release_notes.md
+          echo "## Perubahan Terkini:" >> release_notes.md
           git log -10 --pretty=format:"* %s (%h)" >> release_notes.md
           echo "" >> release_notes.md
 
-      # 3. Setup Node.js 22 (Capacitor 7 ke atas wajibkan Node >=22.0.0)
-      - name: 3. Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # 4. Setup Java JDK 21
-      - name: 4. Setup Java JDK 21
+      - name: 3. Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '21'
 
-      # 5. Pasang dependensi
-      - name: 5. Pasang Dependensi Projek
+      - name: 4. Setup Android SDK & Licenses
         run: |
-          npm install --legacy-peer-deps
-          npm install react-is --legacy-peer-deps
-
-      # 5b. Suntik Versi Dinamik ke Kod React Sebelum Compile Vite
-      - name: 5b. Segerak Versi ke UpdateChecker & Footer App
-        run: |
-          if [ -f "src/services/updateCheckerService.ts" ]; then
-            sed -i "s/export const CURRENT_APP_VERSION = '.*';/export const CURRENT_APP_VERSION = '$APP_VERSION';/g" src/services/updateCheckerService.ts
-            sed -i "s/export const CURRENT_VERSION_CODE = [0-9]*;/export const CURRENT_VERSION_CODE = $VERSION_CODE;/g" src/services/updateCheckerService.ts
-            sed -i "s|https://raw.githubusercontent.com/.*/main/version.json|https://raw.githubusercontent.com/${{ github.repository }}/${{ github.ref_name }}/version.json|g" src/services/updateCheckerService.ts
-            echo "updateCheckerService.ts dikemaskini ke v$APP_VERSION (code: $VERSION_CODE)"
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          if [ -n "$SDK_ROOT" ]; then
+            mkdir -p "$SDK_ROOT/licenses"
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
           fi
 
-          if [ -f "src/App.tsx" ]; then
-            sed -i "s/Versi [0-9.]* APK Android/Versi $APP_VERSION APK Android/g" src/App.tsx
-          fi
-
-      # 6. Build Web Assets (Vite akan bungkus fail audio yang sudah kurus)
-      - name: 6. Build Web Assets (Vite)
-        run: npm run build
-        
-      # 7. Sediakan Platform Android Capacitor (Pintar & Kebal Error)
-      - name: 7. Sediakan Platform Android Capacitor
+      - name: 5. Sediakan Gradle Wrapper & Suntik Versi ke app/build.gradle.kts
         run: |
-          # A. Jika folder android langsung belum ada:
-          if [ ! -d "android" ]; then
-            echo "Folder android belum wujud. Menjana projek penuh Capacitor..."
-            npx cap add android
-          
-          # B. Jika folder android wujud tapi tidak lengkap (cth: cuma ada manifest, tiada build.gradle):
-          elif [ ! -f "android/build.gradle" ] && [ ! -f "android/settings.gradle" ]; then
-            echo "Folder android dikesan tidak lengkap. Membuat backup fail kustom dan membina semula..."
-            mkdir -p /tmp/android_custom_backup
-            cp -r android/* /tmp/android_custom_backup/ 2>/dev/null || true
-            rm -rf android
-            npx cap add android
-            # Pulihkan semula fail kustom (AndroidManifest.xml dsb)
-            cp -r /tmp/android_custom_backup/* android/ 2>/dev/null || true
-          
-          # C. Jika projek lengkap tapi gradlew sahaja yang tertinggal dalam git:
-          elif [ ! -f "android/gradlew" ]; then
-            echo "Projek android wujud tapi gradlew tiada. Menjana gradlew wrapper..."
-            cd android
-            gradle wrapper || true
-            cd ..
-          fi
-
-          # Segerakkan aset web dan plugin ke dalam Android
-          npx cap sync android
-
-      # 8. Suntik versi ke build.gradle
-      - name: 8. Kemas Kini Versi dalam Gradle
-        run: |
-          GRADLE_FILE="android/app/build.gradle"
-          if [ -f "$GRADLE_FILE" ]; then
-            echo "Mengemas kini versi ke $APP_VERSION (code: $VERSION_CODE)..."
-            sed -i "s/versionCode [0-9]*/versionCode $VERSION_CODE/g" "$GRADLE_FILE"
-            sed -i "s/versionName \".*\"/versionName \"$APP_VERSION\"/g" "$GRADLE_FILE"
-          fi
-
-      # 9. Buang adaptive icon lama dan salin pek ikon SolatKini
-      - name: 9. Salin Ikon Aplikasi Baharu
-        run: |
-          rm -rf android/app/src/main/res/mipmap-anydpi-v26
-          if [ -d "public/res" ]; then
-            echo "Menyalin ikon dari public/res/..."
-            cp -r public/res/* android/app/src/main/res/
-          elif [ -d "res" ]; then
-            echo "Menyalin ikon dari res/..."
-            cp -r res/* android/app/src/main/res/
-          fi
-
-      # 10. Beri kebenaran gradlew (dengan fallback)
-      - name: 10. Beri Kebenaran Gradlew
-        run: |
-          cd android
           if [ ! -f "gradlew" ]; then
-            echo "Fail gradlew masih tiada, menjana wrapper kecemasan..."
-            gradle wrapper
+            gradle wrapper --gradle-version 8.9
           fi
           chmod +x gradlew
 
-      # 11. Compile Release APK
-      - name: 11. Compile Release APK
+          GRADLE_KTS="app/build.gradle.kts"
+          if [ -f "$GRADLE_KTS" ]; then
+            sed -i "s/versionCode = [0-9]*/versionCode = $VERSION_CODE/g" "$GRADLE_KTS"
+            sed -i "s/versionName = \".*\"/versionName = \"$APP_VERSION\"/g" "$GRADLE_KTS"
+          fi
+
+      - name: 6. Compile Kotlin Release APK
         run: |
-          cd android
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      # 12. Zipalign & Tandatangan APK
-      - name: 12. Zipalign & Sign APK
+      - name: 7. Zipalign & Tandatangan APK
         run: |
-          APK_DIR="android/app/build/outputs/apk/release"
-          
+          APK_DIR="app/build/outputs/apk/release"
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
 
-          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME/build-tools/"* | sort -V | tail -n 1)
           echo "Build-Tools Digunakan: $BUILD_TOOLS"
 
-          UNSIGNED_APK=$(find $APK_DIR -name "*unsigned.apk" -o -name "*-release.apk" | head -n 1)
+          UNSIGNED_APK=$(find "$APK_DIR" -name "*-unsigned.apk" -o -name "*-release.apk" | head -n 1)
+          if [ -z "$UNSIGNED_APK" ]; then
+            echo "Tiada APK release dijumpai dalam $APK_DIR"
+            exit 1
+          fi
 
-          $BUILD_TOOLS/zipalign -v -p 4 "$UNSIGNED_APK" "$APK_DIR/aligned.apk"
+          "$BUILD_TOOLS/zipalign" -v -p 4 "$UNSIGNED_APK" "$APK_DIR/aligned.apk"
 
           FINAL_APK_NAME="SolatKini-v${APP_VERSION}-signed.apk"
 
-          $BUILD_TOOLS/apksigner sign --ks release.keystore \
+          "$BUILD_TOOLS/apksigner" sign --ks release.keystore \
             --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
             --ks-pass pass:"${{ secrets.STORE_PASSWORD }}" \
             --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
             --out "$APK_DIR/$FINAL_APK_NAME" \
             "$APK_DIR/aligned.apk"
 
-          $BUILD_TOOLS/apksigner verify --verbose "$APK_DIR/$FINAL_APK_NAME"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$APK_DIR/$FINAL_APK_NAME"
 
           echo "SIGNED_APK_PATH=$APK_DIR/$FINAL_APK_NAME" >> $GITHUB_ENV
           rm -f release.keystore "$APK_DIR/aligned.apk"
 
-      # 13. Muat Naik ke GitHub Releases
-      - name: 13. Cipta GitHub Release
+      - name: 8. Cipta GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.APP_VERSION }}"
@@ -184,27 +110,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 14. Kemaskini & Push version.json Secara Automatik ke Repo
-      - name: 14. Kemaskini version.json di GitHub
+      - name: 9. Kemaskini & Push version.json ke Repo
         run: |
-          node -e '
-            const fs = require("fs");
-            const { execSync } = require("child_process");
-            const latestMsg = execSync("git log -1 --pretty=%s").toString().trim();
-            const appVer = process.env.APP_VERSION;
-            const verCode = parseInt(process.env.VERSION_CODE, 10);
-            const repo = process.env.GITHUB_REPOSITORY;
+          python3 -c '
+import json, os, subprocess
 
-            const payload = {
-              latestVersion: appVer,
-              versionCode: verCode,
-              releaseNotes: latestMsg || `Kemaskini baharu SolatKini Malaysia v${appVer}`,
-              downloadUrl: `https://github.com/${repo}/releases/download/v${appVer}/SolatKini-v${appVer}-signed.apk`
-            };
+latest_msg = subprocess.check_output(
+    ["git", "log", "-1", "--pretty=%s"], text=True
+).strip()
+app_ver = os.environ["APP_VERSION"]
+ver_code = int(os.environ["VERSION_CODE"])
+repo = os.environ["GITHUB_REPOSITORY"]
 
-            fs.writeFileSync("version.json", JSON.stringify(payload, null, 2) + "\n");
-            console.log("Kandungan version.json baharu:\n", JSON.stringify(payload, null, 2));
-          '
+payload = {
+    "latestVersion": app_ver,
+    "versionCode": ver_code,
+    "releaseNotes": latest_msg or f"Kemaskini baharu SolatKini Malaysia v{app_ver}",
+    "downloadUrl": f"https://github.com/{repo}/releases/download/v{app_ver}/SolatKini-v{app_ver}-signed.apk"
+}
+
+with open("version.json", "w", encoding="utf-8") as f:
+    json.dump(payload, f, indent=2)
+    f.write("\n")
+
+print(json.dumps(payload, indent=2))
+'
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -214,8 +144,7 @@ jobs:
             git push origin HEAD:${{ github.ref_name }}
           fi
 
-      # 15. Simpan ke Actions Artifacts
-      - name: 15. Simpan ke Artifacts
+      - name: 10. Simpan ke Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SolatKini-v${{ env.APP_VERSION }}-APK
