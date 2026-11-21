@@ -1,8 +1,0 @@
-Letakkan 7 fail MP3 azan rasmi ke dalam folder res/raw/ ini dengan nama berikut (huruf kecil sahaja):
-1. azan_makkah.mp3
-2. azan_madinah.mp3
-3. azan_jakim.mp3
-4. azan_al_aqsa.mp3
-5. azan_mishary.mp3
-6. azan_subuh.mp3
-7. takbir_raya.mp3
