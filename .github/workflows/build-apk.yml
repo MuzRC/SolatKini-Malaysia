@@ -66,11 +66,16 @@ jobs:
             sed -i "s/versionName = \".*\"/versionName = \"$APP_VERSION\"/g" "$GRADLE_KTS"
           fi
 
-      - name: 6. Compile Kotlin Release APK
+      - name: 6. Setup Gradle & Dependency Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: 7. Compile Kotlin Release APK
         run: |
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: 7. Zipalign & Tandatangan APK
+      - name: 8. Zipalign & Tandatangan APK
         run: |
           SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
           APK_DIR="app/build/outputs/apk/release"
@@ -100,12 +105,12 @@ jobs:
 
           echo "SIGNED_APK_PATH=$APK_DIR/$FINAL_APK_NAME" >> $GITHUB_ENV
 
-      - name: 7b. Padam Fail Sementara Keystore
+      - name: 8b. Padam Fail Sementara Keystore
         if: always()
         run: |
           rm -f release.keystore app/build/outputs/apk/release/aligned.apk
 
-      - name: 8. Cipta GitHub Release
+      - name: 9. Cipta GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.APP_VERSION }}"
@@ -115,31 +120,31 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 9. Kemaskini & Push version.json ke Repo
+      - name: 10. Kemaskini & Push version.json ke Repo
         run: |
           python3 -c '
-          import json, os, subprocess
+import json, os, subprocess
 
-          latest_msg = subprocess.check_output(
-              ["git", "log", "-1", "--pretty=%s"], text=True
-          ).strip()
-          app_ver = os.environ["APP_VERSION"]
-          ver_code = int(os.environ["VERSION_CODE"])
-          repo = os.environ["GITHUB_REPOSITORY"]
+latest_msg = subprocess.check_output(
+    ["git", "log", "-1", "--pretty=%s"], text=True
+).strip()
+app_ver = os.environ["APP_VERSION"]
+ver_code = int(os.environ["VERSION_CODE"])
+repo = os.environ["GITHUB_REPOSITORY"]
 
-          payload = {
-              "latestVersion": app_ver,
-              "versionCode": ver_code,
-              "releaseNotes": latest_msg or f"Kemaskini baharu SolatKini Malaysia v{app_ver}",
-              "downloadUrl": f"https://github.com/{repo}/releases/download/v{app_ver}/SolatKini-v{app_ver}-signed.apk"
-          }
+payload = {
+    "latestVersion": app_ver,
+    "versionCode": ver_code,
+    "releaseNotes": latest_msg or f"Kemaskini baharu SolatKini Malaysia v{app_ver}",
+    "downloadUrl": f"https://github.com/{repo}/releases/download/v{app_ver}/SolatKini-v{app_ver}-signed.apk"
+}
 
-          with open("version.json", "w", encoding="utf-8") as f:
-              json.dump(payload, f, indent=2)
-              f.write("\n")
+with open("version.json", "w", encoding="utf-8") as f:
+    json.dump(payload, f, indent=2)
+    f.write("\n")
 
-          print(json.dumps(payload, indent=2))
-          '
+print(json.dumps(payload, indent=2))
+'
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -149,7 +154,7 @@ jobs:
             git push origin HEAD:${{ github.ref_name }}
           fi
 
-      - name: 10. Simpan ke Artifacts
+      - name: 11. Simpan ke Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SolatKini-v${{ env.APP_VERSION }}-APK
