@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SolatKini</string>
+    <string name="widget_name">Jadual Waktu Solat JAKIM</string>
+    <string name="widget_description">Paparan waktu solat harian 5 waktu mengikut zon rasmi JAKIM Malaysia.</string>
+</resources>
